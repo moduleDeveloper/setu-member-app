@@ -9,7 +9,6 @@ import {
   setSelectedSponsorId
 } from './services/sponsorStore';
 import { useAppTheme } from './context/ThemeContext';
-import { applyOpacity } from './utils/colorUtils';
 
 const SponsorsList = ({ onNavigate, onBack }) => {
   const theme = useAppTheme();
@@ -70,14 +69,14 @@ const SponsorsList = ({ onNavigate, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--surface-color)' }}>
+    <div className="min-h-screen" style={{ background: 'var(--page-bg, var(--app-page-bg))' }}>
       <div className="theme-navbar backdrop-blur border-b px-5 py-4 flex items-center gap-3 sticky top-0 z-10">
         <button onClick={onBack} className="p-2 rounded-xl transition-colors" style={{ background: 'color-mix(in srgb, var(--app-accent-bg) 45%, transparent)' }}>
           <ArrowLeft className="h-5 w-5" style={{ color: 'var(--navbar-text)' }} />
         </button>
         <div>
           <h1 className="text-lg font-extrabold" style={{ color: 'var(--navbar-text)' }}>Sponsors</h1>
-          <p className="text-[11px] font-medium" style={{ color: 'var(--body-text-color)' }}>
+          <p className="text-[11px] font-medium" style={{ color: 'var(--advertisement-subtitle)' }}>
             {trustName}{list.length > 0 ? ` · ${list.length} sponsors` : ''}
           </p>
         </div>
@@ -85,8 +84,8 @@ const SponsorsList = ({ onNavigate, onBack }) => {
 
       <div className="px-4 py-4">
         {list.length === 0 ? (
-          <div className="rounded-2xl p-8 text-center" style={{ background: 'color-mix(in srgb, var(--surface-color) 88%, var(--app-accent-bg))', border: '1px solid color-mix(in srgb, var(--brand-navy) 10%, transparent)' }}>
-            <p className="text-sm font-semibold" style={{ color: 'var(--body-text-color)' }}>
+          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>
               {isRefreshing ? 'Refreshing sponsors...' : 'No active sponsors available'}
             </p>
           </div>
@@ -98,8 +97,9 @@ const SponsorsList = ({ onNavigate, onBack }) => {
                 onClick={() => openSponsor(sponsor)}
                 className="w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left transition-all active:scale-[0.985]"
                 style={{
-                  background: `linear-gradient(135deg, var(--surface-color) 0%, ${theme.accentBg || 'var(--app-accent-bg)'} 100%)`,
-                  border: `1px solid ${applyOpacity(theme.primary, 0.12)}`,
+                  background: 'var(--advertisement-card-bg)',
+                  border: '1px solid var(--advertisement-card-border)',
+                  boxShadow: '0 10px 24px color-mix(in srgb, var(--advertisement-card-shadow) 28%, transparent)',
                 }}
               >
                 <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-white border border-slate-100 shadow-sm flex-shrink-0">
@@ -110,12 +110,12 @@ const SponsorsList = ({ onNavigate, onBack }) => {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-extrabold truncate" style={{ color: theme.secondary }}>
+                  <p className="text-[13px] font-extrabold truncate" style={{ color: 'var(--advertisement-title)' }}>
                     {sponsor.name || sponsor.company_name || 'Sponsor'}
                   </p>
                   <div className="mt-0.5 flex items-center gap-1.5 min-w-0">
-                    <Building2 className="h-3 w-3 text-slate-400 flex-shrink-0" />
-                    <p className="text-[10px] font-semibold text-slate-500 truncate">
+                    <Building2 className="h-3 w-3 flex-shrink-0" style={{ color: 'var(--advertisement-subtitle)' }} />
+                    <p className="text-[10px] font-semibold truncate" style={{ color: 'var(--advertisement-subtitle)' }}>
                       {sponsor.company_name || sponsor.position || 'Community partner'}
                     </p>
                   </div>
@@ -136,4 +136,6 @@ const SponsorsList = ({ onNavigate, onBack }) => {
 };
 
 export default SponsorsList;
+
+
 

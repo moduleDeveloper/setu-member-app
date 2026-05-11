@@ -76,7 +76,7 @@ const ContactUs = ({ onNavigateBack }) => {
       className="min-h-screen pb-8"
       style={{
         background: 'var(--page-bg, var(--app-page-bg))',
-        color: 'var(--body-text-color)',
+        color: 'var(--advertisement-description)',
       }}
     >
       <div
@@ -107,7 +107,7 @@ const ContactUs = ({ onNavigateBack }) => {
           <div
             className="rounded-3xl px-5 py-8 text-center"
             style={{
-              background: 'color-mix(in srgb, var(--surface-color) 88%, var(--app-page-bg))',
+              background: 'var(--advertisement-card-bg)',
               border: `1px solid ${applyOpacity(theme.primary, 0.08)}`,
             }}
           >
@@ -115,7 +115,7 @@ const ContactUs = ({ onNavigateBack }) => {
               className="w-9 h-9 mx-auto rounded-full border-2 border-t-transparent animate-spin mb-3"
               style={{ borderColor: theme.primary, borderTopColor: 'transparent' }}
             />
-            <p className="text-sm font-semibold">Loading contact details...</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>Loading contact details...</p>
           </div>
         ) : error ? (
           <div
@@ -125,17 +125,17 @@ const ContactUs = ({ onNavigateBack }) => {
               border: `1px solid ${applyOpacity('#ef4444', 0.18)}`,
             }}
           >
-            <p className="text-sm font-bold" style={{ color: 'var(--heading-color)' }}>{error}</p>
+            <p className="text-sm font-bold" style={{ color: 'var(--advertisement-description)' }}>{error}</p>
           </div>
         ) : contacts.length === 0 ? (
           <div
             className="rounded-3xl px-5 py-8 text-center"
             style={{
-              background: 'color-mix(in srgb, var(--surface-color) 88%, var(--app-page-bg))',
+              background: 'var(--advertisement-card-bg)',
               border: `1px solid ${applyOpacity(theme.primary, 0.08)}`,
             }}
           >
-            <p className="text-base font-bold" style={{ color: 'var(--heading-color)' }}>
+            <p className="text-base font-bold" style={{ color: 'var(--advertisement-description)' }}>
               No contact details found
             </p>
           </div>
@@ -146,13 +146,13 @@ const ContactUs = ({ onNavigateBack }) => {
                 key={contact.id}
                 className="rounded-[28px] p-5"
                 style={{
-                  background: 'color-mix(in srgb, var(--surface-color) 88%, var(--app-page-bg))',
-                  border: `1px solid ${applyOpacity(theme.primary, 0.08)}`,
+                  background: 'var(--advertisement-card-bg)',
+                  border: '1px solid var(--advertisement-card-border)',
                   boxShadow: `0 10px 28px ${applyOpacity(theme.secondary, 0.08)}`,
                 }}
               >
                 <div className="mb-4">
-                  <p className="text-lg font-extrabold" style={{ color: 'var(--heading-color)' }}>
+                  <p className="text-lg font-extrabold" style={{ color: 'var(--advertisement-title)' }}>
                     {contact.facility_name}
                   </p>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: theme.primary }}>
@@ -168,7 +168,7 @@ const ContactUs = ({ onNavigateBack }) => {
                       </div>
                       <div>
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>Contact Person</p>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--heading-color)' }}>{contact.contact_person}</p>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>{contact.contact_person}</p>
                       </div>
                     </div>
                   )}
@@ -177,14 +177,14 @@ const ContactUs = ({ onNavigateBack }) => {
                     <a
                       href={`tel:${contact.contact_number}`}
                       className="flex items-start gap-3 rounded-2xl p-3 transition-all"
-                      style={{ background: applyOpacity(theme.accentBg, 0.7) }}
+                      style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 78%, var(--app-page-bg))' }}
                     >
                       <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: applyOpacity(theme.primary, 0.1) }}>
                         <PhoneCall className="h-5 w-5" style={{ color: theme.primary }} />
                       </div>
                       <div>
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>Phone</p>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--heading-color)' }}>{contact.contact_number}</p>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>{contact.contact_number}</p>
                       </div>
                     </a>
                   )}
@@ -193,14 +193,14 @@ const ContactUs = ({ onNavigateBack }) => {
                     <a
                       href={`mailto:${contact.email_id}`}
                       className="flex items-start gap-3 rounded-2xl p-3 transition-all"
-                      style={{ background: applyOpacity(theme.accentBg, 0.7) }}
+                      style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 78%, var(--app-page-bg))' }}
                     >
                       <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: applyOpacity(theme.primary, 0.1) }}>
                         <Mail className="h-5 w-5" style={{ color: theme.primary }} />
                       </div>
                       <div className="min-w-0">
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>Email</p>
-                        <p className="text-sm font-semibold break-all" style={{ color: 'var(--heading-color)' }}>{contact.email_id}</p>
+                        <p className="text-sm font-semibold break-all" style={{ color: 'var(--advertisement-description)' }}>{contact.email_id}</p>
                       </div>
                     </a>
                   )}

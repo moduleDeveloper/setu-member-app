@@ -8,7 +8,7 @@ import { fetchTrustById } from './services/trustService';
 const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
 const TRUST_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Mahila Mandal';
+const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
 const OTP_FLOW_KEY = 'otp_flow_allowed';
 const SETU_POWERED_LOGO = '/assets/setu-logo.png';
 

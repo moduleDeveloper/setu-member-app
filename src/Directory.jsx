@@ -449,15 +449,15 @@ const Directory = ({ onNavigate }) => {
       <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="directory" />
 
       <div className="px-4 pt-4">
-        <div className="rounded-2xl p-3 flex items-center gap-2" style={{ background: 'var(--surface-color)', border: '1px solid color-mix(in srgb, var(--brand-navy) 12%, transparent)' }}>
-          <Search className="h-4 w-4" style={{ color: 'var(--body-text-color)' }} />
+        <div className="rounded-2xl p-3 flex items-center gap-2" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
+          <Search className="h-4 w-4" style={{ color: 'var(--advertisement-subtitle)' }} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, role, membership, mobile"
             className="w-full bg-transparent outline-none text-sm"
-            style={{ color: 'var(--heading-color)' }}
+            style={{ color: 'var(--advertisement-description)' }}
           />
         </div>
       </div>
@@ -479,9 +479,9 @@ const Directory = ({ onNavigate }) => {
                     boxShadow: '0 4px 10px color-mix(in srgb, var(--brand-navy) 20%, transparent)'
                   }
                 : {
-                    background: 'color-mix(in srgb, var(--surface-color) 82%, var(--app-accent-bg))',
-                    color: 'var(--heading-color)',
-                    border: '1px solid color-mix(in srgb, var(--brand-navy) 20%, transparent)'
+                    background: 'var(--advertisement-card-bg)',
+                    color: 'var(--advertisement-description)',
+                    border: '1px solid var(--advertisement-card-border)'
                   }}
             >
               {item.label}
@@ -492,17 +492,17 @@ const Directory = ({ onNavigate }) => {
 
       <div className="px-4 py-4 space-y-2.5">
         {loading ? (
-          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--surface-color)' }}>
-            <p className="text-sm font-semibold" style={{ color: 'var(--body-text-color)' }}>Loading members...</p>
+          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>Loading members...</p>
           </div>
         ) : error ? (
-          <div className="rounded-2xl p-6 text-center" style={{ background: 'var(--surface-color)', border: '1px solid color-mix(in srgb, var(--brand-red) 20%, transparent)' }}>
+          <div className="rounded-2xl p-6 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid color-mix(in srgb, var(--brand-red) 20%, transparent)' }}>
             <p className="text-sm font-semibold" style={{ color: 'var(--brand-red-dark)' }}>{error}</p>
           </div>
         ) : filteredMembers.length === 0 ? (
-          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--surface-color)' }}>
-            <Users className="h-8 w-8 mx-auto mb-2" style={{ color: 'var(--body-text-color)' }} />
-            <p className="text-sm font-semibold" style={{ color: 'var(--body-text-color)' }}>No members found</p>
+          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
+            <Users className="h-8 w-8 mx-auto mb-2" style={{ color: 'var(--advertisement-subtitle)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>No members found</p>
           </div>
         ) : (
           <>
@@ -513,8 +513,8 @@ const Directory = ({ onNavigate }) => {
                 onClick={() => openMemberDetails(item)}
                 className="w-full text-left rounded-2xl overflow-hidden"
                 style={{
-                  background: 'var(--surface-color)',
-                  border: `1px solid ${applyOpacity(theme.primary, 0.15)}`,
+                  background: 'var(--advertisement-card-bg)',
+                  border: '1px solid var(--advertisement-card-border)',
                   boxShadow: `0 2px 12px ${applyOpacity(theme.secondary, 0.1)}`
                 }}
               >
@@ -553,7 +553,7 @@ const Directory = ({ onNavigate }) => {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-extrabold truncate" style={{ color: 'var(--heading-color)' }}>
+                    <h3 className="text-sm font-extrabold truncate" style={{ color: 'var(--advertisement-title)' }}>
                       {item?.Name || 'N/A'}
                     </h3>
 
@@ -572,7 +572,7 @@ const Directory = ({ onNavigate }) => {
                       ) : null}
 
                       {item?.Mobile ? (
-                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--body-text-color)' }}>
+                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: 'var(--advertisement-description)' }}>
                           <Phone className="h-3 w-3" />
                           {item.Mobile}
                         </span>
@@ -580,7 +580,7 @@ const Directory = ({ onNavigate }) => {
                     </div>
 
                     {item?.Email ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] mt-0.5 truncate" style={{ color: 'var(--body-text-color)' }}>
+                      <span className="inline-flex items-center gap-1 text-[10px] mt-0.5 truncate" style={{ color: 'var(--advertisement-subtitle)' }}>
                         <Mail className="h-3 w-3" />
                         {item.Email}
                       </span>
@@ -605,13 +605,13 @@ const Directory = ({ onNavigate }) => {
                 className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: applyOpacity(theme.secondary, 0.14),
-                  color: 'var(--heading-color)',
+                  color: 'var(--advertisement-description)',
                   border: `1px solid ${applyOpacity(theme.secondary, 0.24)}`,
                 }}
               >
                 Prev
               </button>
-              <span className="text-xs font-semibold" style={{ color: 'var(--body-text-color)' }}>
+              <span className="text-xs font-semibold" style={{ color: 'var(--advertisement-subtitle)' }}>
                 Page {currentPage} of {totalPages}
                 {isPageLoading ? ' • Syncing...' : ''}
               </span>
@@ -626,7 +626,7 @@ const Directory = ({ onNavigate }) => {
                 className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: applyOpacity(theme.primary, 0.16),
-                  color: 'var(--heading-color)',
+                  color: 'var(--advertisement-description)',
                   border: `1px solid ${applyOpacity(theme.primary, 0.24)}`,
                 }}
               >

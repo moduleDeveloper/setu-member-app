@@ -471,7 +471,7 @@ const Notices = ({ onNavigate }) => {
 
       {!loading && !error && sortedNotices.length > 0 && (
         <div className="px-6 pb-2">
-          <p className="text-[11px] font-semibold text-gray-500">
+          <p className="text-[11px] font-semibold" style={{ color: 'var(--advertisement-subtitle)' }}>
             {sortedNotices.length} notice{sortedNotices.length === 1 ? '' : 's'}
           </p>
         </div>
@@ -480,10 +480,10 @@ const Notices = ({ onNavigate }) => {
       {loading && (
         <div className="px-6 py-4 space-y-4 animate-pulse">
           {[1, 2, 3].map((item) => (
-            <div key={item} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-              <div className="h-3 bg-gray-200 rounded w-1/3 mb-3" />
-              <div className="h-4 bg-gray-200 rounded w-2/3 mb-2" />
-              <div className="h-3 bg-gray-200 rounded w-full" />
+            <div key={item} className="rounded-2xl p-5 border shadow-sm" style={{ background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}>
+              <div className="h-3 rounded w-1/3 mb-3" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+              <div className="h-4 rounded w-2/3 mb-2" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+              <div className="h-3 rounded w-full" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
             </div>
           ))}
         </div>
@@ -530,11 +530,11 @@ const Notices = ({ onNavigate }) => {
             <button
               key={notice.id}
               onClick={() => openNoticeDetail(notice.id)}
-              className="w-full text-left bg-white rounded-2xl p-4 sm:p-5 border transition-all hover:shadow-md active:scale-[0.995] border-l-4 shadow-sm"
+              className="w-full text-left rounded-2xl p-4 sm:p-5 border transition-all hover:shadow-md active:scale-[0.995] border-l-4 shadow-sm"
               style={{
                 borderLeftColor: isVip ? 'color-mix(in srgb, var(--brand-red) 45%, #d4af37)' : theme.primary,
-                borderColor: isVip ? 'color-mix(in srgb, var(--brand-red) 20%, #f1e2a4)' : 'color-mix(in srgb, var(--brand-navy) 10%, transparent)',
-                background: isVip ? 'linear-gradient(180deg, color-mix(in srgb, var(--brand-red-light) 48%, #fffdf6) 0%, #ffffff 45%)' : '#ffffff'
+                borderColor: isVip ? 'color-mix(in srgb, var(--brand-red) 20%, #f1e2a4)' : 'var(--advertisement-card-border)',
+                background: 'var(--advertisement-card-bg)'
               }}
             >
               <div className="flex items-center justify-between gap-3 mb-3">
@@ -550,20 +550,20 @@ const Notices = ({ onNavigate }) => {
                   {isVip ? 'VIP Notice' : 'GEN'}
                 </span>
                 {dateLabel && (
-                  <div className="flex items-center gap-1.5 text-gray-400 text-[10px] font-bold whitespace-nowrap">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold whitespace-nowrap" style={{ color: 'var(--advertisement-subtitle)' }}>
                     <Calendar className="h-3 w-3" />
                     {dateLabel}
                   </div>
                 )}
               </div>
 
-              <h3 className="font-bold text-gray-800 text-lg mb-2 leading-tight">
+              <h3 className="font-bold text-lg mb-2 leading-tight" style={{ color: 'var(--advertisement-title)' }}>
                 {notice.name}
               </h3>
 
               {notice.description && (
                 <div className="mb-4">
-                  <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">
+                  <p className="text-sm leading-relaxed line-clamp-3" style={{ color: 'var(--advertisement-description)' }}>
                     {notice.description}
                   </p>
                 </div>
@@ -618,11 +618,11 @@ const Notices = ({ onNavigate }) => {
 
           {sortedNotices.length === 0 && (
             <div className="text-center py-20">
-              <div className="bg-white h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-200 shadow-sm">
-                <FileText className="h-8 w-8 text-slate-300" />
+              <div className="h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4 border shadow-sm" style={{ background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}>
+                <FileText className="h-8 w-8" style={{ color: 'var(--advertisement-subtitle)' }} />
               </div>
-              <h3 className="text-gray-800 font-bold">No active notices right now</h3>
-              <p className="text-gray-500 text-sm mt-1">You're all caught up.</p>
+              <h3 className="font-bold" style={{ color: 'var(--advertisement-title)' }}>No active notices right now</h3>
+              <p className="text-sm mt-1" style={{ color: 'var(--advertisement-subtitle)' }}>You're all caught up.</p>
               <button
                 onClick={() => {
                   clearAllNoticeboardCache();
@@ -641,8 +641,8 @@ const Notices = ({ onNavigate }) => {
               <button
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="w-full py-3 rounded-xl border border-gray-200 bg-white text-sm font-semibold disabled:opacity-60"
-                style={{ color: theme.primary }}
+                className="w-full py-3 rounded-xl border text-sm font-semibold disabled:opacity-60"
+                style={{ color: theme.primary, background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}
               >
                 {loadingMore ? 'Loading more notices...' : 'Load more notices'}
               </button>

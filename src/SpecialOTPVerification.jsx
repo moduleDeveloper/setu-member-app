@@ -8,7 +8,7 @@ import { persistUserSession } from './utils/storageUtils';
 import { useAppTheme } from './context/ThemeContext';
 
 const OTP_FLOW_KEY = 'otp_flow_allowed';
-const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || 'b353d2ff-ec3b-4b90-a896-69f40662084e';
+const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LAST_SELECTED_TRUST_ID_KEY = 'last_selected_trust_id';
 
 function SpecialOTPVerification() {

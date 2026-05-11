@@ -33,8 +33,8 @@ import { fetchTrustById } from './services/trustService';
 import { logUserSessionEvent } from './services/sessionAuditService';
 import logo from '../new_logo.png';
 
-const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Ek Udaan';
-const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || 'b353d2ff-ec3b-4b90-a896-69f40662084e';
+const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
+const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LAST_SELECTED_TRUST_ID_KEY = 'last_selected_trust_id';
 
 // ── Step definitions ──────────────────────────────────────────────────────────

@@ -237,11 +237,11 @@ const buildInitialProfileData = () => {
   }
 };
 const SectionCard = ({ title, subtitle, isOpen, onToggle = () => { }, children }) => (
-  <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 12%, transparent)', background: 'var(--surface-color)' }}>
+  <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--advertisement-card-border)', background: 'var(--advertisement-card-bg)' }}>
     <button type="button" onClick={onToggle} className="w-full px-4 py-3.5 flex items-center justify-between text-left">
       <div>
-        <p className="text-xs font-extrabold uppercase tracking-wider" style={{ color: 'var(--brand-red)' }}>{title}</p>
-        <p className="text-xs mt-0.5" style={{ color: 'color-mix(in srgb, var(--body-text-color) 60%, var(--surface-color))' }}>{subtitle}</p>
+        <p className="text-xs font-extrabold uppercase tracking-wider" style={{ color: 'var(--advertisement-title)' }}>{title}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--advertisement-subtitle)' }}>{subtitle}</p>
       </div>
       <span className="text-lg font-bold" style={{ color: 'var(--brand-navy)' }}>{isOpen ? '−' : '+'}</span>
     </button>
@@ -252,15 +252,15 @@ const SectionCard = ({ title, subtitle, isOpen, onToggle = () => { }, children }
 const DetailRow = ({ label, value, icon: Icon }) => (
   <div className="flex items-start gap-2.5 py-2.5">
     {Icon ? (
-      <span className="mt-0.5 p-1.5 rounded-lg" style={{ background: 'color-mix(in srgb, var(--surface-color) 72%, var(--app-accent-bg))' }}>
-        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--brand-red)' }} />
+      <span className="mt-0.5 p-1.5 rounded-lg" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--app-accent-bg))' }}>
+        <Icon className="h-3.5 w-3.5" style={{ color: 'var(--advertisement-title)' }} />
       </span>
     ) : null}
     <div className="min-w-0">
-      <p className="text-[11px] font-extrabold uppercase tracking-wider" style={{ color: 'color-mix(in srgb, var(--body-text-color) 55%, var(--surface-color))' }}>
+      <p className="text-[11px] font-extrabold uppercase tracking-wider" style={{ color: 'var(--advertisement-subtitle)' }}>
         {label}
       </p>
-      <p className="text-[15px] font-semibold break-words" style={{ color: 'var(--heading-color)' }}>
+      <p className="text-[15px] font-semibold break-words" style={{ color: 'var(--advertisement-description)' }}>
         {value}
       </p>
     </div>
@@ -271,19 +271,20 @@ const DetailSummaryCard = ({ title, subtitle, children }) => (
   <div
     className="rounded-3xl p-4 border shadow-sm"
     style={{
-      borderColor: 'color-mix(in srgb, var(--brand-navy) 10%, transparent)',
-      background: 'linear-gradient(165deg, color-mix(in srgb, var(--surface-color) 93%, var(--app-accent-bg)) 0%, var(--surface-color) 70%, color-mix(in srgb, var(--brand-navy-light) 60%, var(--surface-color)) 100%)'
+      borderColor: 'var(--advertisement-card-border)',
+      background: 'var(--advertisement-card-bg)',
+      boxShadow: '0 10px 28px color-mix(in srgb, var(--advertisement-card-shadow) 34%, transparent)'
     }}
   >
     <div className="mb-2.5">
-      <p className="text-xs font-extrabold uppercase tracking-wider" style={{ color: 'var(--brand-red)' }}>{title}</p>
+      <p className="text-xs font-extrabold uppercase tracking-wider" style={{ color: 'var(--advertisement-title)' }}>{title}</p>
       {subtitle ? (
-        <p className="text-[11px] mt-0.5" style={{ color: 'color-mix(in srgb, var(--body-text-color) 52%, var(--surface-color))' }}>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--advertisement-subtitle)' }}>
           {subtitle}
         </p>
       ) : null}
     </div>
-    <div className="divide-y" style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 10%, transparent)' }}>
+    <div className="divide-y" style={{ borderColor: 'color-mix(in srgb, var(--advertisement-card-border) 62%, transparent)' }}>
       {children}
     </div>
   </div>
@@ -674,7 +675,7 @@ const Profile = ({ onNavigate, onProfileUpdate }) => {
   };
 
   return (
-    <div ref={mainContainerRef} className="min-h-screen font-sans" style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--surface-color) 88%, var(--app-accent-bg)) 0%, var(--surface-color) 40%, color-mix(in srgb, var(--brand-navy-light) 55%, var(--surface-color)) 100%)' }}>
+    <div ref={mainContainerRef} className="min-h-screen font-sans" style={{ background: 'var(--page-bg, var(--app-page-bg))' }}>
 
       {/* Navbar - Brand */}
       <div
@@ -712,12 +713,12 @@ const Profile = ({ onNavigate, onProfileUpdate }) => {
       )}
 
       {/* Profile Header */}
-      <div className="px-5 pt-7 pb-5 border-b" style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 10%, transparent)' }}>
+      <div className="px-5 pt-7 pb-5 border-b" style={{ borderColor: 'color-mix(in srgb, var(--advertisement-card-border) 62%, transparent)' }}>
         {(() => {
           return (
-            <div className="relative rounded-[28px] p-4 text-center" style={{ background: 'linear-gradient(160deg, color-mix(in srgb, var(--surface-color) 90%, var(--app-accent-bg)) 0%, var(--surface-color) 60%, color-mix(in srgb, var(--brand-navy-light) 60%, var(--surface-color)) 100%)', border: '1px solid color-mix(in srgb, var(--brand-navy) 8%, transparent)' }}>
+            <div className="relative rounded-[28px] p-4 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)', boxShadow: '0 10px 28px color-mix(in srgb, var(--advertisement-card-shadow) 30%, transparent)' }}>
               <div className="relative w-fit mx-auto mb-2">
-                <div className="w-20 h-20 rounded-full border-2 overflow-hidden mx-auto shadow-sm" style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 12%, transparent)', background: 'color-mix(in srgb, var(--surface-color) 78%, var(--app-accent-bg))' }}>
+                <div className="w-20 h-20 rounded-full border-2 overflow-hidden mx-auto shadow-sm" style={{ borderColor: 'var(--advertisement-card-border)', background: 'color-mix(in srgb, var(--advertisement-card-bg) 80%, var(--app-accent-bg))' }}>
                   {photoPreview ? (
                     <img src={photoPreview} alt="Profile" className="w-full h-full object-cover"
                       onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${profileData.name || 'U'}&background=e5e7eb&color=374151&size=80`; }} />
@@ -734,25 +735,25 @@ const Profile = ({ onNavigate, onProfileUpdate }) => {
                 <button onClick={() => document.getElementById('photo-upload').click()}
                   className="absolute -bottom-1 -right-1 p-2 rounded-full shadow-sm active:scale-95 transition-all"
                   style={{ background: 'var(--surface-color)', border: '1px solid color-mix(in srgb, var(--brand-navy) 14%, transparent)' }}>
-                  <Pencil className="h-3.5 w-3.5" style={{ color: '#000000' }} />
+                  <Pencil className="h-3.5 w-3.5" style={{ color: 'var(--app-button-icon)' }} />
                 </button>
                 <input id="photo-upload" type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
               </div>
-              <h2 className="text-xl font-extrabold tracking-tight" style={{ color: 'var(--heading-color)' }}>{profileData.name || 'Your Name'}</h2>
+              <h2 className="text-xl font-extrabold tracking-tight" style={{ color: 'var(--advertisement-description)' }}>{profileData.name || 'Your Name'}</h2>
               <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2 text-xs">
-                {profileData.mobile && <span className="px-2 py-1 rounded-full" style={{ background: 'color-mix(in srgb, var(--surface-color) 75%, var(--app-accent-bg))', color: 'var(--brand-navy)' }}>Mobile: {profileData.mobile}</span>}
+                {profileData.mobile && <span className="px-2 py-1 rounded-full" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 76%, var(--app-accent-bg))', color: 'var(--advertisement-subtitle)', border: '1px solid color-mix(in srgb, var(--advertisement-card-border) 55%, transparent)' }}>Mobile: {profileData.mobile}</span>}
               </div>
-              <button
+                <button
                 onClick={() => {
                   setIsEditMode((prev) => !prev);
                   if (isEditMode) setMessage({ type: '', text: '' });
                 }}
                 className="mt-4 w-full max-w-[240px] mx-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-base font-extrabold transition-all active:scale-[0.98] border"
                 style={{
-                  color: '#ffffff',
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #e5e7eb 100%)',
-                  borderColor: 'rgba(255,255,255,0.5)',
-                  boxShadow: '0 10px 24px rgba(76, 29, 149, 0.28)',
+                  color: 'var(--app-button-text)',
+                  background: 'var(--app-button-bg)',
+                  borderColor: 'color-mix(in srgb, var(--app-button-text) 24%, transparent)',
+                  boxShadow: '0 10px 24px color-mix(in srgb, var(--app-button-icon) 26%, transparent)',
                   position: 'relative',
                   zIndex: 5
                 }}
@@ -766,13 +767,13 @@ const Profile = ({ onNavigate, onProfileUpdate }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b sticky top-[64px] z-40" style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 10%, transparent)', background: 'var(--surface-color)' }}>
+      <div className="flex border-b sticky top-[64px] z-40" style={{ borderColor: 'color-mix(in srgb, var(--advertisement-card-border) 62%, transparent)', background: 'color-mix(in srgb, var(--page-bg) 70%, var(--advertisement-card-bg))' }}>
         {TABS.map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className="flex-1 py-4 text-sm font-bold transition-all border-b-2"
             style={activeTab === tab
-              ? { borderColor: 'var(--brand-red)', color: 'var(--brand-red)' }
-              : { borderColor: 'transparent', color: 'color-mix(in srgb, var(--body-text-color) 48%, var(--surface-color))' }}
+              ? { borderColor: 'var(--advertisement-title)', color: 'var(--advertisement-title)' }
+              : { borderColor: 'transparent', color: 'var(--advertisement-subtitle)' }}
           >
             {tab}
           </button>

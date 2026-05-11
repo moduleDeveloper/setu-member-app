@@ -135,7 +135,23 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
   const secondary = theme.secondary || 'var(--brand-navy)';
   const accent = theme.accent || 'var(--app-accent)';
   const accentBg = theme.accentBg || 'var(--app-accent-bg)';
-  const contactUsTextColor = getThemeToken(theme, 'sidebar.contact_us_text_color', 'var(--sidebar-text)');
+  const sidebarTextColor = getThemeToken(theme, 'sidebar.text_color', 'var(--sidebar-text)');
+  const sidebarActiveTextColor = getThemeToken(theme, 'sidebar.active_text_color', primary);
+  const sidebarMutedTextColor = getThemeToken(
+    theme,
+    'sidebar.muted_text_color',
+    sidebarTextColor
+  );
+  const sidebarIconColor = getThemeToken(theme, 'sidebar.icon_color', sidebarTextColor);
+  const sidebarChevronColor = getThemeToken(theme, 'sidebar.chevron_color', sidebarTextColor);
+  const sidebarDividerColor = getThemeToken(theme, 'sidebar.divider_color', applyOpacity(sidebarTextColor, 0.16));
+  const sidebarProgressTrackColor = getThemeToken(theme, 'sidebar.progress_track_color', applyOpacity(sidebarTextColor, 0.2));
+  const sidebarBadgeBgColor = getThemeToken(theme, 'sidebar.badge_bg_color', applyOpacity(sidebarActiveTextColor, 0.16));
+  const sidebarBadgeTextColor = getThemeToken(theme, 'sidebar.badge_text_color', sidebarActiveTextColor);
+  const sidebarTapHighlightColor = getThemeToken(theme, 'sidebar.tap_highlight_color', applyOpacity(sidebarActiveTextColor, 0.06));
+  const sidebarToastBgColor = getThemeToken(theme, 'sidebar.toast_bg_color', secondary);
+  const sidebarToastTextColor = getThemeToken(theme, 'sidebar.toast_text_color', 'var(--surface-color)');
+  const sidebarOverlayBg = getThemeToken(theme, 'sidebar.overlay_bg', 'color-mix(in srgb, var(--app-page-bg) 60%, var(--surface-color))');
   const sidebarRef = useRef(null);
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
@@ -265,7 +281,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
     const loadShareLinks = async () => {
       try {
         const selectedTrustId = localStorage.getItem('selected_trust_id');
-        const fallbackTrustId = 'b353d2ff-ec3b-4b90-a896-69f40662084e';
+        const fallbackTrustId = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
         const trustId = String(selectedTrustId || fallbackTrustId).trim();
         const links = await fetchShareAppLinksByTrustId(trustId);
         setShareAppLinks(links || null);
@@ -371,7 +387,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
   const displayName = resolveNameValue(profile?.name, userData?.Name, userData?.name) || 'User';
   const initials = displayName.charAt(0).toUpperCase();
   const completion = calcCompletion(profile, userData);
-  const completionColor = primary;
+  const completionColor = sidebarActiveTextColor;
 
   const handleOtherMembershipNavigation = () => {
     // Some screens temporarily lock body/html scrolling. Unlock before route change
@@ -437,7 +453,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
         }}
         style={{
           touchAction: 'auto',
-          background: 'color-mix(in srgb, var(--app-page-bg) 60%, var(--surface-color))'
+          background: sidebarOverlayBg
         }}
       />
 
@@ -469,7 +485,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
         {ff('feature_profile') && (
         <div
           className="px-5 pt-14 pb-5 flex-shrink-0 cursor-pointer"
-          style={{ borderBottom: `1px solid ${applyOpacity(primary, 0.08)}` }}
+	          style={{ borderBottom: `1px solid ${sidebarDividerColor}` }}
           onClick={() => { onNavigate('profile'); onClose(); }}
         >
           {/* Avatar + name row */}
@@ -502,13 +518,13 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
 
             {/* Name + subtitle */}
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm truncate" style={{ color: 'var(--sidebar-text)' }}>{displayName}</p>
-              <p className="text-xs font-semibold mt-0.5" style={{ color: primary }}>View &amp; Edit Profile</p>
+              <p className="font-bold text-sm truncate" style={{ color: sidebarTextColor }}>{displayName}</p>
+              <p className="text-xs font-semibold mt-0.5" style={{ color: sidebarActiveTextColor }}>View &amp; Edit Profile</p>
             </div>
 
             <ChevronRight
               className="h-4 w-4 flex-shrink-0"
-              style={{ color: 'color-mix(in srgb, var(--sidebar-text) 45%, var(--surface-color))' }}
+	              style={{ color: sidebarChevronColor }}
             />
           </div>
 
@@ -517,7 +533,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
             <div className="flex items-center justify-between mb-1.5">
               <span
                 className="text-[11px] font-medium"
-                style={{ color: 'color-mix(in srgb, var(--sidebar-text) 64%, var(--surface-color))' }}
+                style={{ color: sidebarMutedTextColor }}
               >
                 Profile Completion
               </span>
@@ -527,7 +543,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
             </div>
             <div
               className="h-1.5 w-full rounded-full overflow-hidden"
-              style={{ background: 'color-mix(in srgb, var(--sidebar-text) 10%, var(--surface-color))' }}
+	              style={{ background: sidebarProgressTrackColor }}
             >
               <div
                 className="h-full rounded-full transition-all duration-500"
@@ -575,7 +591,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
                 if (!normalized) normalized = '';
                 if (!aliasMap[cp] && normalized.endsWith('s')) normalized = normalized.slice(0, -1);
                 const isActive = normalized === String(item.id).toLowerCase();
-                const itemTextColor = item.id === 'contact-us' ? contactUsTextColor : 'var(--sidebar-text)';
+                const itemTextColor = sidebarTextColor;
                 return (
                   <button
                     key={item.id}
@@ -583,29 +599,29 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
                     className="w-full flex items-center gap-3 px-4 rounded-xl transition-all text-left active:scale-95 select-none"
                   style={{
                       minHeight: '52px',
-                      WebkitTapHighlightColor: applyOpacity(primary, 0.06),
+                      WebkitTapHighlightColor: sidebarTapHighlightColor,
                       background: isActive ? accent : 'transparent',
                     }}
                   >
-                    <item.icon
-                      className="h-5 w-5 flex-shrink-0"
-                      style={{
-                        color: isActive
-                          ? primary
-                          : 'color-mix(in srgb, var(--sidebar-text) 72%, var(--surface-color))'
-                      }}
-                    />
+	                    <item.icon
+	                      className="h-5 w-5 flex-shrink-0"
+	                      style={{
+	                        color: isActive
+	                          ? sidebarActiveTextColor
+	                          : itemTextColor
+	                      }}
+	                    />
                     <span
                       className="font-semibold flex-1"
                       style={{
                         color: isActive
-                          ? primary
+                          ? sidebarActiveTextColor
                           : itemTextColor
                       }}
                     >
                       {item.label}
                     </span>
-                    {isActive && <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: primary }} />}
+                    {isActive && <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: sidebarActiveTextColor }} />}
                   </button>
                 );
               })}
@@ -617,23 +633,23 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
               style={{
                 minHeight: '52px',
                 background: 'transparent',
-                WebkitTapHighlightColor: applyOpacity(primary, 0.06),
+                WebkitTapHighlightColor: sidebarTapHighlightColor,
               }}
             >
-              <Users
-                className="h-5 w-5 flex-shrink-0"
-                style={{
-                  color: 'color-mix(in srgb, var(--sidebar-text) 72%, var(--surface-color))'
-                }}
-              />
+	              <Users
+	                className="h-5 w-5 flex-shrink-0"
+	                style={{
+	                  color: sidebarTextColor
+	                }}
+	              />
               <div className="flex-1 text-left">
-                <span className="font-semibold" style={{ color: 'var(--sidebar-text)' }}>
+                <span className="font-semibold" style={{ color: sidebarTextColor }}>
                   Other Membership Details
                 </span>
                 {loadingTrustLinks && (
                   <span
                     className="ml-2 text-[10px]"
-                    style={{ color: 'color-mix(in srgb, var(--sidebar-text) 50%, var(--surface-color))' }}
+	                    style={{ color: sidebarMutedTextColor }}
                   >
                     Loading...
                   </span>
@@ -641,7 +657,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
                 {!loadingTrustLinks && memberTrustLinks.length > 0 && (
                   <span
                     className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                    style={{ background: applyOpacity(secondary, 0.12), color: secondary }}
+	                    style={{ background: sidebarBadgeBgColor, color: sidebarBadgeTextColor }}
                   >
                     {memberTrustLinks.length}
                   </span>
@@ -649,7 +665,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
               </div>
               <ChevronRight
                 className="h-4 w-4 flex-shrink-0"
-                style={{ color: 'color-mix(in srgb, var(--sidebar-text) 45%, var(--surface-color))' }}
+	                style={{ color: sidebarChevronColor }}
               />
             </button>
 
@@ -687,24 +703,24 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
               style={{
                 minHeight: '52px',
                 background: 'transparent',
-                WebkitTapHighlightColor: applyOpacity(primary, 0.06),
+	                WebkitTapHighlightColor: sidebarTapHighlightColor,
               }}
             >
-              <Share2
-                className="h-5 w-5 flex-shrink-0"
-                style={{
-                  color: 'color-mix(in srgb, var(--sidebar-text) 72%, var(--surface-color))'
-                }}
-              />
+	              <Share2
+	                className="h-5 w-5 flex-shrink-0"
+	                style={{
+	                  color: sidebarTextColor
+	                }}
+	              />
               <span
                 className="font-semibold flex-1"
-                style={{ color: 'var(--sidebar-text)' }}
+	                style={{ color: sidebarTextColor }}
               >
                 Share App
               </span>
               {shareToast && (
                 <span className="absolute right-4 text-xs px-2 py-0.5 rounded-full"
-                  style={{ color: 'var(--surface-color)', background: secondary }}>
+	                  style={{ color: sidebarToastTextColor, background: sidebarToastBgColor }}>
                   Link unavailable
                 </span>
               )}
@@ -718,7 +734,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
         className="absolute left-0 right-0 bottom-0 px-3 pt-3 z-50"
         style={{
           background: 'var(--sidebar-bg)',
-          borderTop: `1px solid ${applyOpacity(primary, 0.08)}`,
+	          borderTop: `1px solid ${sidebarDividerColor}`,
           backdropFilter: 'blur(var(--sidebar-blur, 12px))',
           WebkitBackdropFilter: 'blur(var(--sidebar-blur, 12px))',
           paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))'
@@ -758,24 +774,24 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
           style={{
             minHeight: '52px',
             background: 'transparent',
-            WebkitTapHighlightColor: applyOpacity(primary, 0.06),
+	            WebkitTapHighlightColor: sidebarTapHighlightColor,
           }}
         >
-          <LogOut
-            className="h-5 w-5 flex-shrink-0"
-            style={{
-              color: 'color-mix(in srgb, var(--sidebar-text) 72%, var(--surface-color))'
-            }}
-          />
+	          <LogOut
+	            className="h-5 w-5 flex-shrink-0"
+	            style={{
+	              color: sidebarTextColor
+	            }}
+	          />
           <span
             className="font-semibold flex-1"
-            style={{ color: 'var(--sidebar-text)' }}
+	            style={{ color: sidebarTextColor }}
           >
             Logout
           </span>
           <ChevronRight
             className="h-4 w-4 flex-shrink-0"
-            style={{ color: 'color-mix(in srgb, var(--sidebar-text) 45%, var(--surface-color))' }}
+	            style={{ color: sidebarChevronColor }}
           />
         </button>
       </div>

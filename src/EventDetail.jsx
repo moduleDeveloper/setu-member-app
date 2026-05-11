@@ -8,12 +8,12 @@ import { formatEventDate, formatTimeRange } from './services/eventsService';
 const Section = ({ icon, label, children, theme }) => {
   const IconComponent = icon;
   return (
-    <div className="rounded-2xl p-4 bg-white shadow-sm border" style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 8%, transparent)' }}>
+    <div className="rounded-2xl p-4 shadow-sm border" style={{ background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}>
       <div className="flex items-center gap-2 mb-2">
         <IconComponent className="h-4 w-4 shrink-0" style={{ color: theme.primary }} />
         <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: theme.primary }}>{label}</p>
       </div>
-      <div className="text-sm text-gray-700 leading-relaxed">{children}</div>
+      <div className="text-sm leading-relaxed" style={{ color: 'var(--advertisement-description)' }}>{children}</div>
     </div>
   );
 };
@@ -113,23 +113,23 @@ const EventDetail = () => {
           <h1 className="text-base font-bold truncate" style={{ color: 'var(--navbar-text)' }}>
             {loading ? 'Event Details' : (event?.title || 'Event Details')}
           </h1>
-          {dateLabel && <p className="text-[11px] font-medium truncate" style={{ color: 'var(--body-text-color)' }}>{dateLabel}</p>}
+          {dateLabel && <p className="text-[11px] font-medium truncate" style={{ color: 'var(--advertisement-subtitle)' }}>{dateLabel}</p>}
         </div>
       </div>
 
       {/* Loading */}
       {loading && (
         <div className="px-6 py-4 space-y-4 animate-pulse">
-          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div className="h-3 bg-gray-200 rounded w-1/4 mb-3" />
-            <div className="h-5 bg-gray-200 rounded w-3/4 mb-2" />
-            <div className="h-3 bg-gray-200 rounded w-full mb-1" />
-            <div className="h-3 bg-gray-200 rounded w-5/6" />
+          <div className="rounded-2xl p-5 border shadow-sm" style={{ background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}>
+            <div className="h-3 rounded w-1/4 mb-3" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+            <div className="h-5 rounded w-3/4 mb-2" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+            <div className="h-3 rounded w-full mb-1" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+            <div className="h-3 rounded w-5/6" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
           </div>
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className="h-3 bg-gray-200 rounded w-1/3 mb-2" />
-              <div className="h-4 bg-gray-200 rounded w-2/3" />
+            <div key={i} className="rounded-2xl p-4 border shadow-sm" style={{ background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}>
+              <div className="h-3 rounded w-1/3 mb-2" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+              <div className="h-4 rounded w-2/3" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
             </div>
           ))}
         </div>
@@ -150,15 +150,15 @@ const EventDetail = () => {
       {!loading && !error && event && (
         <div className="px-6 pt-6 space-y-4">
           {/* Hero card */}
-          <div className="rounded-2xl p-5 shadow-sm border-l-4" style={{ background: '#ffffff', borderLeftColor: theme.primary, borderColor: 'color-mix(in srgb, var(--brand-navy) 10%, transparent)' }}>
+          <div className="rounded-2xl p-5 shadow-sm border-l-4" style={{ background: 'var(--advertisement-card-bg)', borderLeftColor: theme.primary, borderColor: 'var(--advertisement-card-border)' }}>
             {event.type && (
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full inline-flex items-center gap-1 mb-3" style={{ color: theme.primary, background: `color-mix(in srgb, ${theme.primary} 12%, white)` }}>
                 <Tag className="h-3 w-3" />{event.type}
               </span>
             )}
-            <h2 className="text-xl font-extrabold leading-tight mb-2" style={{ color: 'var(--heading-color)' }}>{event.title}</h2>
+            <h2 className="text-xl font-extrabold leading-tight mb-2" style={{ color: 'var(--advertisement-title)' }}>{event.title}</h2>
             {event.description && (
-              <p className="text-gray-600 text-sm leading-relaxed">{event.description}</p>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--advertisement-description)' }}>{event.description}</p>
             )}
           </div>
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBackNavigation } from './hooks';
 import { fetchTrustById } from './services/trustService';
 
-const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || 'b353d2ff-ec3b-4b90-a896-69f40662084e';
+const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
 
 const getCachedTrust = () => {

@@ -176,7 +176,7 @@ const applyThemeToDocument = (theme) => {
 
 const HospitalTrusteeApp = () => {
   const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
-  const BASE_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Mahila Mandal';
+  const BASE_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
   const LAST_VISITED_ROUTE_KEY = 'lastVisitedRoute';
   const PUBLIC_ROUTES = ['/login', '/otp-verification', '/special-otp-verification', '/terms-and-conditions', '/privacy-policy', '/developers', '/vip-login'];
   const navigate = useNavigate();

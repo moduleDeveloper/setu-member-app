@@ -43,6 +43,7 @@ const SponsorDetails = ({ onBack }) => {
   const bodyColor = getThemeToken(theme, 'typography.body_text_color', '#475569');
   const sponsorTheme = {
     bgColor: getThemeToken(theme, 'advertisement.bg_color', theme.accentBg || '#EEF2F7'),
+    panelBgColor: getThemeToken(theme, 'advertisement.card_bg_color', getThemeToken(theme, 'secondary_color', '#252330')),
     bgOpacity: Number(getThemeToken(theme, 'advertisement.bg_opacity', 1)),
     titleColor: getThemeToken(theme, 'advertisement.title_color', headingColor),
     subtitleColor: getThemeToken(theme, 'advertisement.subtitle_color', bodyColor),
@@ -198,7 +199,7 @@ const SponsorDetails = ({ onBack }) => {
         </button>
         <div>
           <h1 className="text-lg font-extrabold" style={{ color: 'var(--navbar-text)' }}>Sponsor Details</h1>
-          <p className="text-[11px] font-medium" style={{ color: 'var(--body-text-color)' }}>Selected sponsor profile</p>
+          <p className="text-[11px] font-medium" style={{ color: sponsorTheme.subtitleColor }}>Selected sponsor profile</p>
         </div>
       </div>
 
@@ -210,7 +211,7 @@ const SponsorDetails = ({ onBack }) => {
             boxShadow: `0 14px 30px ${sponsorTheme.cardShadowColor}55`,
           }}
         >
-          <div className="relative rounded-3xl backdrop-blur overflow-hidden" style={{ background: toRgba(sponsorTheme.bgColor, sponsorTheme.bgOpacity) }}>
+          <div className="relative rounded-3xl backdrop-blur overflow-hidden" style={{ background: toRgba(sponsorTheme.panelBgColor, 0.96) }}>
             <div className="absolute -top-14 -right-10 h-28 w-28 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${sponsorTheme.cardShadowColor}4A 0%, transparent 70%)` }} />
             <div className="absolute -bottom-12 -left-10 h-24 w-24 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${sponsorTheme.cardBorderColor}38 0%, transparent 72%)` }} />
 
@@ -257,15 +258,15 @@ const SponsorDetails = ({ onBack }) => {
 
             <div className="px-4 py-4 space-y-3">
               {data.about ? (
-                <div className="rounded-2xl border p-3.5" style={{ background: toRgba(sponsorTheme.bgColor, Math.max(0.45, sponsorTheme.bgOpacity * 0.85)), borderColor: sponsorTheme.cardBorderColor }}>
-                  <p className="text-[11px] uppercase tracking-[0.14em] font-bold mb-1" style={{ color: sponsorTheme.badgeTextColor }}>About</p>
+                <div className="rounded-2xl border p-3.5" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--page-bg))', borderColor: sponsorTheme.cardBorderColor }}>
+                  <p className="text-[11px] uppercase tracking-[0.14em] font-bold mb-1" style={{ color: sponsorTheme.titleColor }}>About</p>
                   <p className="text-sm leading-relaxed" style={{ color: sponsorTheme.descriptionColor }}>{data.about}</p>
                 </div>
               ) : null}
 
               {data.contacts.length > 0 ? (
-                <div className="rounded-2xl border p-3.5" style={{ background: toRgba(sponsorTheme.bgColor, Math.max(0.45, sponsorTheme.bgOpacity * 0.85)), borderColor: sponsorTheme.cardBorderColor }}>
-                  <p className="text-[11px] uppercase tracking-[0.14em] font-bold mb-2" style={{ color: sponsorTheme.badgeTextColor }}>Contact Details</p>
+                <div className="rounded-2xl border p-3.5" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--page-bg))', borderColor: sponsorTheme.cardBorderColor }}>
+                  <p className="text-[11px] uppercase tracking-[0.14em] font-bold mb-2" style={{ color: sponsorTheme.titleColor }}>Contact Details</p>
                   <div className="space-y-2 text-sm" style={{ color: sponsorTheme.descriptionColor }}>
                     {data.contacts.map((item, idx) => {
                       const href = buildHref[item.type](item.value);
@@ -287,8 +288,8 @@ const SponsorDetails = ({ onBack }) => {
               ) : null}
 
               {data.addresses.length > 0 ? (
-                <div className="rounded-2xl border p-3.5" style={{ background: toRgba(sponsorTheme.bgColor, Math.max(0.45, sponsorTheme.bgOpacity * 0.85)), borderColor: sponsorTheme.cardBorderColor }}>
-                  <p className="text-[11px] uppercase tracking-[0.14em] font-bold mb-2" style={{ color: sponsorTheme.badgeTextColor }}>Address</p>
+                <div className="rounded-2xl border p-3.5" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--page-bg))', borderColor: sponsorTheme.cardBorderColor }}>
+                  <p className="text-[11px] uppercase tracking-[0.14em] font-bold mb-2" style={{ color: sponsorTheme.titleColor }}>Address</p>
                   <div className="space-y-1.5 text-sm" style={{ color: sponsorTheme.descriptionColor }}>
                     {data.addresses.map((item, idx) => (
                       <div key={`${item.label}-${idx}`} className="flex items-start gap-2">
@@ -304,8 +305,8 @@ const SponsorDetails = ({ onBack }) => {
               ) : null}
 
               {data.links.length > 0 ? (
-                <div className="rounded-2xl border p-3.5" style={{ background: toRgba(sponsorTheme.bgColor, Math.max(0.45, sponsorTheme.bgOpacity * 0.85)), borderColor: sponsorTheme.cardBorderColor }}>
-                  <p className="text-[11px] uppercase tracking-[0.14em] font-bold mb-2" style={{ color: sponsorTheme.badgeTextColor }}>Online Links</p>
+                <div className="rounded-2xl border p-3.5" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--page-bg))', borderColor: sponsorTheme.cardBorderColor }}>
+                  <p className="text-[11px] uppercase tracking-[0.14em] font-bold mb-2" style={{ color: sponsorTheme.titleColor }}>Online Links</p>
                   <div className="space-y-2 text-sm" style={{ color: sponsorTheme.descriptionColor }}>
                     {data.links.map((item) => {
                       const href = buildHref.url(item.value);
@@ -327,7 +328,7 @@ const SponsorDetails = ({ onBack }) => {
               ) : null}
 
               {data.coPartner ? (
-                <div className="rounded-2xl border p-3.5" style={{ background: toRgba(sponsorTheme.bgColor, Math.max(0.45, sponsorTheme.bgOpacity * 0.85)), borderColor: sponsorTheme.cardBorderColor }}>
+                <div className="rounded-2xl border p-3.5" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--page-bg))', borderColor: sponsorTheme.cardBorderColor }}>
                   <p className="text-sm font-medium" style={{ color: sponsorTheme.descriptionColor }}>{ASSOCIATION_LABEL}: {data.coPartner}</p>
                 </div>
               ) : null}

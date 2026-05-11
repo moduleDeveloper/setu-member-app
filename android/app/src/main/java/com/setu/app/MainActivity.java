@@ -1,4 +1,4 @@
-package com.ekudaan.app;
+package com.Setu.app;
 
 import com.getcapacitor.BridgeActivity;
 

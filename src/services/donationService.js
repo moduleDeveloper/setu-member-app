@@ -18,7 +18,7 @@ export const getDonationFormPrefill = () => {
 
   return {
     trustId: selectedTrustId || membership?.trust_id || parsedUser?.trust?.id || '',
-    trustName: selectedTrustName || membership?.trust_name || parsedUser?.trust?.name || 'Ek Udaan',
+    trustName: selectedTrustName || membership?.trust_name || parsedUser?.trust?.name || import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust',
     donorName: normalizeText(parsedUser?.Name || parsedUser?.name),
     mobile: normalizeText(parsedUser?.Mobile || parsedUser?.mobile || parsedUser?.phone),
     email: normalizeText(parsedUser?.Email || parsedUser?.email),

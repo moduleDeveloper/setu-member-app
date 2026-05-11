@@ -30,6 +30,7 @@ dotenv.config();
 // Initialize express app
 const app = express();
 const PORT = process.env.PORT || 5003;
+const TRUST_BRAND_NAME = process.env.VITE_DEFAULT_TRUST_NAME || process.env.DEFAULT_TRUST_NAME || 'Trust';
 
 // --------------------
 // MIDDLEWARE
@@ -82,7 +83,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'Mahila Mandal Backend API running',
+    message: `${TRUST_BRAND_NAME} Backend API running`,
     status: 'healthy',
     timestamp: new Date().toISOString(),
     endpoints: {
@@ -102,7 +103,7 @@ app.get('/', (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     success: true,
-    message: 'Mahila Mandal API',
+    message: `${TRUST_BRAND_NAME} API`,
     version: '1.0.0',
     endpoints: {
       auth: '/api/auth',

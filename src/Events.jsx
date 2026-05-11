@@ -331,8 +331,8 @@ const Events = ({ onNavigate }) => {
         <div
           className="relative flex items-center p-1 rounded-2xl gap-1"
           style={{
-            background: 'color-mix(in srgb, var(--brand-navy) 7%, var(--surface-color))',
-            border: '1.5px solid color-mix(in srgb, var(--brand-navy) 13%, transparent)',
+            background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--page-bg))',
+            border: '1.5px solid var(--advertisement-card-border)',
             boxShadow: 'inset 0 1px 3px color-mix(in srgb, var(--brand-navy) 8%, transparent)',
           }}
         >
@@ -351,7 +351,7 @@ const Events = ({ onNavigate }) => {
                   boxShadow: `0 4px 16px color-mix(in srgb, ${theme.primary} 35%, transparent), 0 1px 0 rgba(255,255,255,0.15) inset`,
                   transform: 'scale(1.03)',
                 } : {
-                  color: 'color-mix(in srgb, var(--body-text-color) 75%, var(--surface-color))',
+                  color: 'var(--advertisement-subtitle)',
                   background: 'transparent',
                 }}
               >
@@ -392,7 +392,7 @@ const Events = ({ onNavigate }) => {
 
       {!loading && !error && events.length > 0 && (
         <div className="px-6 pb-2">
-          <p className="text-[11px] font-semibold" style={{ color: 'var(--body-text-color)' }}>
+          <p className="text-[11px] font-semibold" style={{ color: 'var(--advertisement-subtitle)' }}>
             {events.length} of {counts[activeTab]} {activeTab} event{counts[activeTab] === 1 ? '' : 's'}
           </p>
         </div>
@@ -401,10 +401,10 @@ const Events = ({ onNavigate }) => {
       {loading && (
         <div className="px-6 py-4 space-y-4 animate-pulse">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded-2xl p-5 border shadow-sm" style={{ background: 'var(--surface-color)', borderColor: 'color-mix(in srgb, var(--brand-navy) 10%, transparent)' }}>
-              <div className="h-3 rounded w-1/4 mb-3" style={{ background: 'color-mix(in srgb, var(--surface-color) 60%, var(--app-accent-bg))' }} />
-              <div className="h-4 rounded w-2/3 mb-2" style={{ background: 'color-mix(in srgb, var(--surface-color) 60%, var(--app-accent-bg))' }} />
-              <div className="h-3 rounded w-full" style={{ background: 'color-mix(in srgb, var(--surface-color) 60%, var(--app-accent-bg))' }} />
+            <div key={i} className="rounded-2xl p-5 border shadow-sm" style={{ background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}>
+              <div className="h-3 rounded w-1/4 mb-3" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+              <div className="h-4 rounded w-2/3 mb-2" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+              <div className="h-3 rounded w-full" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
             </div>
           ))}
         </div>
@@ -456,8 +456,8 @@ const Events = ({ onNavigate }) => {
                 onClick={() => openEventDetail(event.id)}
                 className="w-full text-left rounded-2xl overflow-hidden transition-all active:scale-[0.995] shadow-sm"
                 style={{
-                  background: 'var(--surface-color)',
-                  border: '1px solid color-mix(in srgb, var(--brand-navy) 10%, transparent)',
+                  background: 'var(--advertisement-card-bg)',
+                  border: '1px solid var(--advertisement-card-border)',
                   opacity: isPast ? 0.9 : 1,
                 }}
               >
@@ -530,20 +530,20 @@ const Events = ({ onNavigate }) => {
                   </div>
 
                   {/* Title */}
-                  <h3 className="font-bold text-base leading-snug mb-1.5" style={{ color: 'var(--heading-color)' }}>
+                  <h3 className="font-bold text-base leading-snug mb-1.5" style={{ color: 'var(--advertisement-title)' }}>
                     {event.title}
                   </h3>
 
                   {/* Description */}
                   {event.description && (
-                    <p className="text-xs leading-relaxed line-clamp-2 mb-2.5" style={{ color: 'var(--body-text-color)' }}>
+                    <p className="text-xs leading-relaxed line-clamp-2 mb-2.5" style={{ color: 'var(--advertisement-description)' }}>
                       {event.description}
                     </p>
                   )}
 
                   {/* Time & Location */}
                   {(timeLabel || event.location) && (
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-medium mb-3" style={{ color: 'var(--body-text-color)' }}>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-medium mb-3" style={{ color: 'var(--advertisement-description)' }}>
                       {timeLabel && (
                         <div className="flex items-center gap-1">
                           <Clock3 style={{ width: 11, height: 11, color: theme.primary }} />
@@ -575,13 +575,13 @@ const Events = ({ onNavigate }) => {
 
           {events.length === 0 && (
             <div className="text-center py-20">
-              <div className="h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4 border shadow-sm" style={{ background: 'var(--surface-color)', borderColor: 'color-mix(in srgb, var(--brand-navy) 12%, transparent)' }}>
-                <Calendar className="h-8 w-8" style={{ color: 'color-mix(in srgb, var(--body-text-color) 42%, var(--surface-color))' }} />
+              <div className="h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4 border shadow-sm" style={{ background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}>
+                <Calendar className="h-8 w-8" style={{ color: 'var(--advertisement-subtitle)' }} />
               </div>
-              <h3 className="font-bold" style={{ color: 'var(--heading-color)' }}>
+              <h3 className="font-bold" style={{ color: 'var(--advertisement-title)' }}>
                 {activeTab === 'current' ? 'No current events right now.' : activeTab === 'upcoming' ? 'No upcoming events.' : 'No past events available.'}
               </h3>
-              <p className="text-sm mt-1" style={{ color: 'var(--body-text-color)' }}>Check back later.</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--advertisement-subtitle)' }}>Check back later.</p>
             </div>
           )}
 

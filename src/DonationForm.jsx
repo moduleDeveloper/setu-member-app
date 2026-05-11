@@ -64,7 +64,7 @@ const DonationForm = () => {
       className="min-h-screen pb-8"
       style={{
         background: 'var(--page-bg, var(--app-page-bg))',
-        color: 'var(--body-text-color)',
+        color: 'var(--advertisement-description)',
       }}
     >
       <div
@@ -102,12 +102,13 @@ const DonationForm = () => {
         <div
           className="rounded-[30px] px-5 py-5"
           style={{
-            background: 'var(--surface-color)',
+            background: 'var(--advertisement-card-bg)',
+            border: '1px solid var(--advertisement-card-border)',
             boxShadow: `0 20px 48px ${applyOpacity('#000', 0.12)}`,
           }}
         >
           {loading ? (
-            <div className="rounded-[24px] p-5 text-sm font-semibold" style={{ background: applyOpacity(theme.primary, 0.04) }}>
+            <div className="rounded-[24px] p-5 text-sm font-semibold" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 80%, var(--page-bg))', color: 'var(--advertisement-description)' }}>
               Loading donation details...
             </div>
           ) : error ? (
@@ -115,16 +116,16 @@ const DonationForm = () => {
               {error}
             </div>
           ) : members.length === 0 ? (
-            <div className="rounded-[24px] p-5 text-sm font-semibold" style={{ background: applyOpacity(theme.primary, 0.04) }}>
+            <div className="rounded-[24px] p-5 text-sm font-semibold" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 80%, var(--page-bg))', color: 'var(--advertisement-description)' }}>
               No donation member details found for this trust.
             </div>
           ) : (
             <div className="space-y-4">
               <div
                 className="rounded-[22px] p-4 text-sm leading-6"
-                style={{ background: applyOpacity(theme.primary, 0.06), color: 'var(--body-text-color)' }}
+                style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--page-bg))', color: 'var(--advertisement-description)', border: '1px solid var(--advertisement-card-border)' }}
               >
-                Selected Trust: <span className="font-extrabold" style={{ color: 'var(--heading-color)' }}>{prefill.trustName}</span>
+                Selected Trust: <span className="font-extrabold" style={{ color: 'var(--advertisement-title)' }}>{prefill.trustName}</span>
               </div>
 
               {members.map((member) => (
@@ -132,25 +133,25 @@ const DonationForm = () => {
                   key={member.id}
                   className="rounded-[22px] p-4"
                   style={{
-                    background: applyOpacity(theme.secondary, 0.06),
-                    color: 'var(--body-text-color)',
-                    border: `1px solid ${applyOpacity(theme.primary, 0.12)}`,
+                    background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--page-bg))',
+                    color: 'var(--advertisement-description)',
+                    border: '1px solid var(--advertisement-card-border)',
                   }}
                 >
                   <div className="flex items-center gap-2 mb-3">
                     <UserRound className="h-4 w-4" style={{ color: theme.primary }} />
-                    <p className="text-sm font-extrabold" style={{ color: 'var(--heading-color)' }}>{member.name || '-'}</p>
+                    <p className="text-sm font-extrabold" style={{ color: 'var(--advertisement-title)' }}>{member.name || '-'}</p>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
                       <PhoneCall className="h-4 w-4" style={{ color: theme.primary }} />
-                      <a href={`tel:${member.mobile || ''}`} style={{ color: 'var(--heading-color)' }}>
+                      <a href={`tel:${member.mobile || ''}`} style={{ color: 'var(--advertisement-description)' }}>
                         {member.mobile || '-'}
                       </a>
                     </div>
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4" style={{ color: theme.primary }} />
-                      <span style={{ color: 'var(--heading-color)' }}>{member.email_id || '-'}</span>
+                      <span style={{ color: 'var(--advertisement-description)' }}>{member.email_id || '-'}</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <QrCode className="h-4 w-4 mt-0.5" style={{ color: theme.primary }} />
@@ -163,7 +164,7 @@ const DonationForm = () => {
                             style={{ borderColor: applyOpacity(theme.primary, 0.2) }}
                           />
                         ) : (
-                          <span style={{ color: 'var(--heading-color)' }}>Not available</span>
+                          <span style={{ color: 'var(--advertisement-subtitle)' }}>Not available</span>
                         )}
                       </div>
                     </div>

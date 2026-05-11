@@ -107,7 +107,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--page-bg, var(--app-page-bg))' }}>
+    <div className="min-h-screen member-details-theme" style={{ background: 'var(--page-bg, var(--app-page-bg))' }}>
       {/* Header Section */}
       <div
         className="theme-navbar sticky top-0 z-20"
@@ -137,9 +137,9 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
 
       {/* Member Details Card */}
       <div className="p-6">
-        <div className="rounded-2xl shadow-sm p-6" style={{ background: 'color-mix(in srgb, var(--surface-color) 92%, var(--app-accent-bg))', border: '1px solid color-mix(in srgb, var(--brand-navy) 10%, transparent)' }}>
+        <div className="rounded-2xl shadow-sm p-6" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)', boxShadow: '0 12px 28px color-mix(in srgb, var(--advertisement-card-shadow) 24%, transparent)' }}>
           <div className="flex items-center gap-4 mb-6">
-            <div className="bg-indigo-100 h-20 w-20 rounded-2xl flex items-center justify-center text-indigo-600 overflow-hidden shadow-sm border border-indigo-200">
+            <div className="h-20 w-20 rounded-2xl flex items-center justify-center overflow-hidden shadow-sm border" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 76%, var(--app-accent-bg))', color: 'var(--advertisement-title)', borderColor: 'var(--advertisement-card-border)' }}>
               {profilePhoto ? (
                 <img
                   src={profilePhoto}
@@ -168,7 +168,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
               )}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-800">{displayName}</h2>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--advertisement-title)' }}>{displayName}</h2>
               {!member.isHospitalMember && displayRole && (
                 <p className="text-sm font-medium" style={{ color: theme.primary }}>{displayRole}</p>
               )}
@@ -563,6 +563,17 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
           </div>
         </div>
       </div>
+      <style>{`
+        .member-details-theme .bg-gray-50 {
+          background: color-mix(in srgb, var(--advertisement-card-bg) 86%, var(--page-bg)) !important;
+        }
+        .member-details-theme .text-gray-800 {
+          color: var(--advertisement-description) !important;
+        }
+        .member-details-theme .text-gray-500 {
+          color: var(--advertisement-subtitle) !important;
+        }
+      `}</style>
     </div>
   );
 };

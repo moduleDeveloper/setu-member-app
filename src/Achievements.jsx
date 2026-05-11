@@ -219,38 +219,38 @@ const Achievements = ({ onNavigate }) => {
 
       <div className="px-4 py-5">
         {loading ? (
-          <div className="py-16 text-center text-sm" style={{ color: 'var(--muted-text)' }}>Loading achievements...</div>
+          <div className="py-16 text-center text-sm" style={{ color: 'var(--advertisement-subtitle)' }}>Loading achievements...</div>
         ) : error ? (
           <div className="py-12 text-center">
-            <p className="text-sm font-semibold" style={{ color: 'var(--heading-color)' }}>Could not load achievements</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--muted-text)' }}>{error}</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-title)' }}>Could not load achievements</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--advertisement-subtitle)' }}>{error}</p>
             <button
               type="button"
               onClick={() => fetchAchievements(selectedTrustId)}
               className="mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold"
-              style={{ background: 'var(--app-accent-bg)', color: 'var(--button-text-color, #fff)' }}
+              style={{ background: 'var(--app-button-bg)', color: 'var(--app-button-text)' }}
             >
               Retry
             </button>
           </div>
         ) : items.length === 0 ? (
           <div className="py-16 text-center">
-            <div className="mx-auto mb-3 h-12 w-12 rounded-full grid place-items-center" style={{ background: 'color-mix(in srgb, var(--app-accent-bg) 16%, transparent)', color: 'var(--app-accent-bg)' }}>
+            <div className="mx-auto mb-3 h-12 w-12 rounded-full grid place-items-center" style={{ background: 'var(--advertisement-card-bg)', color: 'var(--app-accent-bg)', border: '1px solid var(--advertisement-card-border)' }}>
               <Award size={22} />
             </div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--heading-color)' }}>No achievements yet</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--muted-text)' }}>New milestones will appear here automatically.</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-title)' }}>No achievements yet</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--advertisement-subtitle)' }}>New milestones will appear here automatically.</p>
           </div>
         ) : (
           <>
             {spotlight && (
               <section className="mb-7">
-                <p className="text-[10px] uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--muted-text)' }}>Latest Highlight</p>
-                <div className="relative overflow-hidden rounded-2xl border px-4 py-4" style={{ borderColor: 'color-mix(in srgb, var(--app-accent-bg) 35%, var(--card-border))', background: 'linear-gradient(120deg, color-mix(in srgb, var(--app-accent-bg) 16%, var(--surface-color)) 0%, var(--surface-color) 100%)' }}>
-                  <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full" style={{ background: 'color-mix(in srgb, var(--app-accent-bg) 18%, transparent)' }} />
-                  <h2 className="text-lg font-extrabold leading-tight pr-8" style={{ color: 'var(--heading-color)' }}>{spotlight.name}</h2>
-                  <p className="text-xs mt-1" style={{ color: 'var(--muted-text)' }}>{formatDateTime(spotlight.updated_at || spotlight.created_at)}</p>
-                  {spotlight.description ? <p className="text-sm mt-3 leading-relaxed" style={{ color: 'var(--body-text-color)' }}>{spotlight.description}</p> : null}
+                <p className="text-[10px] uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--advertisement-subtitle)' }}>Latest Highlight</p>
+                <div className="relative overflow-hidden rounded-2xl border px-4 py-4" style={{ borderColor: 'var(--advertisement-card-border)', background: 'var(--advertisement-card-bg)' }}>
+                  <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full" style={{ background: 'color-mix(in srgb, var(--app-accent-bg) 16%, transparent)' }} />
+                  <h2 className="text-lg font-extrabold leading-tight pr-8" style={{ color: 'var(--advertisement-title)' }}>{spotlight.name}</h2>
+                  <p className="text-xs mt-1" style={{ color: 'var(--advertisement-subtitle)' }}>{formatDateTime(spotlight.updated_at || spotlight.created_at)}</p>
+                  {spotlight.description ? <p className="text-sm mt-3 leading-relaxed" style={{ color: 'var(--advertisement-description)' }}>{spotlight.description}</p> : null}
                   {Array.isArray(spotlight.attachments) && spotlight.attachments.length > 0 ? (
                     <div className="mt-3 space-y-2">
                       {spotlight.attachments.map((attachment, idx) => {
@@ -261,8 +261,8 @@ const Achievements = ({ onNavigate }) => {
                             <div
                               key={`spotlight-${spotlight.id}-image-${idx}`}
                               className="block overflow-hidden rounded-xl border"
-                              style={{ borderColor: 'var(--card-border)' }}
-                            >
+                            style={{ borderColor: 'var(--advertisement-card-border)' }}
+                          >
                               <img src={url} alt={getAttachmentLabel(attachment, idx)} className="w-full h-auto max-h-56 object-cover" loading="lazy" />
                             </div>
                           );
@@ -274,7 +274,7 @@ const Achievements = ({ onNavigate }) => {
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border transition-colors"
-                            style={{ borderColor: 'var(--card-border)', color: 'var(--heading-color)', background: 'color-mix(in srgb, var(--surface-color) 92%, var(--app-accent-bg))' }}
+                            style={{ borderColor: 'var(--advertisement-card-border)', color: 'var(--advertisement-title)', background: 'color-mix(in srgb, var(--advertisement-card-bg) 88%, var(--page-bg))' }}
                           >
                             <LinkIcon size={12} />
                             <span>{getAttachmentLabel(attachment, idx)}</span>
@@ -289,17 +289,17 @@ const Achievements = ({ onNavigate }) => {
 
             {timeline.length > 0 ? (
               <section>
-                <p className="text-[10px] uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--muted-text)' }}>Achievement Trail</p>
+                <p className="text-[10px] uppercase tracking-[0.16em] mb-2" style={{ color: 'var(--advertisement-subtitle)' }}>Achievement Trail</p>
                 <div className="relative pl-5">
                   <div className="absolute left-[7px] top-1 bottom-1 w-[2px]" style={{ background: 'linear-gradient(to bottom, color-mix(in srgb, var(--app-accent-bg) 65%, transparent), color-mix(in srgb, var(--app-accent-bg) 15%, transparent))' }} />
                   <div className="space-y-6">
                     {timeline.map((item) => (
-                      <article key={item.id} className="relative">
+                      <article key={item.id} className="relative rounded-2xl border p-3.5" style={{ borderColor: 'var(--advertisement-card-border)', background: 'var(--advertisement-card-bg)' }}>
                         <div className="absolute -left-[22px] top-1.5 h-4 w-4 rounded-full border-2" style={{ borderColor: 'var(--app-accent-bg)', background: 'var(--surface-color)' }} />
-                        <p className="text-[11px] font-semibold" style={{ color: 'var(--muted-text)' }}>{formatDateTime(item.updated_at || item.created_at)}</p>
-                        <h3 className="text-[15px] font-bold mt-0.5" style={{ color: 'var(--heading-color)' }}>{item.name}</h3>
+                        <p className="text-[11px] font-semibold" style={{ color: 'var(--advertisement-subtitle)' }}>{formatDateTime(item.updated_at || item.created_at)}</p>
+                        <h3 className="text-[15px] font-bold mt-0.5" style={{ color: 'var(--advertisement-title)' }}>{item.name}</h3>
                         {item.description ? (
-                          <p className="text-sm leading-relaxed mt-1" style={{ color: 'var(--body-text-color)' }}>{item.description}</p>
+                          <p className="text-sm leading-relaxed mt-1" style={{ color: 'var(--advertisement-description)' }}>{item.description}</p>
                         ) : null}
                         {Array.isArray(item.attachments) && item.attachments.length > 0 ? (
                           <div className="mt-2.5 space-y-2">
@@ -311,7 +311,7 @@ const Achievements = ({ onNavigate }) => {
                                   <div
                                     key={`${item.id}-image-${idx}`}
                                     className="block overflow-hidden rounded-lg border"
-                                    style={{ borderColor: 'var(--card-border)' }}
+                                    style={{ borderColor: 'var(--advertisement-card-border)' }}
                                   >
                                     <img src={url} alt={getAttachmentLabel(attachment, idx)} className="w-full h-auto max-h-52 object-cover" loading="lazy" />
                                   </div>

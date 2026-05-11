@@ -4,12 +4,12 @@ const TTL_MS = 30 * 60 * 1000;
 export const CATEGORIES = ['current', 'upcoming', 'past'];
 export const eventsConfig = { PAGE_SIZE: 10 };
 
-const KEY_ALL = (trustId) => `ev_all_v2_${trustId}`;
-const KEY_BY_ID = (trustId) => `ev_by_id_v2_${trustId}`;
-const KEY_ORDER = (trustId, category) => `ev_order_v2_${trustId}_${category}`;
-const KEY_PAGES = (trustId, category) => `ev_pages_v2_${trustId}_${category}`;
-const KEY_STATE = (trustId, category) => `ev_state_v2_${trustId}_${category}`;
-const KEY_DETAIL = (trustId) => `ev_detail_v2_${trustId}`;
+const KEY_ALL = (trustId) => `ev_all_v3_${trustId}`;
+const KEY_BY_ID = (trustId) => `ev_by_id_v3_${trustId}`;
+const KEY_ORDER = (trustId, category) => `ev_order_v3_${trustId}_${category}`;
+const KEY_PAGES = (trustId, category) => `ev_pages_v3_${trustId}_${category}`;
+const KEY_STATE = (trustId, category) => `ev_state_v3_${trustId}_${category}`;
+const KEY_DETAIL = (trustId) => `ev_detail_v3_${trustId}`;
 
 const inflight = {};
 

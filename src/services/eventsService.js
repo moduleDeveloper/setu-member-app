@@ -37,17 +37,43 @@ const toHhmm = (value) => {
   } catch { return null; }
 };
 
+const pick = (obj, keys = []) => {
+  for (const key of keys) {
+    if (obj?.[key] !== undefined && obj?.[key] !== null) return obj[key];
+  }
+  return null;
+};
+
+const normalizeEvent = (event) => {
+  if (!event || typeof event !== 'object') return event;
+  const startEventDate = pick(event, ['startEventDate', 'start_event_date']);
+  const endEventDate = pick(event, ['endEventDate', 'end_event_date']);
+  const startTime = pick(event, ['startTime', 'start_time']);
+  const endTime = pick(event, ['endTime', 'end_time']);
+  const trust_id = pick(event, ['trust_id', 'trustId']);
+
+  return {
+    ...event,
+    trust_id: trust_id ?? null,
+    startEventDate: startEventDate ?? null,
+    endEventDate: endEventDate ?? null,
+    startTime: startTime ?? null,
+    endTime: endTime ?? null
+  };
+};
+
 /**
  * Classify an event into 'current' | 'upcoming' | 'past'
  */
 export function classifyEvent(event) {
+  const normalizedEvent = normalizeEvent(event);
   const today = getTodayYmd();
   const nowTime = getNowHhmm();
 
-  const start = toYmd(event?.startEventDate);
-  const end = toYmd(event?.endEventDate) || start; // null endDate = single day
-  const startTime = toHhmm(event?.startTime);
-  const endTime = toHhmm(event?.endTime);
+  const start = toYmd(normalizedEvent?.startEventDate);
+  const end = toYmd(normalizedEvent?.endEventDate) || start; // null endDate = single day
+  const startTime = toHhmm(normalizedEvent?.startTime);
+  const endTime = toHhmm(normalizedEvent?.endTime);
 
   if (!start) return 'past'; // no date = treat as past
 
@@ -73,12 +99,14 @@ export function classifyEvent(event) {
 }
 
 const compareAscByDateTime = (a, b) => {
-  const sa = String(a?.startEventDate || '');
-  const sb = String(b?.startEventDate || '');
+  const na = normalizeEvent(a);
+  const nb = normalizeEvent(b);
+  const sa = String(na?.startEventDate || '');
+  const sb = String(nb?.startEventDate || '');
   if (sa !== sb) return sa.localeCompare(sb);
 
-  const ta = String(a?.startTime || '');
-  const tb = String(b?.startTime || '');
+  const ta = String(na?.startTime || '');
+  const tb = String(nb?.startTime || '');
   if (ta !== tb) return ta.localeCompare(tb);
 
   const ca = String(a?.created_at || '');
@@ -89,16 +117,18 @@ const compareAscByDateTime = (a, b) => {
 };
 
 const comparePastDesc = (a, b) => {
-  const sa = String(a?.startEventDate || '');
-  const sb = String(b?.startEventDate || '');
+  const na = normalizeEvent(a);
+  const nb = normalizeEvent(b);
+  const sa = String(na?.startEventDate || '');
+  const sb = String(nb?.startEventDate || '');
   if (sa !== sb) return sb.localeCompare(sa);
 
-  const ea = String(a?.endEventDate || a?.startEventDate || '');
-  const eb = String(b?.endEventDate || b?.startEventDate || '');
+  const ea = String(na?.endEventDate || na?.startEventDate || '');
+  const eb = String(nb?.endEventDate || nb?.startEventDate || '');
   if (ea !== eb) return eb.localeCompare(ea);
 
-  const ta = String(a?.endTime || '');
-  const tb = String(b?.endTime || '');
+  const ta = String(na?.endTime || '');
+  const tb = String(nb?.endTime || '');
   if (ta !== tb) return tb.localeCompare(ta);
 
   return String(a?.id || '').localeCompare(String(b?.id || ''));
@@ -157,23 +187,47 @@ export function formatTimeRange(startTime, endTime) {
  */
 export async function fetchAllEventsForTrust({ trustId }) {
   if (!trustId) return { success: true, data: [] };
+  console.log('[EventsService][Build] eventsService diagnostic v4 loaded at', new Date().toISOString());
+  console.log('[EventsService][Debug] requested_trust_id=', trustId);
 
   const { data, error } = await supabase
     .from(TABLE)
-    .select('id, trust_id, type, title, description, location, startEventDate, endEventDate, startTime, endTime, status, attachments, created_at, updated_at')
-    .eq('trust_id', trustId)
-    .eq('status', 'active')
-    .order('startEventDate', { ascending: true })
-    .order('startTime', { ascending: true })
-    .order('created_at', { ascending: false });
+    .select('*')
+    .eq('trust_id', trustId);
 
   if (error) {
     console.error('[EventsService] fetchAllEventsForTrust error:', error);
     return { success: false, data: [], error: error.message };
   }
 
-  const events = Array.isArray(data) ? data : [];
-  console.log(`[EventsService][Debug] trust=${trustId} fetched=${events.length} active_events`);
+  let events = (Array.isArray(data) ? data : []).map(normalizeEvent);
+  console.log('[EventsService][Debug] strict_trust_query_count=', events.length);
+
+  // Defensive fallback:
+  // Some deployments have schema/key drift (trust_id vs trustId mapping in API layer).
+  // If strict trust_id filter returns empty, retry and filter client-side.
+  if (events.length === 0) {
+    const fallback = await supabase
+      .from(TABLE)
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(300);
+
+    if (!fallback.error) {
+      const allRows = Array.isArray(fallback.data) ? fallback.data : [];
+      events = allRows
+        .map(normalizeEvent)
+        .filter((row) => String(row?.trust_id || '').trim() === String(trustId).trim());
+      console.log('[EventsService][Debug] fallback_scan_total=', allRows.length, 'fallback_matched=', events.length);
+      if (allRows.length > 0 && events.length === 0) {
+        console.log('[EventsService][Debug] fallback_sample_keys=', Object.keys(allRows[0] || {}));
+      }
+    } else {
+      console.error('[EventsService] fallback scan error:', fallback.error);
+    }
+  }
+
+  console.log(`[EventsService][Debug] trust=${trustId} fetched=${events.length} events`);
   return { success: true, data: events };
 }
 
@@ -186,8 +240,7 @@ export async function fetchEventById({ eventId, trustId }) {
   let query = supabase
     .from(TABLE)
     .select('*')
-    .eq('id', eventId)
-    .eq('status', 'active');
+    .eq('id', eventId);
 
   if (trustId) query = query.eq('trust_id', trustId);
 
@@ -198,5 +251,5 @@ export async function fetchEventById({ eventId, trustId }) {
     return { success: false, data: null, error: error.message };
   }
 
-  return { success: true, data: data || null };
+  return { success: true, data: data ? normalizeEvent(data) : null };
 }

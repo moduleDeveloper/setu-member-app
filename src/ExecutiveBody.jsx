@@ -264,15 +264,15 @@ const ExecutiveBody = ({ onNavigate }) => {
       <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="executive-body" />
 
       <div className="px-4 pt-4">
-        <div className="rounded-2xl p-3 flex items-center gap-2" style={{ background: 'var(--surface-color)', border: '1px solid color-mix(in srgb, var(--brand-navy) 12%, transparent)' }}>
-          <Search className="h-4 w-4" style={{ color: 'var(--body-text-color)' }} />
+        <div className="rounded-2xl p-3 flex items-center gap-2" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
+          <Search className="h-4 w-4" style={{ color: 'var(--advertisement-subtitle)' }} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, role, membership, mobile"
             className="w-full bg-transparent outline-none text-sm"
-            style={{ color: 'var(--heading-color)' }}
+            style={{ color: 'var(--advertisement-description)' }}
           />
         </div>
       </div>
@@ -294,9 +294,9 @@ const ExecutiveBody = ({ onNavigate }) => {
                     boxShadow: '0 4px 10px color-mix(in srgb, var(--brand-navy) 20%, transparent)'
                   }
                 : {
-                    background: 'color-mix(in srgb, var(--surface-color) 82%, var(--app-accent-bg))',
-                    color: 'var(--heading-color)',
-                    border: '1px solid color-mix(in srgb, var(--brand-navy) 20%, transparent)'
+                    background: 'var(--advertisement-card-bg)',
+                    color: 'var(--advertisement-description)',
+                    border: '1px solid var(--advertisement-card-border)'
                   }}
             >
               {item.label} ({totalByTab[item.id] || 0})
@@ -307,17 +307,17 @@ const ExecutiveBody = ({ onNavigate }) => {
 
       <div className="px-4 py-4 space-y-2.5">
         {loading ? (
-          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--surface-color)' }}>
-            <p className="text-sm font-semibold" style={{ color: 'var(--body-text-color)' }}>Loading members...</p>
+          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>Loading members...</p>
           </div>
         ) : error ? (
-          <div className="rounded-2xl p-6 text-center" style={{ background: 'var(--surface-color)', border: '1px solid color-mix(in srgb, var(--brand-red) 20%, transparent)' }}>
+          <div className="rounded-2xl p-6 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid color-mix(in srgb, var(--brand-red) 20%, transparent)' }}>
             <p className="text-sm font-semibold" style={{ color: 'var(--brand-red-dark)' }}>{error}</p>
           </div>
         ) : activeMembers.length === 0 ? (
-          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--surface-color)' }}>
-            <Users className="h-8 w-8 mx-auto mb-2" style={{ color: 'var(--body-text-color)' }} />
-            <p className="text-sm font-semibold" style={{ color: 'var(--body-text-color)' }}>No members found</p>
+          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
+            <Users className="h-8 w-8 mx-auto mb-2" style={{ color: 'var(--advertisement-subtitle)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>No members found</p>
           </div>
         ) : (
           <>
@@ -328,8 +328,8 @@ const ExecutiveBody = ({ onNavigate }) => {
                 onClick={() => openMemberDetails(item)}
                 className="w-full text-left rounded-2xl p-3"
                 style={{
-                  background: `linear-gradient(165deg, ${applyOpacity(theme.secondary, 0.08)} 0%, ${applyOpacity(theme.primary, 0.1)} 100%)`,
-                  border: `1px solid ${applyOpacity(theme.primary, 0.2)}`,
+                  background: 'var(--advertisement-card-bg)',
+                  border: '1px solid var(--advertisement-card-border)',
                   boxShadow: `0 8px 18px ${applyOpacity(theme.secondary, 0.12)}`
                 }}
               >
@@ -358,38 +358,38 @@ const ExecutiveBody = ({ onNavigate }) => {
                           />
                         );
                       }
-                      return <User className="h-7 w-7" style={{ color: 'var(--body-text-color)' }} />;
+                      return <User className="h-7 w-7" style={{ color: 'var(--advertisement-subtitle)' }} />;
                     })()}
                   </div>
 
                   <div className="flex-1 min-w-0 flex flex-col gap-2">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-extrabold truncate min-w-0" style={{ color: 'var(--heading-color)' }}>
+                      <h3 className="text-sm font-extrabold truncate min-w-0" style={{ color: 'var(--advertisement-title)' }}>
                         {item?.Name || item?.member_name_english || 'N/A'}
                       </h3>
                       <span
                         className="text-[10px] font-bold uppercase px-2 py-1 rounded-full shrink-0"
                         style={item?.role_type === 'committee'
-                          ? { background: applyOpacity(theme.secondary, 0.18), color: 'var(--heading-color)' }
-                          : { background: applyOpacity(theme.primary, 0.2), color: 'var(--heading-color)' }}
+                          ? { background: applyOpacity(theme.secondary, 0.18), color: 'var(--advertisement-description)' }
+                          : { background: applyOpacity(theme.primary, 0.2), color: 'var(--advertisement-description)' }}
                       >
                         {item?.role_type || 'role'}
                       </span>
                     </div>
 
-                    <p className="text-[11px] leading-[1.2]" style={{ color: 'var(--body-text-color)' }}>
+                    <p className="text-[11px] leading-[1.2]" style={{ color: 'var(--advertisement-description)' }}>
                       {item?.member_role || item?.title || item?.type || 'N/A'}
                     </p>
 
                     {(item?.['Membership number'] || item?.subtitle) && (
                       <div className="flex flex-wrap gap-1 justify-start">
                         {item?.['Membership number'] ? (
-                          <span className="text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: applyOpacity(theme.secondary, 0.14), color: 'var(--heading-color)' }}>
+                          <span className="text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: applyOpacity(theme.secondary, 0.14), color: 'var(--advertisement-description)' }}>
                             M No: {item['Membership number']}
                           </span>
                         ) : null}
                         {item?.subtitle ? (
-                          <span className="self-start text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: applyOpacity(theme.primary, 0.14), color: 'var(--heading-color)' }}>
+                          <span className="self-start text-[10px] font-semibold px-2 py-1 rounded-full" style={{ background: applyOpacity(theme.primary, 0.14), color: 'var(--advertisement-description)' }}>
                             {item.subtitle}
                           </span>
                         ) : null}
@@ -398,13 +398,13 @@ const ExecutiveBody = ({ onNavigate }) => {
 
                     <div className="flex items-center gap-2 text-[11px]">
                       {item?.Mobile ? (
-                        <span className="inline-flex items-center gap-1" style={{ color: 'var(--body-text-color)' }}>
+                        <span className="inline-flex items-center gap-1" style={{ color: 'var(--advertisement-description)' }}>
                           <Phone className="h-3 w-3" />
                           {item.Mobile}
                         </span>
                       ) : null}
                       {item?.Email ? (
-                        <span className="inline-flex items-center gap-1 truncate" style={{ color: 'var(--body-text-color)' }}>
+                        <span className="inline-flex items-center gap-1 truncate" style={{ color: 'var(--advertisement-subtitle)' }}>
                           <Mail className="h-3 w-3" />
                           {item.Email}
                         </span>
@@ -423,13 +423,13 @@ const ExecutiveBody = ({ onNavigate }) => {
                 className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: applyOpacity(theme.secondary, 0.14),
-                  color: 'var(--heading-color)',
+                  color: 'var(--advertisement-description)',
                   border: `1px solid ${applyOpacity(theme.secondary, 0.24)}`,
                 }}
               >
                 Prev
               </button>
-              <span className="text-xs font-semibold" style={{ color: 'var(--body-text-color)' }}>
+              <span className="text-xs font-semibold" style={{ color: 'var(--advertisement-subtitle)' }}>
                 Page {currentPage} of {totalPages}
               </span>
               <button
@@ -439,7 +439,7 @@ const ExecutiveBody = ({ onNavigate }) => {
                 className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: applyOpacity(theme.primary, 0.16),
-                  color: 'var(--heading-color)',
+                  color: 'var(--advertisement-description)',
                   border: `1px solid ${applyOpacity(theme.primary, 0.24)}`,
                 }}
               >

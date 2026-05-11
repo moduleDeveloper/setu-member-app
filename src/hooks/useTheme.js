@@ -17,7 +17,7 @@ const LAST_THEME_CACHE_KEY = 'last_theme_cache_v2';
 const LEGACY_LAST_THEME_CACHE_KEY = 'last_theme_cache_v1';
 const getPersistTrustCacheIndexKey = (trustId) => `theme_cache_persist_trust_v2_${trustId}`;
 const getPersistThemeCacheEntryKey = (trustId, templateId) => `theme_cache_persist_v2_${trustId}_${templateId || 'none'}`;
-const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || 'b353d2ff-ec3b-4b90-a896-69f40662084e';
+const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const THEME_CACHE_TTL_MS = Number(import.meta.env.VITE_THEME_CACHE_TTL_MS) > 0
   ? Number(import.meta.env.VITE_THEME_CACHE_TTL_MS)
   : (import.meta.env.DEV ? 5 * 60 * 1000 : 20 * 60 * 1000);

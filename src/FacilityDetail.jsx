@@ -205,7 +205,7 @@ const FacilityDetail = ({ onNavigate }) => {
       <div className="theme-navbar border-b px-6 py-5 flex items-center justify-between sticky top-0 z-40 shadow-sm" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 20px)' }}>
         <button
           onClick={handleBack}
-          className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+          className="p-2 rounded-xl transition-colors"
           aria-label="Back to facilities"
         >
           <ArrowLeft className="h-5 w-5" style={{ color: 'var(--navbar-text)' }} />
@@ -213,7 +213,7 @@ const FacilityDetail = ({ onNavigate }) => {
         <h1 className="text-lg font-bold" style={{ color: 'var(--navbar-text)' }}>Facility Details</h1>
         <button
           onClick={() => onNavigate('home')}
-          className="p-2 rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center"
+          className="p-2 rounded-xl transition-colors flex items-center justify-center"
           style={{ color: 'var(--navbar-text)' }}
           aria-label="Go to home"
         >
@@ -223,12 +223,12 @@ const FacilityDetail = ({ onNavigate }) => {
 
       <div className="px-6 pt-6 pb-10">
         {loading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse">
-            <div className="h-4 w-24 bg-slate-200 rounded mb-4" />
-            <div className="h-6 w-3/4 bg-slate-200 rounded mb-3" />
-            <div className="h-4 w-1/2 bg-slate-200 rounded mb-4" />
-            <div className="h-4 w-full bg-slate-200 rounded mb-2" />
-            <div className="h-4 w-11/12 bg-slate-200 rounded" />
+          <div className="rounded-2xl border p-5 shadow-sm animate-pulse" style={{ borderColor: 'var(--advertisement-card-border)', background: 'var(--advertisement-card-bg)' }}>
+            <div className="h-4 w-24 rounded mb-4" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+            <div className="h-6 w-3/4 rounded mb-3" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+            <div className="h-4 w-1/2 rounded mb-4" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+            <div className="h-4 w-full rounded mb-2" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
+            <div className="h-4 w-11/12 rounded" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 62%, var(--app-accent-bg))' }} />
           </div>
         )}
 
@@ -251,11 +251,11 @@ const FacilityDetail = ({ onNavigate }) => {
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="rounded-2xl border bg-white p-5 shadow-sm border-l-4"
+            className="rounded-2xl border p-5 shadow-sm border-l-4"
             style={{
               borderLeftColor: isVip ? 'color-mix(in srgb, var(--brand-red) 45%, #d4af37)' : theme.primary,
               borderColor: isVip ? 'color-mix(in srgb, var(--brand-red) 22%, #f1e2a4)' : 'color-mix(in srgb, var(--brand-navy) 10%, transparent)',
-              background: isVip ? 'linear-gradient(180deg, color-mix(in srgb, var(--brand-red-light) 50%, #fffdf6) 0%, #ffffff 48%)' : '#ffffff'
+              background: 'var(--advertisement-card-bg)'
             }}
           >
             <div className="flex items-center justify-between gap-3 mb-4">
@@ -271,19 +271,19 @@ const FacilityDetail = ({ onNavigate }) => {
                 {isVip ? 'VIP Facility' : 'GEN'}
               </span>
               {dateLabel && (
-                <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--advertisement-subtitle)' }}>
                   <Calendar className="h-3.5 w-3.5" />
                   {dateLabel}
                 </div>
               )}
             </div>
 
-            <h2 className="text-xl font-bold leading-tight" style={{ color: 'var(--heading-color)' }}>
+            <h2 className="text-xl font-bold leading-tight" style={{ color: 'var(--advertisement-title)' }}>
               {facility.name}
             </h2>
             {carouselFacilities.length > 1 && (
               <div className="mt-2">
-                <p className="text-[11px] font-semibold" style={{ color: 'color-mix(in srgb, var(--body-text-color) 60%, var(--surface-color))' }}>
+                <p className="text-[11px] font-semibold" style={{ color: 'var(--advertisement-subtitle)' }}>
                   Swipe to explore other facilities
                 </p>
                 <div className="mt-2 flex items-center gap-1.5">
@@ -304,7 +304,7 @@ const FacilityDetail = ({ onNavigate }) => {
               </div>
             )}
 
-            <p className="mt-4 text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--body-text-color)' }}>
+            <p className="mt-4 text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--advertisement-description)' }}>
               {facility.description || 'No description provided.'}
             </p>
 
@@ -352,11 +352,11 @@ const FacilityDetail = ({ onNavigate }) => {
 
         {!loading && !error && !facility && (
           <div className="text-center py-20">
-            <div className="bg-white h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-200 shadow-sm">
-              <FileText className="h-8 w-8 text-slate-300" />
+            <div className="h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4 border shadow-sm" style={{ background: 'var(--advertisement-card-bg)', borderColor: 'var(--advertisement-card-border)' }}>
+              <FileText className="h-8 w-8" style={{ color: 'var(--advertisement-subtitle)' }} />
             </div>
-            <h3 className="text-gray-800 font-bold">Facility not found</h3>
-            <p className="text-gray-500 text-sm mt-1">This facility may no longer be available for your access.</p>
+            <h3 className="font-bold" style={{ color: 'var(--advertisement-title)' }}>Facility not found</h3>
+            <p className="text-sm mt-1" style={{ color: 'var(--advertisement-subtitle)' }}>This facility may no longer be available for your access.</p>
           </div>
         )}
       </div>

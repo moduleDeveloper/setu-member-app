@@ -146,7 +146,7 @@ const Donation = ({ onNavigate }) => {
       className="min-h-screen pb-8"
       style={{
         background: 'var(--page-bg, var(--app-page-bg))',
-        color: 'var(--body-text-color)',
+        color: 'var(--advertisement-description)',
       }}
     >
       <div
@@ -193,7 +193,7 @@ const Donation = ({ onNavigate }) => {
             boxShadow: `0 14px 28px ${applyOpacity(theme.secondary, 0.14)}`,
           }}
         >
-          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--heading-color)' }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--advertisement-description)' }}>
             Every contribution makes a real difference for our community.
           </p>
           <button
@@ -215,7 +215,7 @@ const Donation = ({ onNavigate }) => {
               <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>
                 Donation Options
               </p>
-              <h2 className="text-lg font-extrabold" style={{ color: 'var(--heading-color)' }}>
+              <h2 className="text-lg font-extrabold" style={{ color: 'var(--advertisement-title)' }}>
                 Active Donations
               </h2>
             </div>
@@ -228,7 +228,7 @@ const Donation = ({ onNavigate }) => {
           </div>
 
           {loading ? (
-            <div className="rounded-[24px] p-5 text-sm font-semibold" style={{ background: 'color-mix(in srgb, var(--surface-color) 90%, var(--app-page-bg))' }}>
+            <div className="rounded-[24px] p-5 text-sm font-semibold" style={{ background: 'var(--advertisement-card-bg)', color: 'var(--advertisement-description)', border: '1px solid var(--advertisement-card-border)' }}>
               Loading donations...
             </div>
           ) : error ? (
@@ -236,7 +236,7 @@ const Donation = ({ onNavigate }) => {
               {error}
             </div>
           ) : donations.length === 0 ? (
-            <div className="rounded-[24px] p-5 text-sm font-semibold" style={{ background: 'color-mix(in srgb, var(--surface-color) 90%, var(--app-page-bg))' }}>
+            <div className="rounded-[24px] p-5 text-sm font-semibold" style={{ background: 'var(--advertisement-card-bg)', color: 'var(--advertisement-description)', border: '1px solid var(--advertisement-card-border)' }}>
               No donations found for this trust.
             </div>
           ) : (
@@ -249,8 +249,8 @@ const Donation = ({ onNavigate }) => {
                   key={row.id}
                   className="rounded-[26px] overflow-hidden"
                   style={{
-                    background: 'color-mix(in srgb, var(--surface-color) 93%, var(--app-accent-bg))',
-                    border: `1px solid ${isVip ? '#E0A11B' : applyOpacity(theme.primary, 0.14)}`,
+                    background: 'var(--advertisement-card-bg)',
+                    border: `1px solid ${isVip ? '#E0A11B' : 'var(--advertisement-card-border)'}`,
                     boxShadow: `0 14px 30px ${applyOpacity(theme.secondary, 0.12)}`,
                   }}
                 >
@@ -258,10 +258,10 @@ const Donation = ({ onNavigate }) => {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="text-base font-extrabold" style={{ color: 'var(--heading-color)' }}>
+                        <h3 className="text-base font-extrabold" style={{ color: 'var(--advertisement-title)' }}>
                           {row.name}
                         </h3>
-                        <p className="text-xs mt-1 leading-5" style={{ color: 'var(--body-text-color)' }}>
+                        <p className="text-xs mt-1 leading-5" style={{ color: 'var(--advertisement-description)' }}>
                           {row.description || 'Donation support entry'}
                         </p>
                       </div>
@@ -301,7 +301,7 @@ const Donation = ({ onNavigate }) => {
                     <div className="flex items-center justify-between gap-3 mt-4">
                       <div className="flex items-center gap-2 min-w-0">
                         <IndianRupee className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
-                        <p className="text-sm font-bold truncate" style={{ color: 'var(--heading-color)' }}>
+                        <p className="text-sm font-bold truncate" style={{ color: 'var(--advertisement-description)' }}>
                           {donationSummary(row)}
                         </p>
                       </div>

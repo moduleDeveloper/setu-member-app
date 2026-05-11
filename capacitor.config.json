@@ -1,6 +1,6 @@
 {
-  "appId": "com.ekudaan.app",
-  "appName": "Pankhuri Ek Udaan",
+  "appId": "com.Setu.app",
+  "appName": "Setu",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "plugins": {

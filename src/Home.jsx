@@ -33,7 +33,7 @@ import {
 } from './utils/themeUtils';
 import { applyOpacity } from './utils/colorUtils';
 
-const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Mahila Mandal';
+const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
 const DEFAULT_TRUST_LOGO = '/new_logo.png';
 const SPONSOR_CHUNK_SIZE = sponsorConfig.CAROUSEL_BATCH_SIZE;
 const LAST_SELECTED_TRUST_ID_KEY = 'last_selected_trust_id';
@@ -1846,6 +1846,20 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
   ].filter(Boolean);
 
   const enabledQuickActions = [...dbQuickActions, ...fallbackQuickActions]
+    .filter((item) => {
+      const normalizedRoute = normalizeQuickRoute(item?.route);
+      const excludedQuickRoutes = new Set([
+        'gallery',
+        'notifications',
+        'notification',
+        'developers',
+        'developer-info',
+        'developerinfo',
+        'trustlist',
+        'trust-list'
+      ]);
+      return !excludedQuickRoutes.has(normalizedRoute);
+    })
     .filter((item, index, all) =>
       all.findIndex((entry) => normalizeQuickRoute(entry.route) === normalizeQuickRoute(item.route)) === index
     )

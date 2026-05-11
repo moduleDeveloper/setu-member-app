@@ -70,7 +70,7 @@ const deleteOtherMembership = async (id) => {
 
 const Label = ({ children }) => (
   <p style={{
-    fontSize: '11px', fontWeight: 700, color: 'var(--body-text-color)',
+    fontSize: '11px', fontWeight: 700, color: 'var(--advertisement-description)',
     textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 5px'
   }}>{children}</p>
 );
@@ -78,12 +78,12 @@ const Label = ({ children }) => (
 const inputStyle = {
   width: '100%',
   padding: '11px 14px',
-  border: '1.5px solid color-mix(in srgb, var(--brand-navy) 14%, transparent)',
+  border: '1.5px solid var(--advertisement-card-border)',
   borderRadius: '12px',
   fontSize: '14px',
   fontFamily: "var(--font-family, 'Inter', sans-serif)",
-  color: 'var(--body-text-color)',
-  background: 'color-mix(in srgb, var(--app-accent-bg) 72%, #ffffff)',
+  color: 'var(--advertisement-description)',
+  background: 'color-mix(in srgb, var(--advertisement-card-bg) 80%, var(--app-accent-bg))',
   outline: 'none',
   boxSizing: 'border-box',
   transition: 'border-color 0.2s',
@@ -596,7 +596,7 @@ const OtherMemberships = ({ onNavigate }) => {
 
             {/* ── ADD MEMBERSHIP FORM ── */}
             {showForm && (
-              <div style={{ background: colors.surface, borderRadius: '20px', border: `2px solid ${applyOpacity(colors.primary, 0.12)}`, boxShadow: `0 12px 32px ${applyOpacity(colors.primary, 0.12)}`, marginBottom: '24px', overflow: 'hidden', animation: 'fadeUp 0.35s ease-out' }}>
+              <div style={{ background: 'var(--advertisement-card-bg)', borderRadius: '20px', border: '2px solid var(--advertisement-card-border)', boxShadow: '0 12px 32px color-mix(in srgb, var(--advertisement-card-shadow) 26%, transparent)', marginBottom: '24px', overflow: 'hidden', animation: 'fadeUp 0.35s ease-out' }}>
                 <div style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -604,7 +604,7 @@ const OtherMemberships = ({ onNavigate }) => {
                     </div>
                     <div>
                       <h2 style={{ color: '#fff', fontSize: '15px', fontWeight: 800, margin: 0 }}>Add New Membership</h2>
-                      <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '11px', margin: 0 }}>Fill in the trust membership details</p>
+                      <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '11px', margin: 0 }}>Fill in the trust membership details</p>
                     </div>
                   </div>
                   <button onClick={() => { setShowForm(false); setSubmitError(''); setForm(EMPTY_FORM); }}
@@ -676,7 +676,7 @@ const OtherMemberships = ({ onNavigate }) => {
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button type="button"
                       onClick={() => { setShowForm(false); setSubmitError(''); setForm(EMPTY_FORM); }}
-                      style={{ flex: 1, padding: '12px', background: '#F1F5F9', color: '#475569', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                      style={{ flex: 1, padding: '12px', background: 'color-mix(in srgb, var(--advertisement-card-bg) 82%, var(--app-accent-bg))', color: 'var(--advertisement-description)', border: '1px solid var(--advertisement-card-border)', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
                       Cancel
                     </button>
                     <button type="submit" disabled={submitting}
@@ -730,12 +730,32 @@ const OtherMemberships = ({ onNavigate }) => {
 
             {/* Empty state */}
             {otherMems.length === 0 && trustLinks.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '60px 24px', background: '#fff', borderRadius: '20px', border: `1.5px solid ${colors.border}`, boxShadow: '0 2px 16px rgba(43,47,126,0.06)' }}>
-                <div style={{ width: 72, height: 72, borderRadius: '20px', background: 'linear-gradient(135deg, #EEF1FF, #E0E7FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                  <Building2 size={32} color={colors.primary} />
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '60px 24px',
+                  background: 'var(--advertisement-card-bg)',
+                  borderRadius: '20px',
+                  border: '1.5px solid var(--advertisement-card-border)',
+                  boxShadow: '0 10px 28px color-mix(in srgb, var(--advertisement-card-shadow) 32%, transparent)'
+                }}
+              >
+                <div
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: '20px',
+                    background: 'color-mix(in srgb, var(--advertisement-card-bg) 78%, var(--app-accent-bg))',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px'
+                  }}
+                >
+                  <Building2 size={32} color={'var(--advertisement-title)'} />
                 </div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--heading-color)', margin: '0 0 8px' }}>No Memberships Yet</h3>
-                <p style={{ fontSize: '13px', color: colors.muted, margin: 0, lineHeight: 1.5 }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--advertisement-description)', margin: '0 0 8px' }}>No Memberships Yet</h3>
+                <p style={{ fontSize: '13px', color: 'var(--advertisement-subtitle)', margin: 0, lineHeight: 1.5 }}>
                   Tap <strong>"Add New Membership"</strong> to add your first trust membership.
                 </p>
               </div>
@@ -745,6 +765,10 @@ const OtherMemberships = ({ onNavigate }) => {
       </div>
 
       <style>{`
+        input::placeholder, textarea::placeholder {
+          color: var(--advertisement-subtitle);
+          opacity: 0.9;
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(16px); }

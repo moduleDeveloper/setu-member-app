@@ -2,7 +2,7 @@
 import { supabase } from './supabaseClient';
 
 const USE_MOCK_AUTH = import.meta.env.VITE_AUTH_MOCK === 'true';
-const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || 'b353d2ff-ec3b-4b90-a896-69f40662084e';
+const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || '';
 
 const postAuthJson = async (endpoint, payload) => {

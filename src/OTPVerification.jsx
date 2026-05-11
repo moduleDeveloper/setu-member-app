@@ -16,7 +16,7 @@ const SETU_POWERED_LOGO = '/assets/setu-logo.png';
 const normalizeText = (value) => String(value || '').trim();
 
 const resolveAuthDefaultTrust = () => {
-  const defaultName = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Mahila Mandal';
+  const defaultName = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
   const selectedId = String(localStorage.getItem('selected_trust_id') || '').trim();
   const selectedName = String(localStorage.getItem('selected_trust_name') || '').trim();
   if (selectedId) return { id: selectedId, name: selectedName || defaultName };
