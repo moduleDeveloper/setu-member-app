@@ -11,13 +11,6 @@ import Sidebar from './components/Sidebar';
 
 const MEMBERS_PER_PAGE = 20;
 const DIRECTORY_CACHE_TTL_MS = 10 * 60 * 1000;
-const ROLE_FILTERS = [
-  { id: 'all', label: 'All' },
-  { id: 'patron', label: 'Patron' },
-  { id: 'trustee', label: 'Trustee' },
-  { id: 'member', label: 'Member' },
-];
-
 const normalizeRole = (value) => String(value || '').trim().toLowerCase();
 const normalizeText = (value) => String(value || '').trim();
 const getDirectoryCacheKey = (trustId) => `directory_cache_v2_${trustId || 'global'}`;
@@ -245,20 +238,28 @@ const Directory = ({ onNavigate }) => {
     };
   }, [members]);
 
-  const roleAvailability = useMemo(() => {
-    const available = new Set();
+  const roleCounts = useMemo(() => {
+    const counts = new Map();
     members.forEach((item) => {
-      const role = normalizeRole(item?.role || item?.type);
-      if (role.includes('patron')) available.add('patron');
-      else if (role.includes('trustee')) available.add('trustee');
-      else available.add('member');
+      const rawRole = normalizeText(item?.role || item?.type);
+      const roleKey = normalizeRole(rawRole) || 'member';
+      counts.set(roleKey, {
+        id: roleKey,
+        label: rawRole || 'Member',
+        count: (counts.get(roleKey)?.count || 0) + 1,
+      });
     });
-    return available;
+    return counts;
   }, [members]);
 
   const visibleRoleFilters = useMemo(() => {
-    return ROLE_FILTERS.filter((role) => role.id === 'all' || roleAvailability.has(role.id));
-  }, [roleAvailability]);
+    const roles = Array.from(roleCounts.values())
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return [
+      { id: 'all', label: 'All' },
+      ...roles,
+    ];
+  }, [roleCounts]);
 
   useEffect(() => {
     if (!visibleRoleFilters.some((item) => item.id === activeRole)) {
@@ -272,10 +273,8 @@ const Directory = ({ onNavigate }) => {
 
     if (activeRole !== 'all') {
       roleFiltered = members.filter((item) => {
-        const role = normalizeRole(item?.role || item?.type);
-        if (activeRole === 'patron') return role.includes('patron');
-        if (activeRole === 'trustee') return role.includes('trustee');
-        return !role.includes('patron') && !role.includes('trustee');
+        const role = normalizeRole(item?.role || item?.type) || 'member';
+        return role === activeRole;
       });
     }
 

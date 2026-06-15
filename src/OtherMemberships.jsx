@@ -280,11 +280,16 @@ const OtherMemberships = ({ onNavigate }) => {
     setError('');
     try {
       const parsedUser = getStoredUser();
-      const id = parsedUser?.members_id || parsedUser?.id;
+      const id = normalizeText(parsedUser?.members_id);
+      if (!id) {
+        setError('Member ID not found. Please re-login.');
+        setLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
       const name = parsedUser?.Name || parsedUser?.name || parsedUser?.full_name || '';
-      const phone = parsedUser?.Mobile || parsedUser?.mobile || parsedUser?.phone || parsedUser?.Phone || '';
       setMemberName(name);
-      setMemberPhone(phone);
+      setMemberPhone('');
 
       const merged = buildTrustLinksFromUserPayload(parsedUser);
 
@@ -292,19 +297,15 @@ const OtherMemberships = ({ onNavigate }) => {
       writeTrustLinksCache(id || 'anonymous', merged);
 
       // ── other_memberships table ──
-      if (id) {
-        try {
-          const otherMemsData = await fetchOtherMemberships(id);
-          setOtherMems((prev) => {
-            const next = otherMemsData || [];
-            return areMembershipCollectionsEqual(prev, next) ? prev : next;
-          });
-        } catch (e) {
-          console.warn('other_memberships fetch failed:', e);
-        }
+      try {
+        const otherMemsData = await fetchOtherMemberships(id);
+        setOtherMems((prev) => {
+          const next = otherMemsData || [];
+          return areMembershipCollectionsEqual(prev, next) ? prev : next;
+        });
+      } catch (e) {
+        console.warn('other_memberships fetch failed:', e);
       }
-
-      if (merged.length === 0 && !id) setError('Member ID not found. Please re-login.');
     } catch (err) {
       console.error('OtherMemberships load error:', err);
       setError('Something went wrong. Please try again.');
@@ -374,11 +375,11 @@ const OtherMemberships = ({ onNavigate }) => {
 
     setSubmitting(true);
     try {
-      const id = user?.members_id || user?.id;
+      const id = normalizeText(user?.members_id);
       const payload = {
         member_id: id || null,
         member_name: memberName || null,
-        member_phone: memberPhone || null,
+        member_phone: null,
         trust_id: null,
         organisation_name: form.organisation_name.trim() || null,
         membership_no: form.membership_no.trim(),

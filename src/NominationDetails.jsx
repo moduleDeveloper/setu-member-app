@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, FileText, UserRound, ShieldCheck, Plus, Save, X } from 'lucide-react';
+import { ChevronLeft, FileText, ShieldCheck, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppTheme } from './context/ThemeContext';
 import { applyOpacity } from './utils/colorUtils';
-import { createFamilyMember, getFamilyMembers, updateFamilyMember } from './services/api';
+import { getFamilyMembers } from './services/api';
 import { supabase } from './services/supabaseClient';
 
 const resolveInitialMemberships = () => {
@@ -17,63 +18,34 @@ const resolveInitialMemberships = () => {
 };
 
 const normalizeId = (value) => String(value || '').trim();
-const RELATION_OPTIONS = ['Spouse', 'Father', 'Mother', 'Son', 'Daughter', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Uncle', 'Aunt', 'Other'];
-const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
-const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-const createDraftMember = () => ({
-  id: null,
-  name: '',
-  relation: '',
-  gender: '',
-  age: '',
-  blood_group: '',
-  contact_no: '',
-  email: '',
-  address: ''
-});
-
 const NominationDetails = ({ onNavigateBack }) => {
   const theme = useAppTheme();
+  const navigate = useNavigate();
   const [memberships, setMemberships] = useState(() => resolveInitialMemberships());
   const [selectedTrustId, setSelectedTrustId] = useState(() => normalizeId(localStorage.getItem('selected_trust_id')));
   const [familyMembers, setFamilyMembers] = useState([]);
   const [nominations, setNominations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState('');
-  const [memberSaving, setMemberSaving] = useState(false);
-  const [showMemberForm, setShowMemberForm] = useState(false);
-  const [formState, setFormState] = useState(createDraftMember());
-  const [nominationForm, setNominationForm] = useState({ family_member_id: '', nominee_type: 'primary' });
+  const [nominationForm, setNominationForm] = useState({ family_member_id: '' });
   const [message, setMessage] = useState({ type: '', text: '' });
   const [contextIds, setContextIds] = useState({ memberId: '', regId: '' });
+  const [replaceDialog, setReplaceDialog] = useState({
+    open: false,
+    familyMemberId: '',
+    currentNomineeName: '',
+    nextNomineeName: '',
+  });
 
-  const trustOptions = useMemo(() => {
-    const seen = new Set();
-    return memberships
-      .filter((item) => item?.trust_id)
-      .filter((item) => {
-        const key = normalizeId(item.trust_id);
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .map((item) => ({
-        trust_id: normalizeId(item.trust_id),
-        trust_name: item.trust_name || item.trust_id,
-      }));
-  }, [memberships]);
+  const nominatedFamilyIds = useMemo(
+    () => new Set(nominations.map((row) => normalizeId(row?.family_member_id)).filter(Boolean)),
+    [nominations]
+  );
 
-  const nominationByFamily = useMemo(() => {
-    const map = new Map();
-    nominations.forEach((row) => {
-      const fid = normalizeId(row?.family_member_id);
-      if (!fid) return;
-      const list = map.get(fid) || [];
-      list.push(row);
-      map.set(fid, list);
-    });
-    return map;
-  }, [nominations]);
+  const selectedNominee = useMemo(
+    () => familyMembers.find((member) => normalizeId(member?.id) === normalizeId(nominationForm.family_member_id)) || null,
+    [familyMembers, nominationForm.family_member_id]
+  );
 
   const resolveMemberContext = async (trustId, membershipRows = memberships) => {
     let memberId = '';
@@ -127,12 +99,15 @@ const NominationDetails = ({ onNavigateBack }) => {
         return;
       }
 
+      if (!ids.regId) {
+        setNominations([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('member_nominations')
-        .select('id, family_member_id, nominee_type, status, trust_id, member_id, reg_id')
-        .eq('trust_id', normalizedTrustId)
-        .eq('member_id', ids.memberId)
-        .in('status', ['active', 'pending']);
+        .select('id, family_member_id, reg_id')
+        .eq('reg_id', ids.regId);
 
       if (error) throw error;
       setNominations(Array.isArray(data) ? data : []);
@@ -146,51 +121,64 @@ const NominationDetails = ({ onNavigateBack }) => {
   };
 
   useEffect(() => {
-    if (!selectedTrustId && trustOptions[0]?.trust_id) {
-      setSelectedTrustId(trustOptions[0].trust_id);
-      return;
-    }
     if (!selectedTrustId) return;
     loadAll(selectedTrustId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTrustId]);
 
+  useEffect(() => {
+    const syncSelectedTrust = () => {
+      const nextTrustId = normalizeId(localStorage.getItem('selected_trust_id'));
+      if (nextTrustId && nextTrustId !== selectedTrustId) {
+        setSelectedTrustId(nextTrustId);
+      }
+    };
+
+    window.addEventListener('storage', syncSelectedTrust);
+    window.addEventListener('trust-changed', syncSelectedTrust);
+    return () => {
+      window.removeEventListener('storage', syncSelectedTrust);
+      window.removeEventListener('trust-changed', syncSelectedTrust);
+    };
+  }, [selectedTrustId]);
+
   const refreshNominations = async () => {
-    if (!selectedTrustId || !contextIds.memberId) return;
+    if (!selectedTrustId || !contextIds.regId) return;
     const { data, error } = await supabase
       .from('member_nominations')
-      .select('id, family_member_id, nominee_type, status, trust_id, member_id, reg_id')
-      .eq('trust_id', selectedTrustId)
-      .eq('member_id', contextIds.memberId)
-      .in('status', ['active', 'pending']);
+      .select('id, family_member_id, reg_id')
+      .eq('reg_id', contextIds.regId);
     if (error) throw error;
     setNominations(Array.isArray(data) ? data : []);
   };
 
-  const setNomineeType = async (familyMemberId, nomineeType) => {
-    if (!selectedTrustId || !contextIds.memberId || !contextIds.regId) {
+  const assignNominee = async (familyMemberId) => {
+    if (!selectedTrustId || !contextIds.regId) {
       setMessage({ type: 'error', text: 'Member context missing for selected trust.' });
       return;
     }
-    const lockKey = `${familyMemberId}:${nomineeType}`;
+    const lockKey = `${familyMemberId}:assign`;
     setSavingKey(lockKey);
     setMessage({ type: '', text: '' });
     try {
+      const alreadyNominated = nominations.some(
+        (row) => normalizeId(row?.family_member_id) === normalizeId(familyMemberId)
+      );
+      if (alreadyNominated) {
+        setMessage({ type: 'success', text: 'This member is already nominated.' });
+        return;
+      }
+
       const payload = {
-        trust_id: selectedTrustId,
-        member_id: contextIds.memberId,
         reg_id: contextIds.regId,
         family_member_id: familyMemberId,
-        nominee_type: nomineeType,
-        status: 'active',
         updated_at: new Date().toISOString(),
       };
-      const { error } = await supabase
-        .from('member_nominations')
-        .upsert(payload, { onConflict: 'trust_id,member_id,family_member_id,nominee_type' });
+      const { error } = await supabase.from('member_nominations').insert(payload);
       if (error) throw error;
       await refreshNominations();
-      setMessage({ type: 'success', text: `${nomineeType === 'primary' ? 'Primary' : 'Secondary'} nominee updated.` });
+      setNominationForm({ family_member_id: '' });
+      setMessage({ type: 'success', text: 'Nominee saved successfully.' });
     } catch (error) {
       setMessage({ type: 'error', text: error?.message || 'Unable to update nominee.' });
     } finally {
@@ -198,19 +186,70 @@ const NominationDetails = ({ onNavigateBack }) => {
     }
   };
 
+  const handleSaveNominee = async () => {
+    const familyId = normalizeId(nominationForm.family_member_id);
+    if (!familyId) {
+      setMessage({ type: 'error', text: 'Please select a family member for nomination.' });
+      return;
+    }
+
+    const currentNomination = nominations[0] || null;
+    const currentNomineeId = normalizeId(currentNomination?.family_member_id);
+
+    if (!currentNomineeId) {
+      await assignNominee(familyId);
+      return;
+    }
+
+    if (currentNomineeId === familyId) {
+      setMessage({ type: 'success', text: 'This member is already nominated.' });
+      return;
+    }
+
+    const currentNominee = familyMembers.find((member) => normalizeId(member?.id) === currentNomineeId);
+    const nextNominee = familyMembers.find((member) => normalizeId(member?.id) === familyId);
+    setReplaceDialog({
+      open: true,
+      familyMemberId: familyId,
+      currentNomineeName: currentNominee?.name || 'Current nominee',
+      nextNomineeName: nextNominee?.name || 'Selected member',
+    });
+  };
+
+  const confirmReplaceNominee = async () => {
+    const familyId = normalizeId(replaceDialog.familyMemberId);
+    if (!familyId) return;
+
+    setReplaceDialog((prev) => ({ ...prev, open: false }));
+    const currentNomination = nominations[0] || null;
+    const currentNominationId = normalizeId(currentNomination?.id);
+    if (currentNominationId) {
+      await revokeNominee(currentNomination.family_member_id);
+    }
+    await assignNominee(familyId);
+    setNominationForm({ family_member_id: '' });
+  };
+
   const revokeNominee = async (familyMemberId) => {
-    if (!selectedTrustId || !contextIds.memberId) return;
+    if (!selectedTrustId || !contextIds.regId) return;
     const lockKey = `${familyMemberId}:revoke`;
     setSavingKey(lockKey);
     setMessage({ type: '', text: '' });
     try {
+      const targetIds = nominations
+        .filter((row) => normalizeId(row?.family_member_id) === normalizeId(familyMemberId))
+        .map((row) => row.id)
+        .filter(Boolean);
+
+      if (targetIds.length === 0) {
+        setMessage({ type: 'error', text: 'Selected member is not a nominee.' });
+        return;
+      }
+
       const { error } = await supabase
         .from('member_nominations')
-        .update({ status: 'revoked', updated_at: new Date().toISOString() })
-        .eq('trust_id', selectedTrustId)
-        .eq('member_id', contextIds.memberId)
-        .eq('family_member_id', familyMemberId)
-        .in('status', ['active', 'pending']);
+        .delete()
+        .in('id', targetIds);
       if (error) throw error;
       await refreshNominations();
       setMessage({ type: 'success', text: 'Nomination removed.' });
@@ -221,91 +260,8 @@ const NominationDetails = ({ onNavigateBack }) => {
     }
   };
 
-  const openAddMember = () => {
-    setFormState(createDraftMember());
-    setShowMemberForm(true);
-  };
-
-  const openEditMember = (member) => {
-    setFormState({
-      id: member?.id || null,
-      name: String(member?.name || ''),
-      relation: String(member?.relation || ''),
-      gender: String(member?.gender || ''),
-      age: member?.age === null || member?.age === undefined ? '' : String(member?.age),
-      blood_group: String(member?.blood_group || ''),
-      contact_no: String(member?.contact_no || ''),
-      email: String(member?.email || ''),
-      address: String(member?.address || ''),
-    });
-    setShowMemberForm(true);
-  };
-
-  const saveMember = async () => {
-    const name = String(formState?.name || '').trim();
-    const relation = String(formState?.relation || '').trim();
-    if (!name) {
-      setMessage({ type: 'error', text: 'Member name is required.' });
-      return;
-    }
-    if (!relation) {
-      setMessage({ type: 'error', text: 'Relation is required.' });
-      return;
-    }
-
-    const ageText = String(formState?.age || '').trim();
-    const payload = {
-      name,
-      relation,
-      gender: String(formState?.gender || '').trim() || null,
-      age: ageText === '' ? null : Number(ageText),
-      blood_group: String(formState?.blood_group || '').trim() || null,
-      contact_no: String(formState?.contact_no || '').trim() || null,
-      email: String(formState?.email || '').trim() || null,
-      address: String(formState?.address || '').trim() || null,
-    };
-
-    setMemberSaving(true);
-    setMessage({ type: '', text: '' });
-    try {
-      const isCreate = !formState?.id;
-      const response = isCreate
-        ? await createFamilyMember(payload)
-        : await updateFamilyMember(formState.id, payload);
-      const saved = response?.member;
-      if (!saved?.id) throw new Error('Failed to save family member.');
-
-      setFamilyMembers((prev) => {
-        if (isCreate) return [saved, ...prev];
-        return prev.map((item) => (normalizeId(item?.id) === normalizeId(saved?.id) ? saved : item));
-      });
-      setShowMemberForm(false);
-      setFormState(createDraftMember());
-      setMessage({ type: 'success', text: isCreate ? 'Family member added.' : 'Family member updated.' });
-    } catch (error) {
-      setMessage({ type: 'error', text: error?.message || 'Unable to save family member.' });
-    } finally {
-      setMemberSaving(false);
-    }
-  };
-
   const submitNominationForm = async () => {
-    const familyId = normalizeId(nominationForm.family_member_id);
-    const nomineeType = nominationForm.nominee_type === 'secondary' ? 'secondary' : 'primary';
-    if (!familyId) {
-      setMessage({ type: 'error', text: 'Please select a family member for nomination.' });
-      return;
-    }
-    await setNomineeType(familyId, nomineeType);
-  };
-
-  const removeFromNominationForm = async () => {
-    const familyId = normalizeId(nominationForm.family_member_id);
-    if (!familyId) {
-      setMessage({ type: 'error', text: 'Please select a family member to remove nomination.' });
-      return;
-    }
-    await revokeNominee(familyId);
+    await handleSaveNominee();
   };
 
   return (
@@ -341,101 +297,6 @@ const NominationDetails = ({ onNavigateBack }) => {
 
       <div className="px-6 py-5 space-y-4">
         <div
-          className="rounded-2xl p-4"
-          style={{
-            background: 'color-mix(in srgb, var(--surface-color) 88%, var(--app-page-bg))',
-            border: `1px solid ${applyOpacity(theme.primary, 0.08)}`,
-          }}
-        >
-          <label className="block text-[11px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: theme.primary }}>
-            Select Trust
-          </label>
-          <select
-            value={selectedTrustId}
-            onChange={(e) => {
-              const next = normalizeId(e.target.value);
-              setSelectedTrustId(next);
-              localStorage.setItem('selected_trust_id', next);
-            }}
-            className="w-full px-3 py-2.5 rounded-xl border-2 bg-transparent focus:outline-none"
-            style={{
-              borderColor: applyOpacity(theme.primary, 0.18),
-              color: 'var(--body-text-color)',
-              background: 'var(--surface-color)',
-            }}
-          >
-            {trustOptions.map((trust) => (
-              <option key={trust.trust_id} value={trust.trust_id}>{trust.trust_name}</option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          type="button"
-          onClick={openAddMember}
-          className="w-full h-11 rounded-xl text-sm font-bold active:scale-95 transition-all inline-flex items-center justify-center gap-2"
-          style={{ color: 'var(--surface-color)', background: 'linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 45%, var(--brand-navy) 100%)' }}
-        >
-          <Plus className="h-4 w-4" />
-          {showMemberForm ? 'Family Form Open' : 'Add Family Member'}
-        </button>
-
-        {showMemberForm ? (
-          <div
-            className="rounded-2xl p-4"
-            style={{ background: 'var(--surface-color)', border: `1px solid ${applyOpacity(theme.primary, 0.15)}` }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-base font-extrabold" style={{ color: 'var(--heading-color)' }}>
-                {formState?.id ? 'Edit Family Member' : 'Add Family Member'}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMemberForm(false);
-                  setFormState(createDraftMember());
-                }}
-                className="w-8 h-8 rounded-lg inline-flex items-center justify-center"
-                style={{ background: 'color-mix(in srgb, var(--body-text-color) 8%, var(--surface-color))' }}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <input value={formState.name} onChange={(e) => setFormState((p) => ({ ...p, name: e.target.value }))} placeholder="Name *" className="sm:col-span-2 h-10 rounded-xl px-3 border bg-transparent min-w-0" style={{ borderColor: applyOpacity(theme.primary, 0.16) }} />
-              <select value={formState.relation} onChange={(e) => setFormState((p) => ({ ...p, relation: e.target.value }))} className="h-10 rounded-xl px-3 border bg-transparent min-w-0" style={{ borderColor: applyOpacity(theme.primary, 0.16) }}>
-                <option value="">Relation *</option>
-                {RELATION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-              <select value={formState.gender} onChange={(e) => setFormState((p) => ({ ...p, gender: e.target.value }))} className="h-10 rounded-xl px-3 border bg-transparent min-w-0" style={{ borderColor: applyOpacity(theme.primary, 0.16) }}>
-                <option value="">Gender</option>
-                {GENDER_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
-              </select>
-              <input value={formState.age} onChange={(e) => setFormState((p) => ({ ...p, age: e.target.value }))} type="number" min="0" max="120" placeholder="Age" className="h-10 rounded-xl px-3 border bg-transparent min-w-0" style={{ borderColor: applyOpacity(theme.primary, 0.16) }} />
-              <select value={formState.blood_group} onChange={(e) => setFormState((p) => ({ ...p, blood_group: e.target.value }))} className="h-10 rounded-xl px-3 border bg-transparent min-w-0" style={{ borderColor: applyOpacity(theme.primary, 0.16) }}>
-                <option value="">Blood Group</option>
-                {BLOOD_GROUP_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <input value={formState.contact_no} onChange={(e) => setFormState((p) => ({ ...p, contact_no: e.target.value }))} placeholder="Contact No" className="sm:col-span-2 h-10 rounded-xl px-3 border bg-transparent min-w-0" style={{ borderColor: applyOpacity(theme.primary, 0.16) }} />
-              <input value={formState.email} onChange={(e) => setFormState((p) => ({ ...p, email: e.target.value }))} placeholder="Email" className="sm:col-span-2 h-10 rounded-xl px-3 border bg-transparent min-w-0" style={{ borderColor: applyOpacity(theme.primary, 0.16) }} />
-              <input value={formState.address} onChange={(e) => setFormState((p) => ({ ...p, address: e.target.value }))} placeholder="Address" className="sm:col-span-2 h-10 rounded-xl px-3 border bg-transparent min-w-0" style={{ borderColor: applyOpacity(theme.primary, 0.16) }} />
-            </div>
-
-            <button
-              type="button"
-              disabled={memberSaving}
-              onClick={saveMember}
-              className="mt-3 w-full h-10 rounded-xl text-sm font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60"
-              style={{ color: 'var(--surface-color)', background: 'linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 45%, var(--brand-navy) 100%)' }}
-            >
-              <Save className="h-4 w-4" />
-              {memberSaving ? 'Saving...' : 'Save Family Member'}
-            </button>
-          </div>
-        ) : null}
-
-        <div
           className="rounded-2xl p-4 space-y-3"
           style={{
             background: 'color-mix(in srgb, var(--surface-color) 90%, var(--app-page-bg))',
@@ -448,50 +309,61 @@ const NominationDetails = ({ onNavigateBack }) => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <select
               value={nominationForm.family_member_id}
-              onChange={(e) => setNominationForm((prev) => ({ ...prev, family_member_id: normalizeId(e.target.value) }))}
-              className="h-10 rounded-xl px-3 border bg-transparent min-w-0"
+              onChange={(e) => {
+                const nextValue = normalizeId(e.target.value);
+                if (nextValue === '__add_family_member__') {
+                  navigate('/my-family', { state: { returnTo: '/nomination-details' } });
+                  return;
+                }
+                setNominationForm((prev) => ({ ...prev, family_member_id: nextValue }));
+              }}
+              className="sm:col-span-2 h-10 rounded-xl px-3 border bg-transparent min-w-0"
               style={{ borderColor: applyOpacity(theme.primary, 0.16) }}
             >
               <option value="">Select Family Member</option>
+              <option value="__add_family_member__">+ Add Family Member</option>
               {familyMembers.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.name || 'Unnamed Member'}
                 </option>
               ))}
             </select>
-            <select
-              value={nominationForm.nominee_type}
-              onChange={(e) => setNominationForm((prev) => ({ ...prev, nominee_type: e.target.value === 'secondary' ? 'secondary' : 'primary' }))}
-              className="h-10 rounded-xl px-3 border bg-transparent min-w-0"
-              style={{ borderColor: applyOpacity(theme.primary, 0.16) }}
-            >
-              <option value="primary">Primary Nominee</option>
-              <option value="secondary">Secondary Nominee</option>
-            </select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={Boolean(savingKey)}
-              onClick={submitNominationForm}
-              className="h-10 rounded-xl text-sm font-bold active:scale-95 transition-all disabled:opacity-60"
-              style={{ color: 'var(--surface-color)', background: 'linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 45%, var(--brand-navy) 100%)' }}
-            >
-              Save Nominee
-            </button>
-            <button
-              type="button"
-              disabled={Boolean(savingKey)}
-              onClick={removeFromNominationForm}
-              className="h-10 rounded-xl text-sm font-bold active:scale-95 transition-all disabled:opacity-60"
+          {selectedNominee ? (
+            <div
+              className="rounded-2xl p-4"
               style={{
-                color: 'color-mix(in srgb, var(--body-text-color) 78%, var(--surface-color))',
-                background: 'color-mix(in srgb, var(--body-text-color) 8%, var(--surface-color))',
+                background: 'var(--surface-color)',
+                border: `1px solid ${applyOpacity(theme.primary, 0.1)}`,
               }}
             >
-              Remove Nominee
-            </button>
-          </div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-base truncate" style={{ color: 'var(--heading-color)' }}>
+                    {selectedNominee?.name || 'Unnamed Member'}
+                  </p>
+                  <p className="text-sm mt-0.5" style={{ color: 'color-mix(in srgb, var(--body-text-color) 60%, var(--surface-color))' }}>
+                    {[selectedNominee?.relation, selectedNominee?.gender].filter(Boolean).join(' | ') || 'Family Member'}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'color-mix(in srgb, var(--body-text-color) 58%, var(--surface-color))' }}>
+                    {[selectedNominee?.age ? `Age ${selectedNominee.age}` : '', selectedNominee?.blood_group ? `Blood ${selectedNominee.blood_group}` : ''].filter(Boolean).join(' | ')}
+                  </p>
+                  <p className="text-xs mt-1 break-words" style={{ color: 'color-mix(in srgb, var(--body-text-color) 58%, var(--surface-color))' }}>
+                    {[selectedNominee?.contact_no || '', selectedNominee?.email || '', selectedNominee?.address || ''].filter(Boolean).join(' | ')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={Boolean(savingKey)}
+                onClick={submitNominationForm}
+                className="mt-3 w-full h-10 rounded-xl text-sm font-bold active:scale-95 transition-all disabled:opacity-60"
+                style={{ color: 'var(--surface-color)', background: 'linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 45%, var(--brand-navy) 100%)' }}
+              >
+                Save Nominee
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {message.text ? (
@@ -508,6 +380,48 @@ const NominationDetails = ({ onNavigateBack }) => {
           </div>
         ) : null}
 
+        {replaceDialog.open ? (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div
+              className="absolute inset-0"
+              style={{ background: 'rgba(15, 23, 42, 0.45)' }}
+              onClick={() => setReplaceDialog({ open: false, familyMemberId: '', currentNomineeName: '', nextNomineeName: '' })}
+            />
+            <div
+              className="relative w-full max-w-sm rounded-2xl p-5 shadow-2xl"
+              style={{ background: 'var(--surface-color)', border: `1px solid ${applyOpacity(theme.primary, 0.12)}` }}
+            >
+              <p className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>
+                Nominee Limit
+              </p>
+              <h3 className="mt-2 text-lg font-extrabold" style={{ color: 'var(--heading-color)' }}>
+                You can create only one nominee
+              </h3>
+              <p className="mt-2 text-sm" style={{ color: 'var(--body-text-color)' }}>
+                Replace <strong>{replaceDialog.currentNomineeName}</strong> with <strong>{replaceDialog.nextNomineeName}</strong>?
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReplaceDialog({ open: false, familyMemberId: '', currentNomineeName: '', nextNomineeName: '' })}
+                  className="h-10 rounded-xl text-sm font-bold"
+                  style={{ background: 'color-mix(in srgb, var(--body-text-color) 8%, var(--surface-color))', color: 'var(--body-text-color)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmReplaceNominee}
+                  className="h-10 rounded-xl text-sm font-bold"
+                  style={{ background: 'linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-dark) 45%, var(--brand-navy) 100%)', color: 'var(--surface-color)' }}
+                >
+                  Replace
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {loading ? (
           <div className="py-16 text-center">
             <div
@@ -516,7 +430,7 @@ const NominationDetails = ({ onNavigateBack }) => {
             />
             <p className="mt-3 text-sm font-semibold">Loading nominations...</p>
           </div>
-        ) : familyMembers.length === 0 ? (
+        ) : nominations.length === 0 ? (
           <div
             className="rounded-2xl p-8 text-center"
             style={{
@@ -525,75 +439,59 @@ const NominationDetails = ({ onNavigateBack }) => {
             }}
           >
             <FileText className="h-8 w-8 mx-auto mb-2" style={{ color: theme.primary }} />
-            <p className="font-semibold">No family members found.</p>
+            <p className="font-semibold">No nominees selected.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {familyMembers.map((member) => {
+            {familyMembers.filter((member) => nominatedFamilyIds.has(normalizeId(member?.id))).map((member) => {
               const familyId = normalizeId(member?.id);
-              const rows = nominationByFamily.get(familyId) || [];
-              const hasPrimary = rows.some((row) => row?.nominee_type === 'primary');
-              const hasSecondary = rows.some((row) => row?.nominee_type === 'secondary');
 
               return (
                 <div
                   key={familyId}
-                  className="rounded-2xl p-4"
+                  className="relative rounded-2xl p-4 pr-12"
                   style={{
                     background: 'var(--surface-color)',
                     border: `1px solid ${applyOpacity(theme.primary, 0.1)}`,
                   }}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-base truncate" style={{ color: 'var(--heading-color)' }}>
-                        {member?.name || 'Unnamed Member'}
-                      </p>
-                      <p className="text-sm mt-0.5" style={{ color: 'color-mix(in srgb, var(--body-text-color) 60%, var(--surface-color))' }}>
-                        {[member?.relation, member?.gender].filter(Boolean).join(' | ') || 'Family Member'}
-                      </p>
-                      <p className="text-xs mt-1" style={{ color: 'color-mix(in srgb, var(--body-text-color) 58%, var(--surface-color))' }}>
-                        {[member?.age ? `Age ${member.age}` : '', member?.blood_group ? `Blood ${member.blood_group}` : ''].filter(Boolean).join(' | ')}
-                      </p>
-                      <p className="text-xs mt-1 break-words" style={{ color: 'color-mix(in srgb, var(--body-text-color) 58%, var(--surface-color))' }}>
-                        {[member?.contact_no || '', member?.email || '', member?.address || ''].filter(Boolean).join(' | ')}
-                      </p>
-                    </div>
-                    {(hasPrimary || hasSecondary) ? (
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        {hasPrimary ? (
-                          <span
-                            className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full"
-                            style={{ color: 'var(--brand-navy)', background: applyOpacity(theme.primary, 0.12) }}
-                          >
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                            Primary
-                          </span>
-                        ) : null}
-                        {hasSecondary ? (
-                          <span
-                            className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full"
-                            style={{ color: 'var(--brand-red-dark)', background: 'color-mix(in srgb, var(--brand-red) 14%, var(--surface-color))' }}
-                          >
-                            <UserRound className="h-3.5 w-3.5" />
-                            Secondary
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-
                   <button
                     type="button"
-                    onClick={() => openEditMember(member)}
-                    className="mt-3 w-full h-9 rounded-xl text-xs font-semibold active:scale-95 transition-all"
-                    style={{
-                      color: 'var(--brand-navy)',
-                      background: 'color-mix(in srgb, var(--brand-navy) 10%, var(--surface-color))',
+                    onClick={() => {
+                      const confirmed = window.confirm('Do you want to remove this nominee?');
+                      if (confirmed) revokeNominee(familyId);
                     }}
+                    disabled={Boolean(savingKey)}
+                    className="absolute top-3 right-3 w-7 h-7 rounded-full inline-flex items-center justify-center disabled:opacity-60"
+                    style={{
+                      color: 'var(--brand-red-dark)',
+                      background: 'color-mix(in srgb, var(--brand-red) 12%, var(--surface-color))',
+                    }}
+                    aria-label="Remove nominee"
                   >
-                    Edit Family Details
+                    <X className="h-3.5 w-3.5" />
                   </button>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-base truncate" style={{ color: 'var(--heading-color)' }}>
+                      {member?.name || 'Unnamed Member'}
+                    </p>
+                    <p className="text-sm mt-0.5" style={{ color: 'color-mix(in srgb, var(--body-text-color) 60%, var(--surface-color))' }}>
+                      {[member?.relation, member?.gender].filter(Boolean).join(' | ') || 'Family Member'}
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'color-mix(in srgb, var(--body-text-color) 58%, var(--surface-color))' }}>
+                      {[member?.age ? `Age ${member.age}` : '', member?.blood_group ? `Blood ${member.blood_group}` : ''].filter(Boolean).join(' | ')}
+                    </p>
+                    <p className="text-xs mt-1 break-words" style={{ color: 'color-mix(in srgb, var(--body-text-color) 58%, var(--surface-color))' }}>
+                      {[member?.contact_no || '', member?.email || '', member?.address || ''].filter(Boolean).join(' | ')}
+                    </p>
+                  </div>
+                  <div className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full"
+                    style={{ color: 'var(--brand-navy)', background: applyOpacity(theme.primary, 0.12) }}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Nominee
+                  </div>
+
                 </div>
               );
             })}

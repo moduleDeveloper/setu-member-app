@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Calendar, FileText, Home as HomeIcon, Paperclip, Star } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Home as HomeIcon, Star, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppTheme } from './context/ThemeContext';
 import { getNoticeboardSnapshot, loadNoticeDetail } from './services/noticeboardStore';
@@ -8,6 +8,7 @@ const AUTO_SWIPE_INTERVAL_MS = 5000;
 const AUTO_SWIPE_PAUSE_AFTER_INTERACTION_MS = 3500;
 const SWIPE_THRESHOLD_PX = 44;
 const MAX_DRAG_TRANSLATE_PX = 72;
+const getCurrentTimestamp = () => Date.now();
 
 const formatDateRange = (startDate, endDate) => {
   const toLabel = (value) => {
@@ -101,11 +102,13 @@ const NoticeDetail = ({ onNavigate }) => {
   const [currentNoticeIndex, setCurrentNoticeIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [previewImage, setPreviewImage] = useState(null);
   const [dragTranslateX, setDragTranslateX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const touchStartXRef = useRef(null);
   const touchEndXRef = useRef(null);
   const lastInteractionTsRef = useRef(0);
+  const isTouchHoldingRef = useRef(false);
   const selectedTrustId = useMemo(() => localStorage.getItem('selected_trust_id') || '', []);
 
   useEffect(() => {
@@ -152,6 +155,7 @@ const NoticeDetail = ({ onNavigate }) => {
       } else if (!fromList) {
         setError('Notice not found');
       }
+      setPreviewImage(null);
       setLoading(false);
     };
 
@@ -161,7 +165,8 @@ const NoticeDetail = ({ onNavigate }) => {
   useEffect(() => {
     if (loading || error || !Array.isArray(noticeList) || noticeList.length <= 1) return undefined;
     const timer = setInterval(() => {
-      if (Date.now() - lastInteractionTsRef.current < AUTO_SWIPE_PAUSE_AFTER_INTERACTION_MS) return;
+      if (isTouchHoldingRef.current) return;
+      if (getCurrentTimestamp() - lastInteractionTsRef.current < AUTO_SWIPE_PAUSE_AFTER_INTERACTION_MS) return;
       setCurrentNoticeIndex((prev) => (prev + 1) % noticeList.length);
     }, AUTO_SWIPE_INTERVAL_MS);
     return () => clearInterval(timer);
@@ -174,7 +179,8 @@ const NoticeDetail = ({ onNavigate }) => {
 
   const onCardTouchStart = (event) => {
     if (!Array.isArray(noticeList) || noticeList.length <= 1) return;
-    lastInteractionTsRef.current = Date.now();
+    isTouchHoldingRef.current = true;
+    lastInteractionTsRef.current = getCurrentTimestamp();
     touchStartXRef.current = event.touches?.[0]?.clientX ?? null;
     touchEndXRef.current = touchStartXRef.current;
     setIsDragging(true);
@@ -194,7 +200,8 @@ const NoticeDetail = ({ onNavigate }) => {
 
   const onCardTouchEnd = () => {
     if (!Array.isArray(noticeList) || noticeList.length <= 1) return;
-    lastInteractionTsRef.current = Date.now();
+    isTouchHoldingRef.current = false;
+    lastInteractionTsRef.current = getCurrentTimestamp();
     setIsDragging(false);
     const start = touchStartXRef.current;
     const end = touchEndXRef.current;
@@ -204,6 +211,29 @@ const NoticeDetail = ({ onNavigate }) => {
     if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
     if (delta < 0) setCurrentNoticeIndex((prev) => (prev + 1) % noticeList.length);
     else setCurrentNoticeIndex((prev) => (prev - 1 + noticeList.length) % noticeList.length);
+  };
+
+  const onCardPointerDown = () => {
+    if (!Array.isArray(noticeList) || noticeList.length <= 1) return;
+    isTouchHoldingRef.current = true;
+    lastInteractionTsRef.current = getCurrentTimestamp();
+  };
+
+  const onCardPointerUp = () => {
+    if (!Array.isArray(noticeList) || noticeList.length <= 1) return;
+    isTouchHoldingRef.current = false;
+    lastInteractionTsRef.current = getCurrentTimestamp();
+  };
+
+  const openImagePreview = (attachment) => {
+    if (!attachment?.url) return;
+    lastInteractionTsRef.current = getCurrentTimestamp();
+    setPreviewImage(attachment);
+  };
+
+  const closeImagePreview = () => {
+    lastInteractionTsRef.current = getCurrentTimestamp();
+    setPreviewImage(null);
   };
 
   const hasCarousel = Array.isArray(noticeList) && noticeList.length > 0;
@@ -289,6 +319,10 @@ const NoticeDetail = ({ onNavigate }) => {
             onTouchMove={onCardTouchMove}
             onTouchEnd={onCardTouchEnd}
             onTouchCancel={onCardTouchEnd}
+            onPointerDown={onCardPointerDown}
+            onPointerUp={onCardPointerUp}
+            onPointerCancel={onCardPointerUp}
+            onPointerLeave={onCardPointerUp}
           >
             <div className="flex items-center justify-between gap-3 mb-4">
               <span
@@ -329,12 +363,17 @@ const NoticeDetail = ({ onNavigate }) => {
                       style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 12%, transparent)' }}
                     >
                       {attachment.type === 'image' && (
-                        <div className="relative w-full h-44 bg-slate-100">
+                        <button
+                          type="button"
+                          className="relative flex w-full items-center justify-center overflow-hidden bg-[color:var(--advertisement-card-bg)] px-3 py-3"
+                          onClick={() => openImagePreview(attachment)}
+                          aria-label={`Open ${attachment.label}`}
+                        >
                           <img
                             src={attachment.url}
                             alt={attachment.label}
                             loading="lazy"
-                            className="w-full h-44 object-cover bg-slate-100"
+                            className="block max-h-[28rem] w-auto max-w-full rounded-xl object-contain shadow-sm"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                               const fallback = e.currentTarget.nextElementSibling;
@@ -342,12 +381,15 @@ const NoticeDetail = ({ onNavigate }) => {
                             }}
                           />
                           <div
-                            className="hidden absolute inset-0 items-center justify-center px-3 text-xs font-semibold text-slate-600"
+                            className="hidden min-h-44 w-full items-center justify-center rounded-xl px-3 py-6 text-xs font-semibold text-slate-600"
                             style={{ background: 'color-mix(in srgb, var(--surface-color) 74%, var(--app-accent-bg))' }}
                           >
                             Image unavailable
                           </div>
-                        </div>
+                          <div className="absolute bottom-3 right-3 rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm" style={{ background: 'rgba(15, 23, 42, 0.72)', color: '#fff' }}>
+                            Tap to open
+                          </div>
+                        </button>
                       )}
 
                       {attachment.type === 'pdf' && (
@@ -380,7 +422,7 @@ const NoticeDetail = ({ onNavigate }) => {
                     <button
                       key={item?.id || idx}
                       onClick={() => {
-                        lastInteractionTsRef.current = Date.now();
+                        lastInteractionTsRef.current = getCurrentTimestamp();
                         setCurrentNoticeIndex(idx);
                       }}
                       className="rounded-full transition-all"
@@ -408,6 +450,32 @@ const NoticeDetail = ({ onNavigate }) => {
           </div>
         )}
       </div>
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 px-4 py-6"
+          onClick={closeImagePreview}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-full p-2 text-white"
+            onClick={closeImagePreview}
+            aria-label="Close image preview"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <div
+            className="flex max-h-full w-full max-w-5xl items-center justify-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <img
+              src={previewImage.url}
+              alt={previewImage.label}
+              className="max-h-[88vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
