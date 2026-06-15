@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { flushSync } from 'react-dom';
-import { Users, ChevronRight, LogOut, Share2, PhoneCall, FileText } from 'lucide-react';
+import { Users, ChevronRight, LogOut, Share2, PhoneCall, FileText, CirclePlus } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { getProfile } from '../services/api';
 import { fetchFeatureFlags, isFeatureEnabled } from '../services/featureFlags';
@@ -28,6 +28,8 @@ const normalizeSidebarRoute = (route = '', featureKey = '') => {
   if (featureValue === 'myfamily' || featureValue === 'my-family' || featureValue === 'feature-my-family' || featureValue === 'feature_my_family') return 'my-family';
   if (routeValue === 'nomination-details' || routeValue === 'nominationdetails') return 'nomination-details';
   if (featureValue === 'nominationdetails' || featureValue === 'nomination-details' || featureValue === 'feature-nomination-details' || featureValue === 'feature_nomination_details') return 'nomination-details';
+  if (routeValue === 'add-community' || routeValue === 'addcommunity') return 'add-community';
+  if (featureValue === 'addcommunity' || featureValue === 'add-community' || featureValue === 'feature-add-community' || featureValue === 'feature_add_community') return 'add-community';
   return routeValue;
 };
 
@@ -36,6 +38,7 @@ const resolveSidebarIcon = (featureKey, route) => {
   if (normalizedRoute === 'contact-us') return PhoneCall;
   if (normalizedRoute === 'my-family') return Users;
   if (normalizedRoute === 'nomination-details') return FileText;
+  if (normalizedRoute === 'add-community') return CirclePlus;
   return PhoneCall;
 };
 
@@ -420,7 +423,11 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
         || normalizedKey === 'nominationdetails'
         || normalizedKey === 'nomination-details'
         || normalizedKey === 'feature-nomination-details';
-      return Boolean(key) && meta?.is_enabled && (isContactUs || isMyFamily || isNominationDetails);
+      const isAddCommunity = resolvedRoute === 'add-community'
+        || normalizedKey === 'addcommunity'
+        || normalizedKey === 'add-community'
+        || normalizedKey === 'feature-add-community';
+      return Boolean(key) && meta?.is_enabled && (isContactUs || isMyFamily || isNominationDetails || isAddCommunity);
     })
     .map(([key, meta]) => ({
       id: normalizeSidebarRoute(meta?.route, key),
@@ -436,6 +443,8 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
       if (ao !== bo) return ao - bo;
       return String(a.label).localeCompare(String(b.label));
     });
+  const addCommunityMenuItem = menuItems.find((item) => item.id === 'add-community');
+  const primaryMenuItems = menuItems.filter((item) => item.id !== 'add-community');
 
   return (
     <>
@@ -573,7 +582,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
           {/* Nav items + More Options */}
           <div className="py-3 px-3">
             <div className="space-y-1">
-              {menuItems.map((item) => {
+              {primaryMenuItems.map((item) => {
                 const cp = (currentPage || '').toLowerCase();
                 const aliasMap = {
                   'healthcare-directory': 'directory',
@@ -668,6 +677,29 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
 	                style={{ color: sidebarChevronColor }}
               />
             </button>
+
+              {addCommunityMenuItem && (
+                <button
+                  onClick={() => { onNavigate(addCommunityMenuItem.id); onClose(); }}
+                  className="w-full flex items-center gap-3 px-4 rounded-xl transition-all text-left active:scale-95 select-none"
+                  style={{
+                    minHeight: '52px',
+                    WebkitTapHighlightColor: sidebarTapHighlightColor,
+                    background: 'transparent',
+                  }}
+                >
+                  <addCommunityMenuItem.icon
+                    className="h-5 w-5 flex-shrink-0"
+                    style={{ color: sidebarTextColor }}
+                  />
+                  <span
+                    className="font-semibold flex-1"
+                    style={{ color: sidebarTextColor }}
+                  >
+                    {addCommunityMenuItem.label}
+                  </span>
+                </button>
+              )}
 
               {/* Share Button - controlled by feature_share_app */}
               {ff('feature_share_app') && <button

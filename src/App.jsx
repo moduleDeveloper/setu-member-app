@@ -41,6 +41,7 @@ import AdminUserProfiles from './admin/AdminUserProfiles';
 import ContactUs from './ContactUs';
 import MyFamily from './MyFamily';
 import NominationDetails from './NominationDetails';
+import AddCommunity from './AddCommunity';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
 import { syncTrustVersion } from './services/trustVersionService';
 import { logUserSessionEvent } from './services/sessionAuditService';
@@ -939,6 +940,7 @@ const HospitalTrusteeApp = () => {
         'contact-us': '/contact-us',
         'my-family': '/my-family',
         'nomination-details': '/nomination-details',
+        'add-community': '/add-community',
         'other-memberships': '/other-memberships',
       };
       const route = routeMap[screen] || '/';
@@ -1336,6 +1338,16 @@ const HospitalTrusteeApp = () => {
                 <NominationDetails
                   onNavigateBack={() => navigate('/')}
                 />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/add-community"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_add_community">
+                <AddCommunity onNavigateBack={() => navigate('/')} />
               </FeatureGuard>
             </ProtectedRoute>
           }

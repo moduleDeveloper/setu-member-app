@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { useAppTheme } from './context/ThemeContext';
 import {
+  getNoticeboardCacheStatus,
   getNoticeboardSnapshot,
   loadNoticeboardPage,
   noticeboardConfig,
@@ -194,16 +195,39 @@ const resolveTrustContextForNotices = () => {
   return { trustId: null, trustName: null };
 };
 
+const getInitialNoticeboardState = () => {
+  const { trustId } = resolveTrustContextForNotices();
+  if (!trustId) {
+    return {
+      notices: [],
+      loading: true,
+      hasMoreNotices: true,
+      selectedTrustId: ''
+    };
+  }
+
+  const snapshot = getNoticeboardSnapshot(trustId);
+  const cachedNotices = Array.isArray(snapshot?.notices) ? snapshot.notices : [];
+
+  return {
+    notices: cachedNotices,
+    loading: cachedNotices.length === 0,
+    hasMoreNotices: cachedNotices.length > 0 ? Boolean(snapshot.hasMoreNotices) : true,
+    selectedTrustId: trustId
+  };
+};
+
 const Notices = ({ onNavigate }) => {
   const navigate = useNavigate();
   const theme = useAppTheme();
   const NOTICE_SCROLL_KEY = 'noticeboard_scroll_y';
+  const initialNoticeboardState = useMemo(() => getInitialNoticeboardState(), []);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [notices, setNotices] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [notices, setNotices] = useState(initialNoticeboardState.notices);
+  const [loading, setLoading] = useState(initialNoticeboardState.loading);
   const [error, setError] = useState('');
-  const [selectedTrustId, setSelectedTrustId] = useState(() => localStorage.getItem('selected_trust_id') || '');
-  const [hasMoreNotices, setHasMoreNotices] = useState(true);
+  const [selectedTrustId, setSelectedTrustId] = useState(initialNoticeboardState.selectedTrustId);
+  const [hasMoreNotices, setHasMoreNotices] = useState(initialNoticeboardState.hasMoreNotices);
   const [loadingMore, setLoadingMore] = useState(false);
   const latestLoadRequestRef = useRef(0);
   const missingTrustRetryRef = useRef(0);
@@ -325,11 +349,16 @@ const Notices = ({ onNavigate }) => {
 
       // Show cached notices immediately if available (avoids blank flash)
       const snapshot = getNoticeboardSnapshot(trustId);
-      if (!forceRefresh && snapshot.hasCachedData && Array.isArray(snapshot.notices) && snapshot.notices.length > 0) {
+      const cacheStatus = getNoticeboardCacheStatus(trustId, 1);
+      const hasCachedNotices = snapshot.hasCachedData && Array.isArray(snapshot.notices) && snapshot.notices.length > 0;
+      if (!forceRefresh && hasCachedNotices) {
         if (!isStale()) {
           setNotices(snapshot.notices);
           setHasMoreNotices(Boolean(snapshot.hasMoreNotices));
           setLoading(false);
+        }
+        if (cacheStatus.isPageFresh) {
+          return;
         }
       } else {
         // No valid cache or forceRefresh → show spinner
@@ -525,7 +554,6 @@ const Notices = ({ onNavigate }) => {
               .filter(Boolean);
             const attachCount = normalizedAttachments.length;
             const firstAttachment = attachCount > 0 ? normalizedAttachments[0] : null;
-            const extraAttachmentCount = attachCount > 1 ? attachCount - 1 : 0;
             return (
             <button
               key={notice.id}
@@ -571,16 +599,16 @@ const Notices = ({ onNavigate }) => {
 
               {firstAttachment && (
                 <div
-                  className="mb-3 rounded-xl overflow-hidden border"
+                  className="mb-3 rounded-xl border px-3 py-3"
                   style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 12%, transparent)' }}
                 >
                   {firstAttachment.type === 'image' ? (
-                    <div className="relative w-full h-36 bg-slate-100">
+                    <div className="relative flex items-center justify-center">
                       <img
                         src={firstAttachment.url}
                         alt={firstAttachment.label}
                         loading="lazy"
-                        className="w-full h-36 object-cover bg-slate-100"
+                        className="block max-h-48 w-auto max-w-full rounded-xl object-contain shadow-sm"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                           const fallback = e.currentTarget.nextElementSibling;
@@ -588,7 +616,7 @@ const Notices = ({ onNavigate }) => {
                         }}
                       />
                       <div
-                        className="hidden absolute inset-0 items-center justify-center px-3 text-xs font-semibold text-slate-600"
+                        className="hidden min-h-32 w-full items-center justify-center rounded-xl px-3 py-6 text-xs font-semibold text-slate-600"
                         style={{ background: 'color-mix(in srgb, var(--surface-color) 74%, var(--app-accent-bg))' }}
                       >
                         Image unavailable
