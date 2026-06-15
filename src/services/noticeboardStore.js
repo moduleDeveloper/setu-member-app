@@ -123,6 +123,27 @@ export function getNoticeboardSnapshot(trustId) {
   };
 }
 
+export function getNoticeboardCacheStatus(trustId, page = 1) {
+  const memberId = resolveCurrentMemberId();
+  const activeScope = readJson(KEY_ACTIVE_SCOPE(trustId, memberId), null);
+  if (!trustId || !activeScope) {
+    return {
+      hasCachedScope: false,
+      hasCachedNotices: false,
+      isPageFresh: false,
+      lastPageTs: 0
+    };
+  }
+
+  const cache = getCachedPage(activeScope, page);
+  return {
+    hasCachedScope: true,
+    hasCachedNotices: Array.isArray(cache.notices) && cache.notices.length > 0,
+    isPageFresh: Boolean(cache.isFresh),
+    lastPageTs: readJson(KEY_PAGES(activeScope), {})?.[String(page)]?.ts || 0
+  };
+}
+
 function mergeNoticePage(scopeKey, page, notices, hasMore) {
   const byId = readJson(KEY_BY_ID(scopeKey), {});
   const order = readJson(KEY_ORDER(scopeKey), []);

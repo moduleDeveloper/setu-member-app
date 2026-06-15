@@ -104,7 +104,7 @@ const SponsorsList = ({ onNavigate, onBack }) => {
               >
                 <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-white border border-slate-100 shadow-sm flex-shrink-0">
                   {(sponsor.photo_url || sponsor.photo_thumb_url) ? (
-                    <img src={sponsor.photo_url || sponsor.photo_thumb_url} alt={sponsor.name} className="w-full h-full object-cover object-center bg-white" loading="lazy" />
+                    <img src={sponsor.photo_url || sponsor.photo_thumb_url} alt={sponsor.name} className="w-full h-full object-cover bg-white" style={{ objectPosition: '50% 20%' }} loading="lazy" />
                   ) : (
                     <Star className="h-4 w-4" style={{ color: theme.primary }} />
                   )}

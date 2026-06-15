@@ -783,7 +783,7 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
       // Preserve known icon_url/name from cache so trust chips don't flash placeholders.
       mergedTrusts = mergeTrustsWithExistingVisuals(mergedTrusts, readCachedTrustList());
       mergedTrusts = pinBaseTrustFirst(mergedTrusts);
-      
+
       setTrustList(mergedTrusts);
       try { localStorage.setItem('trust_list_cache', JSON.stringify(mergedTrusts)); } catch { /* ignore */ }
 
@@ -1000,7 +1000,7 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
     if (!user) return;
     let parsedUser = null;
     try { parsedUser = JSON.parse(user); } catch { return; }
-    
+
     const userDerivedTrusts = Array.isArray(parsedUser?.hospital_memberships)
       ? parsedUser.hospital_memberships.map((m) => ({
         id: m?.trust_id || m?.id || null,
@@ -1010,9 +1010,9 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
         is_active: m?.is_active
       }))
       : [];
-    
+
     console.log('📋 User derived trusts from hospital_memberships:', userDerivedTrusts.length, userDerivedTrusts.map(t => t.name).join(', '));
-    
+
     const fallbackIdsFromMemberships = Array.isArray(parsedUser?.hospital_memberships)
       ? parsedUser.hospital_memberships.map((m) => m?.members_id).filter(Boolean)
       : [];
@@ -1048,7 +1048,7 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
     const loadMemberTrusts = async () => {
       try {
         console.log('🔍 Fetching member trusts for IDs:', membersIds.join(', '));
-        
+
         const membershipResults = await Promise.all(
           membersIds.map((memberId) => fetchMemberTrusts(memberId).catch(() => []))
         );
@@ -1064,12 +1064,12 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
             membership_number: trust.membership_number || trust['Membership number'] || null,
             members_id: trust.members_id || trust.member_id || null,
           }));
-        
+
         console.log('📊 Membership trusts found:', membershipTrusts.length, membershipTrusts.map(t => t.name).join(', '));
 
         const uniqueTrusts = mergeUniqueTrusts(userDerivedTrusts, membershipTrusts);
         console.log('✨ Total unique trusts:', uniqueTrusts.length, uniqueTrusts.map(t => t.name).join(', '));
-        
+
         if (uniqueTrusts.length === 0) return;
 
         const primaryTrust = parsedUser?.primary_trust || uniqueTrusts.find((t) => t.is_active) || uniqueTrusts[0];
@@ -1147,7 +1147,7 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
   const handleTrustSelect = async (trustId) => {
     const normalizedId = normalizeTrustId(trustId);
     console.log(`🔄 Switching trust from "${selectedTrustId}" to "${normalizedId}"`);
-    
+
     // Force reload by resetting heavy modules; keep marquee visible from cache
     // so trust switch does not blank the updates strip.
     try {
@@ -1165,29 +1165,29 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
     setNotifications([]);
     setUnreadCount(0);
     setSponsorFetchSettledTrustId(''); // Force sponsor refetch
-    
+
     // Clear localStorage caches for this operation to force refresh
     try {
       localStorage.removeItem(`sponsor_carousel_index_${normalizedId}`);
     } catch { /* ignore */ }
-    
+
     // Update selected trust
     setSelectedTrustId(normalizedId);
     localStorage.setItem('selected_trust_id', normalizedId);
     localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, normalizedId);
     setSessionSelectionFlag();
-    
+
     const selected = trustList.find((t) => normalizeTrustId(t.id) === normalizedId) || null;
     setTrustInfo(selected);
     if (selected?.name) {
       localStorage.setItem('selected_trust_name', selected.name);
       console.log(`✓ Trust switched to: ${selected.name}`);
     }
-    
-    window.dispatchEvent(new CustomEvent('trust-changed', { 
-      detail: { trustId: normalizedId, trustName: selected?.name || null } 
+
+    window.dispatchEvent(new CustomEvent('trust-changed', {
+      detail: { trustId: normalizedId, trustName: selected?.name || null }
     }));
-    
+
     // Fetch and update fresh trust details
     try {
       const freshTrust = await fetchTrustById(normalizedId);
@@ -1298,7 +1298,7 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
           syncSponsorStoreSnapshot(trustId);
           setSponsorFetchSettledTrustId(trustId);
         })
-        .catch(() => {});
+        .catch(() => { });
     } else {
       setIsSponsorsLoading(true);
       setIsCarouselReady(false);
@@ -1514,7 +1514,7 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
     if (sponsorListPreloadRef.current[trustId]) return;
 
     const timer = setTimeout(() => {
-      preloadSponsorListFirstPage(trustId).catch(() => {});
+      preloadSponsorListFirstPage(trustId).catch(() => { });
       sponsorListPreloadRef.current[trustId] = true;
     }, 250);
     return () => clearTimeout(timer);
@@ -1759,7 +1759,17 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
 
   // Build Quick Access tiles from Supabase flag metadata.
   const dbQuickActions = Object.entries(flagsData)
-    .filter(([key, data]) => Boolean(key) && data?.is_enabled && Boolean(resolveQuickRoute(data?.route, key)))
+    .filter(([key, data]) => (
+      Boolean(key)
+      && data?.is_enabled
+      && key !== 'feature_add_community'
+      && key !== 'feature_nomination_details'
+      && key !== 'feature_nomination'
+      && normalizeQuickRoute(data?.route) !== 'add-community'
+      && normalizeQuickRoute(data?.route) !== 'nomination-details'
+      && normalizeQuickRoute(data?.route) !== 'nomination'
+      && Boolean(resolveQuickRoute(data?.route, key))
+    ))
     .map(([key, data]) => ({
       id: key,
       route: resolveQuickRoute(data.route, key),
@@ -1852,6 +1862,9 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
         'gallery',
         'notifications',
         'notification',
+        'add-community',
+        'nomination',
+        'nomination-details',
         'developers',
         'developer-info',
         'developerinfo',
@@ -2097,13 +2110,13 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
           {/* Hamburger */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all flex-shrink-0 active:scale-95"
-              style={{
-                background: isMenuOpen
-                  ? appButtonBg
-                  : 'color-mix(in srgb, var(--navbar-bg) 72%, var(--surface-color))',
-                boxShadow: isMenuOpen ? `0 4px 12px ${applyOpacity(theme.primary, 0.25)}` : 'none',
-              }}
+            className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all flex-shrink-0 active:scale-95"
+            style={{
+              background: isMenuOpen
+                ? appButtonBg
+                : 'color-mix(in srgb, var(--navbar-bg) 72%, var(--surface-color))',
+              boxShadow: isMenuOpen ? `0 4px 12px ${applyOpacity(theme.primary, 0.25)}` : 'none',
+            }}
           >
             {isMenuOpen
               ? <X className="h-5 w-5" style={{ color: onPrimaryText }} />
@@ -2281,62 +2294,62 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
               }}
             >
               <div className="flex items-center gap-2 min-w-0">
-                  {userProfile?.profilePhotoUrl ? (
-                    <img
-                      src={userProfile.profilePhotoUrl}
-                      alt={userProfile.name}
-                      className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                      style={{ border: `1.5px solid ${showSelectedTrustMemberBanner ? '#d4a017' : theme.primary}` }}
-                    />
-                  ) : (
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0"
-                      style={{
-                        background: showSelectedTrustMemberBanner
-                          ? 'linear-gradient(135deg, #7c5a00 0%, #d4a017 100%)'
-                          : appButtonBg,
-                        color: showSelectedTrustMemberBanner ? '#fffdf5' : onPrimaryText
-                      }}
-                    >
-                      {(userProfile?.name || currentUser?.name || 'M').charAt(0).toUpperCase()}
-                    </div>
-                  )}
-
-                  <div className="min-w-0 flex-1">
-                    {userProfile?.name ? (
-                      <div className="flex items-center min-w-0">
-                        <p className="text-[12px] font-semibold truncate leading-snug" style={{ color: showSelectedTrustMemberBanner ? '#f8f0c5' : headingColor }}>
-                          <span className="font-extrabold">{userProfile.name}</span>
-                        </p>
-                      </div>
-                    ) : null}
+                {userProfile?.profilePhotoUrl ? (
+                  <img
+                    src={userProfile.profilePhotoUrl}
+                    alt={userProfile.name}
+                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                    style={{ border: `1.5px solid ${showSelectedTrustMemberBanner ? '#d4a017' : theme.primary}` }}
+                  />
+                ) : (
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0"
+                    style={{
+                      background: showSelectedTrustMemberBanner
+                        ? 'linear-gradient(135deg, #7c5a00 0%, #d4a017 100%)'
+                        : appButtonBg,
+                      color: showSelectedTrustMemberBanner ? '#fffdf5' : onPrimaryText
+                    }}
+                  >
+                    {(userProfile?.name || currentUser?.name || 'M').charAt(0).toUpperCase()}
                   </div>
-                  {showSelectedTrustMemberBanner && selectedTrustMembership?.membership_number ? (
-                      <span
-                        className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] max-w-[28%] flex-shrink-0"
-                        style={{
-                          background: 'linear-gradient(135deg, #5a3f00 0%, #d4a017 100%)',
-                          color: '#fff8db',
-                          border: '1px solid rgba(255, 227, 133, 0.5)',
-                        }}
-                      >
-                        <Crown className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="truncate">{selectedTrustMembership.membership_number}</span>
-                      </span>
-                    ) : null}
-                  {showSelectedTrustMemberBanner && selectedTrustMembership?.role ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] max-w-[34%] flex-shrink-0"
-                      style={{
-                        background: 'linear-gradient(135deg, #5a3f00 0%, #d4a017 100%)',
-                        color: '#fff8db',
-                        border: '1px solid rgba(255, 227, 133, 0.5)',
-                      }}
-                    >
-                      <Crown className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span className="truncate">{selectedTrustMembership.role}</span>
-                    </span>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  {userProfile?.name ? (
+                    <div className="flex items-center min-w-0">
+                      <p className="text-[12px] font-semibold truncate leading-snug" style={{ color: showSelectedTrustMemberBanner ? '#f8f0c5' : headingColor }}>
+                        <span className="font-extrabold">{userProfile.name}</span>
+                      </p>
+                    </div>
                   ) : null}
+                </div>
+                {showSelectedTrustMemberBanner && selectedTrustMembership?.membership_number ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] max-w-[28%] flex-shrink-0"
+                    style={{
+                      background: 'linear-gradient(135deg, #5a3f00 0%, #d4a017 100%)',
+                      color: '#fff8db',
+                      border: '1px solid rgba(255, 227, 133, 0.5)',
+                    }}
+                  >
+                    <Crown className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="truncate">{selectedTrustMembership.membership_number}</span>
+                  </span>
+                ) : null}
+                {showSelectedTrustMemberBanner && selectedTrustMembership?.role ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] max-w-[34%] flex-shrink-0"
+                    style={{
+                      background: 'linear-gradient(135deg, #5a3f00 0%, #d4a017 100%)',
+                      color: '#fff8db',
+                      border: '1px solid rgba(255, 227, 133, 0.5)',
+                    }}
+                  >
+                    <Crown className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="truncate">{selectedTrustMembership.role}</span>
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
@@ -2354,422 +2367,422 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
           userSelect: isNotificationsOpen ? 'none' : 'auto'
         }}
       >
-      {(() => {
-        const SECTIONS = {
-          trustList: showTrustSelector && trustList.length > 0 ? (
-            <div
-              className="flex gap-2 overflow-x-auto overscroll-x-contain px-4 py-2"
-              style={{
-                scrollbarWidth: 'none',
-                background: 'transparent',
-                borderBottom: 'none',
-                animation: resolveAnimation('trustList', 'cards')
-              }}
-              key="trustList"
-            >
-              {trustList.map((trust) => {
-                const isActive = normalizeTrustId(trust.id) === selectedTrustId;
-                return (
-                  <button
-                    key={trust.id || trust.name}
-                    onClick={() => handleTrustSelect(trust.id)}
-                    className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden transition-all duration-200"
-                    style={{
-                      border: isActive
-                        ? `2.5px solid ${theme.primary}`
-                        : '2px solid color-mix(in srgb, var(--body-text-color) 18%, var(--surface-color))',
-                      backgroundColor: 'color-mix(in srgb, var(--app-page-bg) 86%, var(--surface-color))',
-                      transform: isActive ? 'scale(1.05)' : 'scale(1)',
-                      boxShadow: isActive
-                        ? '0 4px 12px color-mix(in srgb, var(--brand-navy) 22%, transparent)'
-                        : 'none',
-                    }}
-                    title={trust?.name || ''}
-                  >
-                    <TrustChipIcon
-                      iconUrl={trust?.icon_url || trustIconUrlById[normalizeTrustId(trust?.id)]}
-                      altText={trust?.name || 'Trust'}
-                      versionToken={trustIconVersionById[normalizeTrustId(trust?.id)] || resolveTrustIconToken(trust, '')}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          ) : null,
-          marquee: ff('feature_marquee') && marqueeUpdates.length > 0 ? (
-            <div
-              className="mt-0 mb-2 w-full overflow-hidden"
-              style={{
-                background: 'var(--marquee-bg)',
-                boxShadow: `0 2px 12px ${applyOpacity(theme.primary, 0.3)}`,
-                animation: resolveAnimation('marquee', 'cards')
-              }}
-              key="marquee"
-            >
-              <div className="flex items-stretch">
-                <div className="flex-shrink-0 px-3 flex items-center gap-2" style={{ background: `color-mix(in srgb, ${theme.secondary} 28%, transparent)` }}>
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-70" style={{ background: 'var(--marquee-text)' }} />
-                    <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: 'var(--marquee-text)' }} />
-                  </span>
-                  <span className="text-[11px] font-bold uppercase tracking-widest whitespace-nowrap" style={{ color: 'var(--marquee-text)' }}>
-                    {flagsData?.feature_marquee?.display_name || 'Updates'}
-                  </span>
-                </div>
-                <div className="w-px my-1.5" style={{ background: 'color-mix(in srgb, var(--marquee-text) 30%, transparent)' }} />
-                <div className="overflow-hidden flex-1 py-2">
-                  <div className="marquee-track flex">
-                    {[...marqueeUpdates, ...marqueeUpdates].map((msg, i) => (
-                      <span key={i} className="whitespace-nowrap text-xs font-semibold px-6" style={{ color: 'var(--marquee-text)' }}>⭐ {msg}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null,
-          gallery: ff('feature_gallery') ? (
-            <div className="px-4 mt-5 mb-3" style={{ animation: resolveAnimation('gallery', 'zoomIn') }} key="gallery">
-              {/* Gallery card */}
+        {(() => {
+          const SECTIONS = {
+            trustList: showTrustSelector && trustList.length > 0 ? (
               <div
-                className="rounded-3xl overflow-hidden"
+                className="flex gap-2 overflow-x-auto overscroll-x-contain px-4 py-2"
                 style={{
-                  boxShadow: `0 10px 32px ${applyOpacity(theme.secondary, 0.16)}, 0 2px 8px ${applyOpacity(theme.primary, 0.08)}`,
-                  border: `1px solid ${applyOpacity(theme.primary, 0.1)}`,
+                  scrollbarWidth: 'none',
+                  background: 'transparent',
+                  borderBottom: 'none',
+                  animation: resolveAnimation('trustList', 'cards')
                 }}
+                key="trustList"
               >
-                <div className="h-[3px]" style={{ background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})` }} />
-                {showGalleryLoader ? (
-                  <div className="w-full h-[200px] flex items-center justify-center" style={{ background: theme.accentBg }}>
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: theme.primary, borderTopColor: 'transparent' }} />
-                      <p className="text-xs font-medium" style={{ color: theme.secondary }}>Loading gallery...</p>
-                    </div>
-                  </div>
-                ) : carouselImages.length > 0 ? (
-                  <ImageSlider images={carouselImages} onNavigate={onNavigate} />
-                ) : (
-                  <button
-                    onClick={() => onNavigate('gallery')}
-                    className="w-full h-[200px] flex flex-col items-center justify-center gap-3"
-                    style={{
-                      background: 'color-mix(in srgb, var(--app-page-bg) 80%, var(--surface-color))'
-                    }}
-                  >
-                    <div
-                      className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                      style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentBg})` }}
-                    >
-                      <Image className="h-7 w-7" style={{ color: theme.primary }} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-center" style={{ color: theme.secondary }}>
-                        {(activeTrust?.name || defaultTrust?.name || DEFAULT_TRUST_NAME)} Gallery
-                      </p>
-                      <p
-                        className="text-xs text-center mt-0.5"
-                        style={{ color: 'color-mix(in srgb, var(--body-text-color) 72%, var(--surface-color))' }}
-                      >
-                        {galleryError || 'Tap to open gallery'}
-                      </p>
-                    </div>
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : null,
-
-          quickActions: enabledQuickActions.length > 0 ? (
-            <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('quickActions', 'cards') }} key="quickActions">
-              <div className="grid grid-cols-2 gap-3">
-                {enabledQuickActions.map((action) => {
+                {trustList.map((trust) => {
+                  const isActive = normalizeTrustId(trust.id) === selectedTrustId;
                   return (
                     <button
-                      key={action.id}
-                      onClick={() => onNavigate(action.route)}
-                      className="rounded-2xl text-left transition-all active:scale-[0.97] duration-150"
+                      key={trust.id || trust.name}
+                      onClick={() => handleTrustSelect(trust.id)}
+                      className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden transition-all duration-200"
                       style={{
-                        background: quickActionsBg,
-                        border: `1px solid color-mix(in srgb, ${quickActionsText} 22%, transparent)`,
-                        boxShadow: `0 4px 16px color-mix(in srgb, ${quickActionsText} 14%, transparent), 0 1px 4px color-mix(in srgb, ${quickActionsText} 10%, transparent)`,
-                        overflow: 'hidden',
+                        border: isActive
+                          ? `2.5px solid ${theme.primary}`
+                          : '2px solid color-mix(in srgb, var(--body-text-color) 18%, var(--surface-color))',
+                        backgroundColor: 'color-mix(in srgb, var(--app-page-bg) 86%, var(--surface-color))',
+                        transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                        boxShadow: isActive
+                          ? '0 4px 12px color-mix(in srgb, var(--brand-navy) 22%, transparent)'
+                          : 'none',
                       }}
+                      title={trust?.name || ''}
                     >
-                      <div
-                        className="h-[4px]"
-                        style={{ background: `linear-gradient(90deg, ${quickActionsText} 0%, color-mix(in srgb, ${quickActionsText} 60%, var(--surface-color)) 100%)` }}
+                      <TrustChipIcon
+                        iconUrl={trust?.icon_url || trustIconUrlById[normalizeTrustId(trust?.id)]}
+                        altText={trust?.name || 'Trust'}
+                        versionToken={trustIconVersionById[normalizeTrustId(trust?.id)] || resolveTrustIconToken(trust, '')}
                       />
-                      <div className="p-3.5">
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center mb-2.5"
-                          style={{
-                            background: quickActionsIconBg,
-                            border: `1px solid color-mix(in srgb, ${quickActionsText} 20%, transparent)`,
-                          }}
-                        >
-                          <img
-                            src={action.icon_url}
-                            alt={action.displayName}
-                            className="h-[18px] w-[18px] object-contain"
-                          />
-                        </div>
-                        <div className="flex items-start justify-between gap-1">
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-[12px] font-extrabold leading-snug" style={{ color: quickActionsText }}>
-                              {action.displayName}
-                            </h3>
-                            <p className="text-[10px] font-medium mt-0.5 leading-snug" style={{ color: `color-mix(in srgb, ${quickActionsText} 80%, var(--surface-color))` }}>
-                              {action.tagline}
-                            </p>
-                          </div>
-                          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: `color-mix(in srgb, ${quickActionsText} 72%, transparent)` }} />
-                        </div>
-                      </div>
                     </button>
                   );
                 })}
               </div>
-            </div>
-          ) : null,
-
-          sponsors: (
-            <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('sponsors', 'cards') }} key="sponsors">
-              {sponsors.length > 0 ? (
-              <div className="relative">
+            ) : null,
+            marquee: ff('feature_marquee') && marqueeUpdates.length > 0 ? (
+              <div
+                className="mt-0 mb-2 w-full overflow-hidden"
+                style={{
+                  background: 'var(--marquee-bg)',
+                  boxShadow: `0 2px 12px ${applyOpacity(theme.primary, 0.3)}`,
+                  animation: resolveAnimation('marquee', 'cards')
+                }}
+                key="marquee"
+              >
+                <div className="flex items-stretch">
+                  <div className="flex-shrink-0 px-3 flex items-center gap-2" style={{ background: `color-mix(in srgb, ${theme.secondary} 28%, transparent)` }}>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-70" style={{ background: 'var(--marquee-text)' }} />
+                      <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: 'var(--marquee-text)' }} />
+                    </span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest whitespace-nowrap" style={{ color: 'var(--marquee-text)' }}>
+                      {flagsData?.feature_marquee?.display_name || 'Updates'}
+                    </span>
+                  </div>
+                  <div className="w-px my-1.5" style={{ background: 'color-mix(in srgb, var(--marquee-text) 30%, transparent)' }} />
+                  <div className="overflow-hidden flex-1 py-2">
+                    <div className="marquee-track flex">
+                      {[...marqueeUpdates, ...marqueeUpdates].map((msg, i) => (
+                        <span key={i} className="whitespace-nowrap text-xs font-semibold px-6" style={{ color: 'var(--marquee-text)' }}>⭐ {msg}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null,
+            gallery: ff('feature_gallery') ? (
+              <div className="px-4 mt-5 mb-3" style={{ animation: resolveAnimation('gallery', 'zoomIn') }} key="gallery">
+                {/* Gallery card */}
                 <div
-                  className="relative overflow-hidden rounded-3xl"
-                  onTouchStart={handleSponsorTouchStart}
-                  onTouchMove={handleSponsorTouchMove}
-                  onTouchEnd={handleSponsorTouchEnd}
+                  className="rounded-3xl overflow-hidden"
+                  style={{
+                    boxShadow: `0 10px 32px ${applyOpacity(theme.secondary, 0.16)}, 0 2px 8px ${applyOpacity(theme.primary, 0.08)}`,
+                    border: `1px solid ${applyOpacity(theme.primary, 0.1)}`,
+                  }}
                 >
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: sponsorOverlayBackground,
-                    }}
-                  />
-                  <div className="relative min-h-[196px]">
-                  {visibleSponsors.map((sponsor, idx) => {
-                    if (!sponsor?.id) return null;
-                    const isActive = idx === activeVisibleSponsorIndex;
+                  <div className="h-[3px]" style={{ background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})` }} />
+                  {showGalleryLoader ? (
+                    <div className="w-full h-[200px] flex items-center justify-center" style={{ background: theme.accentBg }}>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: theme.primary, borderTopColor: 'transparent' }} />
+                        <p className="text-xs font-medium" style={{ color: theme.secondary }}>Loading gallery...</p>
+                      </div>
+                    </div>
+                  ) : carouselImages.length > 0 ? (
+                    <ImageSlider images={carouselImages} onNavigate={onNavigate} />
+                  ) : (
+                    <button
+                      onClick={() => onNavigate('gallery')}
+                      className="w-full h-[200px] flex flex-col items-center justify-center gap-3"
+                      style={{
+                        background: 'color-mix(in srgb, var(--app-page-bg) 80%, var(--surface-color))'
+                      }}
+                    >
+                      <div
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                        style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentBg})` }}
+                      >
+                        <Image className="h-7 w-7" style={{ color: theme.primary }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-center" style={{ color: theme.secondary }}>
+                          {(activeTrust?.name || defaultTrust?.name || DEFAULT_TRUST_NAME)} Gallery
+                        </p>
+                        <p
+                          className="text-xs text-center mt-0.5"
+                          style={{ color: 'color-mix(in srgb, var(--body-text-color) 72%, var(--surface-color))' }}
+                        >
+                          {galleryError || 'Tap to open gallery'}
+                        </p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : null,
+
+            quickActions: enabledQuickActions.length > 0 ? (
+              <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('quickActions', 'cards') }} key="quickActions">
+                <div className="grid grid-cols-2 gap-3">
+                  {enabledQuickActions.map((action) => {
                     return (
                       <button
-                        key={sponsor.id}
-                        onClick={() => {
-                          console.log(`[Sponsor] clicked sponsor.id=${sponsor.id}`);
-                          setSelectedSponsorId(sponsor.id);
-                          setPinnedSponsor(currentSponsorTrustId, sponsor.id);
-                          onNavigate('sponsors');
+                        key={action.id}
+                        onClick={() => onNavigate(action.route)}
+                        className="rounded-2xl text-left transition-all active:scale-[0.97] duration-150"
+                        style={{
+                          background: quickActionsBg,
+                          border: `1px solid color-mix(in srgb, ${quickActionsText} 22%, transparent)`,
+                          boxShadow: `0 4px 16px color-mix(in srgb, ${quickActionsText} 14%, transparent), 0 1px 4px color-mix(in srgb, ${quickActionsText} 10%, transparent)`,
+                          overflow: 'hidden',
                         }}
-                        className={`absolute inset-0 w-full text-left transition-all duration-700 ease-out ${isActive ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-1 scale-[0.99] pointer-events-none'}`}
-                        aria-hidden={!isActive}
-                        tabIndex={isActive ? 0 : -1}
                       >
                         <div
-                          className="relative rounded-3xl p-[1px] h-full overflow-hidden"
-                          style={{
-                            background: `linear-gradient(130deg, ${sponsorTheme.borderColor1}44 0%, ${sponsorTheme.borderColor2}33 40%, ${sponsorTheme.borderColor1}2E 100%)`,
-                            boxShadow: `0 12px 28px ${sponsorTheme.shadowColor}1F`,
-                          }}
-                        >
+                          className="h-[4px]"
+                          style={{ background: `linear-gradient(90deg, ${quickActionsText} 0%, color-mix(in srgb, ${quickActionsText} 60%, var(--surface-color)) 100%)` }}
+                        />
+                        <div className="p-3.5">
                           <div
-                            className="relative rounded-3xl p-5 flex items-center gap-4 h-full overflow-hidden"
+                            className="w-10 h-10 rounded-xl flex items-center justify-center mb-2.5"
                             style={{
-                              background: applyOpacity(sponsorTheme.cardBgColor, sponsorTheme.cardBgOpacity),
-                              backdropFilter: 'blur(8px)',
+                              background: quickActionsIconBg,
+                              border: `1px solid color-mix(in srgb, ${quickActionsText} 20%, transparent)`,
                             }}
                           >
-                            <div
-                            className="absolute inset-0 pointer-events-none opacity-45"
-                            style={{
-                                background: `repeating-linear-gradient(135deg, transparent 0 13px, ${sponsorTheme.patternColor}44 13px 14px)`,
-                            }}
-                          />
-                            <div
-                              className="absolute -top-10 -right-10 h-24 w-24 rounded-full pointer-events-none"
-                              style={{ background: `radial-gradient(circle, ${sponsorTheme.glowColor1}66 0%, transparent 70%)` }}
+                            <img
+                              src={action.icon_url}
+                              alt={action.displayName}
+                              className="h-[18px] w-[18px] object-contain"
                             />
-                            <div
-                              className="absolute -bottom-10 -left-8 h-20 w-20 rounded-full pointer-events-none"
-                              style={{ background: `radial-gradient(circle, ${sponsorTheme.glowColor2}4A 0%, transparent 75%)` }}
-                            />
-
-                            <div className="w-20 h-20 rounded-[1.2rem] p-[2px] flex-shrink-0 z-10" style={{ background: `linear-gradient(145deg, ${sponsorTheme.photoRingColor1}55, ${sponsorTheme.photoRingColor2}44)` }}>
-                              <div
-                                className="w-full h-full rounded-[1rem] flex items-center justify-center overflow-hidden"
-                                style={{
-                                  background: surfaceColor,
-                                  boxShadow: `0 6px 16px ${sponsorTheme.photoRingColor1}1A`,
-                                }}
-                              >
-                                {(sponsor.photo_url || sponsor.photo_thumb_url)
-                                  ? <img src={sponsor.photo_url || sponsor.photo_thumb_url} alt={sponsor.name || sponsor.company_name} className="w-full h-full object-cover object-center" loading="lazy" decoding="async" />
-                                  : <Star className="h-6 w-6" style={{ color: sponsorTheme.textColor }} />}
-                              </div>
-                            </div>
-
-                            <div className="flex-1 min-w-0 z-10">
-                              <div className="mb-1.5">
-                                <div
-                                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1"
-                                  style={{ background: sponsorTheme.badgeBgColor, border: `1px solid ${sponsorTheme.badgeTextColor}30`, boxShadow: `0 1px 5px ${sponsorTheme.badgeTextColor}12` }}
-                                >
-                                  <span className="w-2 h-2 rounded-full inline-block animate-pulse" style={{ background: sponsorTheme.badgeDotColor }} />
-                                  <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: sponsorTheme.badgeTextColor }}>
-                                    {sponsor.badge_label || 'Official Sponsor'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="text-[20px] font-extrabold leading-snug truncate" style={{ color: sponsorTheme.titleColor }}>
-                                {sponsor.name || sponsor.company_name}
-                              </div>
-                              <div className="mt-1 flex items-center gap-1.5 min-w-0">
-                                <Building2 className="h-4 w-4 flex-shrink-0" style={{ color: sponsorTheme.subtitleColor }} />
-                                <p className="text-[14px] font-bold truncate tracking-wide" style={{ color: sponsorTheme.subtitleColor }}>
-                                  {sponsor.company_name || sponsor.position || 'Community partner'}
-                                </p>
-                              </div>
-
-                              <p className="text-[13px] font-medium mt-2 line-clamp-3 leading-relaxed" style={{ color: sponsorTheme.descriptionColor }}>
-                                {sponsor.shortText || 'Supporting our community with care and commitment.'}
+                          </div>
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-[12px] font-extrabold leading-snug" style={{ color: quickActionsText }}>
+                                {action.displayName}
+                              </h3>
+                              <p className="text-[10px] font-medium mt-0.5 leading-snug" style={{ color: `color-mix(in srgb, ${quickActionsText} 80%, var(--surface-color))` }}>
+                                {action.tagline}
                               </p>
                             </div>
-
+                            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: `color-mix(in srgb, ${quickActionsText} 72%, transparent)` }} />
                           </div>
                         </div>
                       </button>
                     );
                   })}
-                  </div>
                 </div>
-                {sponsors.length > 1 && (
-                  <div className="flex justify-center items-center gap-1.5 mt-2">
-                    {visibleSponsors.map((_, idx) => {
-                      const globalIndex = sponsorChunkStart + idx;
-                      const isActive = globalIndex === sponsorIndex;
-                      return (
-                        <span
-                          key={`sponsor-indicator-${globalIndex}`}
-                          className="h-1.5 rounded-full transition-all duration-300"
+              </div>
+            ) : null,
+
+            sponsors: (
+              <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('sponsors', 'cards') }} key="sponsors">
+                {sponsors.length > 0 ? (
+                  <div className="relative">
+                    <div
+                      className="relative overflow-hidden rounded-3xl"
+                      onTouchStart={handleSponsorTouchStart}
+                      onTouchMove={handleSponsorTouchMove}
+                      onTouchEnd={handleSponsorTouchEnd}
+                    >
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background: sponsorOverlayBackground,
+                        }}
+                      />
+                      <div className="relative min-h-[196px]">
+                        {visibleSponsors.map((sponsor, idx) => {
+                          if (!sponsor?.id) return null;
+                          const isActive = idx === activeVisibleSponsorIndex;
+                          return (
+                            <button
+                              key={sponsor.id}
+                              onClick={() => {
+                                console.log(`[Sponsor] clicked sponsor.id=${sponsor.id}`);
+                                setSelectedSponsorId(sponsor.id);
+                                setPinnedSponsor(currentSponsorTrustId, sponsor.id);
+                                onNavigate('sponsors');
+                              }}
+                              className={`absolute inset-0 w-full text-left transition-all duration-700 ease-out ${isActive ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-1 scale-[0.99] pointer-events-none'}`}
+                              aria-hidden={!isActive}
+                              tabIndex={isActive ? 0 : -1}
+                            >
+                              <div
+                                className="relative rounded-3xl p-[1px] h-full overflow-hidden"
+                                style={{
+                                  background: `linear-gradient(130deg, ${sponsorTheme.borderColor1}44 0%, ${sponsorTheme.borderColor2}33 40%, ${sponsorTheme.borderColor1}2E 100%)`,
+                                  boxShadow: `0 12px 28px ${sponsorTheme.shadowColor}1F`,
+                                }}
+                              >
+                                <div
+                                  className="relative rounded-3xl p-5 flex items-center gap-4 h-full overflow-hidden"
+                                  style={{
+                                    background: applyOpacity(sponsorTheme.cardBgColor, sponsorTheme.cardBgOpacity),
+                                    backdropFilter: 'blur(8px)',
+                                  }}
+                                >
+                                  <div
+                                    className="absolute inset-0 pointer-events-none opacity-45"
+                                    style={{
+                                      background: `repeating-linear-gradient(135deg, transparent 0 13px, ${sponsorTheme.patternColor}44 13px 14px)`,
+                                    }}
+                                  />
+                                  <div
+                                    className="absolute -top-10 -right-10 h-24 w-24 rounded-full pointer-events-none"
+                                    style={{ background: `radial-gradient(circle, ${sponsorTheme.glowColor1}66 0%, transparent 70%)` }}
+                                  />
+                                  <div
+                                    className="absolute -bottom-10 -left-8 h-20 w-20 rounded-full pointer-events-none"
+                                    style={{ background: `radial-gradient(circle, ${sponsorTheme.glowColor2}4A 0%, transparent 75%)` }}
+                                  />
+
+                                  <div className="w-20 h-20 rounded-[1.2rem] p-[2px] flex-shrink-0 z-10" style={{ background: `linear-gradient(145deg, ${sponsorTheme.photoRingColor1}55, ${sponsorTheme.photoRingColor2}44)` }}>
+                                    <div
+                                      className="w-full h-full rounded-[1rem] flex items-center justify-center overflow-hidden"
+                                      style={{
+                                        background: surfaceColor,
+                                        boxShadow: `0 6px 16px ${sponsorTheme.photoRingColor1}1A`,
+                                      }}
+                                    >
+                                      {(sponsor.photo_url || sponsor.photo_thumb_url)
+                                        ? <img src={sponsor.photo_url || sponsor.photo_thumb_url} alt={sponsor.name || sponsor.company_name} className="w-full h-full object-cover" style={{ objectPosition: '50% 20%' }} loading="lazy" decoding="async" />
+                                        : <Star className="h-6 w-6" style={{ color: sponsorTheme.textColor }} />}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex-1 min-w-0 z-10">
+                                    <div className="mb-1.5">
+                                      <div
+                                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1"
+                                        style={{ background: sponsorTheme.badgeBgColor, border: `1px solid ${sponsorTheme.badgeTextColor}30`, boxShadow: `0 1px 5px ${sponsorTheme.badgeTextColor}12` }}
+                                      >
+                                        <span className="w-2 h-2 rounded-full inline-block animate-pulse" style={{ background: sponsorTheme.badgeDotColor }} />
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: sponsorTheme.badgeTextColor }}>
+                                          {sponsor.badge_label || 'Official Sponsor'}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="text-[20px] font-extrabold leading-snug truncate" style={{ color: sponsorTheme.titleColor }}>
+                                      {sponsor.name || sponsor.company_name}
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-1.5 min-w-0">
+                                      <Building2 className="h-4 w-4 flex-shrink-0" style={{ color: sponsorTheme.subtitleColor }} />
+                                      <p className="text-[14px] font-bold truncate tracking-wide" style={{ color: sponsorTheme.subtitleColor }}>
+                                        {sponsor.company_name || sponsor.position || 'Community partner'}
+                                      </p>
+                                    </div>
+
+                                    <p className="text-[13px] font-medium mt-2 line-clamp-3 leading-relaxed" style={{ color: sponsorTheme.descriptionColor }}>
+                                      {sponsor.shortText || 'Supporting our community with care and commitment.'}
+                                    </p>
+                                  </div>
+
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {sponsors.length > 1 && (
+                      <div className="flex justify-center items-center gap-1.5 mt-2">
+                        {visibleSponsors.map((_, idx) => {
+                          const globalIndex = sponsorChunkStart + idx;
+                          const isActive = globalIndex === sponsorIndex;
+                          return (
+                            <span
+                              key={`sponsor-indicator-${globalIndex}`}
+                              className="h-1.5 rounded-full transition-all duration-300"
+                              style={{
+                                width: isActive ? 16 : 6,
+                                background: isActive ? `linear-gradient(90deg, ${sponsorTheme.indicatorActive1}, ${sponsorTheme.indicatorActive2})` : sponsorTheme.indicatorInactive,
+                                boxShadow: isActive ? `0 1px 5px ${sponsorTheme.indicatorActive1}38` : 'none',
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : isSponsorSectionLoading ? (
+                  <div
+                    className="relative overflow-hidden rounded-3xl"
+                    style={{
+                      boxShadow: `0 8px 24px ${applyOpacity(theme.secondary, 0.07)}`
+                    }}
+                  >
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background: sponsorOverlayBackground,
+                      }}
+                    />
+                    <div
+                      className="relative rounded-3xl p-[1px]"
+                      style={{
+                        background: `linear-gradient(130deg, ${sponsorTheme.borderColor1}44 0%, ${sponsorTheme.borderColor2}33 40%, ${sponsorTheme.borderColor1}2E 100%)`,
+                      }}
+                    >
+                      <div
+                        className="relative rounded-3xl p-4 min-h-[168px] overflow-hidden"
+                        style={{
+                          background: applyOpacity(sponsorTheme.cardBgColor, sponsorTheme.cardBgOpacity),
+                          backdropFilter: 'blur(8px)',
+                        }}
+                      >
+                        <div
+                          className="absolute inset-0 pointer-events-none opacity-45"
                           style={{
-                            width: isActive ? 16 : 6,
-                            background: isActive ? `linear-gradient(90deg, ${sponsorTheme.indicatorActive1}, ${sponsorTheme.indicatorActive2})` : sponsorTheme.indicatorInactive,
-                            boxShadow: isActive ? `0 1px 5px ${sponsorTheme.indicatorActive1}38` : 'none',
+                            background: `repeating-linear-gradient(135deg, transparent 0 13px, ${sponsorTheme.patternColor}44 13px 14px)`,
                           }}
                         />
-                      );
-                    })}
+                        <div className="relative z-10 h-full flex items-center gap-4">
+                          <div className="w-20 h-20 rounded-[1.2rem] animate-pulse flex-shrink-0" style={{ background: sponsorTheme.skeletonColor }} />
+                          <div className="flex-1 min-w-0 space-y-2.5">
+                            {sponsorSkeletonRows.map((row) => (
+                              <div
+                                key={`sponsor-skeleton-${row}`}
+                                className={`rounded-full animate-pulse ${row === 1 ? 'h-6 w-52' : row === 2 ? 'h-4 w-40' : 'h-4 w-32'}`}
+                                style={{ background: sponsorTheme.skeletonColor }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="relative overflow-hidden rounded-3xl"
+                    style={{
+                      boxShadow: `0 8px 24px ${applyOpacity(theme.secondary, 0.07)}`
+                    }}
+                  >
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background: sponsorOverlayBackground,
+                      }}
+                    />
+                    <div
+                      className="relative rounded-3xl p-[1px]"
+                      style={{
+                        background: `linear-gradient(130deg, ${sponsorTheme.borderColor1}44 0%, ${sponsorTheme.borderColor2}33 40%, ${sponsorTheme.borderColor1}2E 100%)`,
+                      }}
+                    >
+                      <div
+                        className="relative rounded-3xl p-4 min-h-[168px] overflow-hidden"
+                        style={{
+                          background: applyOpacity(sponsorTheme.cardBgColor, sponsorTheme.cardBgOpacity),
+                          backdropFilter: 'blur(8px)',
+                        }}
+                      >
+                        <div
+                          className="absolute inset-0 pointer-events-none opacity-45"
+                          style={{
+                            background: `repeating-linear-gradient(135deg, transparent 0 13px, ${sponsorTheme.patternColor}44 13px 14px)`,
+                          }}
+                        />
+                        <div className="relative z-10 h-full flex items-center gap-4">
+                          <div className="w-20 h-20 rounded-[1.2rem] flex items-center justify-center flex-shrink-0" style={{ background: sponsorTheme.skeletonColor }}>
+                            <Star className="h-6 w-6" style={{ color: sponsorTheme.badgeTextColor }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold" style={{ color: sponsorTheme.emptyTextColor }}>
+                              No active sponsors available right now.
+                            </p>
+                            {!sponsors.length && import.meta.env.DEV && sponsorEmptyDebugReason && (
+                              <p className="text-[11px] mt-1 font-medium break-words" style={{ color: getThemeToken(theme, 'typography.component_overrides.error_text', theme.primary) }}>
+                                Debug: {sponsorEmptyDebugReason}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
+
               </div>
-              ) : isSponsorSectionLoading ? (
-                <div
-                  className="relative overflow-hidden rounded-3xl"
-                  style={{
-                    boxShadow: `0 8px 24px ${applyOpacity(theme.secondary, 0.07)}`
-                  }}
-                >
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: sponsorOverlayBackground,
-                    }}
-                  />
-                  <div
-                    className="relative rounded-3xl p-[1px]"
-                    style={{
-                      background: `linear-gradient(130deg, ${sponsorTheme.borderColor1}44 0%, ${sponsorTheme.borderColor2}33 40%, ${sponsorTheme.borderColor1}2E 100%)`,
-                    }}
-                  >
-                    <div
-                      className="relative rounded-3xl p-4 min-h-[168px] overflow-hidden"
-                      style={{
-                        background: applyOpacity(sponsorTheme.cardBgColor, sponsorTheme.cardBgOpacity),
-                        backdropFilter: 'blur(8px)',
-                      }}
-                    >
-                      <div
-                        className="absolute inset-0 pointer-events-none opacity-45"
-                        style={{
-                          background: `repeating-linear-gradient(135deg, transparent 0 13px, ${sponsorTheme.patternColor}44 13px 14px)`,
-                        }}
-                      />
-                      <div className="relative z-10 h-full flex items-center gap-4">
-                        <div className="w-20 h-20 rounded-[1.2rem] animate-pulse flex-shrink-0" style={{ background: sponsorTheme.skeletonColor }} />
-                        <div className="flex-1 min-w-0 space-y-2.5">
-                          {sponsorSkeletonRows.map((row) => (
-                            <div
-                              key={`sponsor-skeleton-${row}`}
-                              className={`rounded-full animate-pulse ${row === 1 ? 'h-6 w-52' : row === 2 ? 'h-4 w-40' : 'h-4 w-32'}`}
-                              style={{ background: sponsorTheme.skeletonColor }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="relative overflow-hidden rounded-3xl"
-                  style={{
-                    boxShadow: `0 8px 24px ${applyOpacity(theme.secondary, 0.07)}`
-                  }}
-                >
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: sponsorOverlayBackground,
-                    }}
-                  />
-                  <div
-                    className="relative rounded-3xl p-[1px]"
-                    style={{
-                      background: `linear-gradient(130deg, ${sponsorTheme.borderColor1}44 0%, ${sponsorTheme.borderColor2}33 40%, ${sponsorTheme.borderColor1}2E 100%)`,
-                    }}
-                  >
-                    <div
-                      className="relative rounded-3xl p-4 min-h-[168px] overflow-hidden"
-                      style={{
-                        background: applyOpacity(sponsorTheme.cardBgColor, sponsorTheme.cardBgOpacity),
-                        backdropFilter: 'blur(8px)',
-                      }}
-                    >
-                      <div
-                        className="absolute inset-0 pointer-events-none opacity-45"
-                        style={{
-                          background: `repeating-linear-gradient(135deg, transparent 0 13px, ${sponsorTheme.patternColor}44 13px 14px)`,
-                        }}
-                      />
-                      <div className="relative z-10 h-full flex items-center gap-4">
-                        <div className="w-20 h-20 rounded-[1.2rem] flex items-center justify-center flex-shrink-0" style={{ background: sponsorTheme.skeletonColor }}>
-                          <Star className="h-6 w-6" style={{ color: sponsorTheme.badgeTextColor }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold" style={{ color: sponsorTheme.emptyTextColor }}>
-                            No active sponsors available right now.
-                          </p>
-                          {!sponsors.length && import.meta.env.DEV && sponsorEmptyDebugReason && (
-                            <p className="text-[11px] mt-1 font-medium break-words" style={{ color: getThemeToken(theme, 'typography.component_overrides.error_text', theme.primary) }}>
-                              Debug: {sponsorEmptyDebugReason}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+            ),
+          };
 
-            </div>
-          ),
-        };
-
-        return resolvedHomeLayout.map((key) => {
-          if (key === 'trustList' && !showTrustSelector) return null;
-          return SECTIONS[key] || null;
-        });
-      })()}
+          return resolvedHomeLayout.map((key) => {
+            if (key === 'trustList' && !showTrustSelector) return null;
+            return SECTIONS[key] || null;
+          });
+        })()}
       </div>
 
 

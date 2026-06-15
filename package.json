@@ -1,5 +1,5 @@
 {
-  "name": "ek_udaan",
+  "name": "setu",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -11,7 +11,7 @@
     "resize-icon": "node resize_icon.js"
   },
   "dependencies": {
-    "@capawesome/capacitor-app-update": "^7.0.1",
+    "@capacitor-community/facebook-login": "^8.0.0",
     "@capacitor/android": "^8.0.2",
     "@capacitor/app": "^8.0.1",
     "@capacitor/cli": "^8.0.2",
@@ -23,6 +23,7 @@
     "@capacitor/splash-screen": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
     "@capacitor/toast": "^8.0.1",
+    "@capawesome/capacitor-app-update": "^7.0.1",
     "@supabase/supabase-js": "^2.89.0",
     "axios": "^1.13.2",
     "firebase": "^12.7.0",
