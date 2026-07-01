@@ -836,19 +836,19 @@ const toYmdOnly = (value) => {
 const isFlashDateValidForToday = (row, todayYmd) => {
   const startYmd = toYmdOnly(row?.start_date);
   const endYmd = toYmdOnly(row?.end_date);
-  const startOk = Boolean(startYmd) && startYmd <= todayYmd;
+  const startOk = !startYmd || startYmd <= todayYmd;
   const endOk = !endYmd || endYmd >= todayYmd;
   return startOk && endOk;
 };
 
 const isRowActive = (row) => {
-  const value = row?.is_active;
+  const value = row?.is_active ?? row?.status;
   if (value === undefined || value === null) return true;
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value === 1;
   const normalized = String(value).trim().toLowerCase();
   if (!normalized) return true;
-  return !['false', '0', 'no', 'inactive'].includes(normalized);
+  return !['false', '0', 'no', 'inactive', 'paused'].includes(normalized);
 };
 
 // Get sponsor information

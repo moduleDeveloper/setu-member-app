@@ -4,7 +4,6 @@ import { fetchTrustById } from './services/trustService';
 import {
   buildOrderedSponsors,
   ensureAllSponsorsLoaded,
-  mergeByIdAndAppendOrder,
   setPinnedSponsor,
   setSelectedSponsorId
 } from './services/sponsorStore';
@@ -40,10 +39,7 @@ const SponsorsList = ({ onNavigate, onBack }) => {
       ensureAllSponsorsLoaded(selectedTrustId, { force: true }).then((fresh) => {
         if (!activeRef.current) return;
         const data = Array.isArray(fresh) ? fresh : [];
-        if (data.length > 0) {
-          mergeByIdAndAppendOrder(selectedTrustId, data);
-          setItems(buildOrderedSponsors(selectedTrustId));
-        }
+        setItems(data.length > 0 ? buildOrderedSponsors(selectedTrustId) : []);
       }).catch(() => {}).finally(() => { if (activeRef.current) setIsRefreshing(false); });
       return;
     }
@@ -52,8 +48,7 @@ const SponsorsList = ({ onNavigate, onBack }) => {
     ensureAllSponsorsLoaded(selectedTrustId, { force: true }).then((fresh) => {
       if (!activeRef.current) return;
       const data = Array.isArray(fresh) ? fresh : [];
-      mergeByIdAndAppendOrder(selectedTrustId, data);
-      setItems(buildOrderedSponsors(selectedTrustId));
+      setItems(data.length > 0 ? buildOrderedSponsors(selectedTrustId) : []);
     }).catch((err) => {
       console.error('[SponsorsList] fetch error:', err);
     }).finally(() => { if (activeRef.current) setIsRefreshing(false); });

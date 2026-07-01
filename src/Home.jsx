@@ -2544,7 +2544,7 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
               </div>
             ) : null,
 
-            sponsors: (
+            sponsors: ff('feature_sponsors') ? (
               <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('sponsors', 'cards') }} key="sponsors">
                 {sponsors.length > 0 ? (
                   <div className="relative">
@@ -2775,7 +2775,7 @@ const Home = ({ onNavigate, onLogout, isMember }) => {
                 )}
 
               </div>
-            ),
+            ) : null,
           };
 
           return resolvedHomeLayout.map((key) => {
