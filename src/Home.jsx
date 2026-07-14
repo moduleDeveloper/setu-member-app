@@ -2679,7 +2679,7 @@ const Home = ({ onNavigate, onLogout }) => {
         {(() => {
           const SECTIONS = {
             trustList: showTrustSelector && (selectedTrust || otherTrusts.length > 0) ? (
-              <div>
+              <div key="trustList">
                 <p className="text-sm font-semibold text-muted-foreground ml-4 mt-1" style={{color: ` ${theme.primary}`}}>Our trusts</p>
                 <div
                   className="flex items-center gap-2 px-4 py-2"
@@ -2701,7 +2701,6 @@ const Home = ({ onNavigate, onLogout }) => {
                         borderBottom: 'none',
                         scrollBehavior: 'smooth'
                       }}
-                      key="trustList"
                       ref={trustListScrollRef}
                     >
                       {otherTrusts.map((trust) => renderTrustChip(trust))}
