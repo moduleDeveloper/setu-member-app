@@ -46,24 +46,6 @@ const getTargetUserIds = async (notification) => {
     audienceMobiles.forEach((mobile) => userIds.add(mobile));
   }
 
-  const payload = notification.audience_payload && typeof notification.audience_payload === 'object'
-    ? notification.audience_payload
-    : {};
-
-  const payloadUserIds = Array.isArray(payload.user_ids) ? payload.user_ids : [];
-  payloadUserIds.forEach((userId) => {
-    const normalized = String(userId || '').trim();
-    if (normalized && !normalized.startsWith('ADMIN_BROADCAST_')) {
-      userIds.add(normalized);
-    }
-  });
-
-  const payloadAudience = String(payload.target_audience || '').trim();
-  if (payloadAudience) {
-    const audienceMobiles = await getAudienceMobiles(payloadAudience);
-    audienceMobiles.forEach((mobile) => userIds.add(mobile));
-  }
-
   return [...userIds];
 };
 
@@ -73,7 +55,7 @@ const getTokensForUsers = async (userIds) => {
     .from('notification_devices')
     .select('token')
     .in('user_id', userIds)
-    .in('platform', ['android', 'ios'])
+    .eq('platform', 'android')
     .eq('is_active', true);
 
   if (error || !data) return [];
@@ -106,18 +88,11 @@ export const sendPushForNotification = async (notification) => {
     },
     data: {
       notificationId: String(notification.id || ''),
-      type: String(notification.type || notification.click_action || 'general'),
+      type: String(notification.type || 'general'),
       open: 'notifications',
     },
     android: {
       priority: 'high',
-    },
-    apns: {
-      payload: {
-        aps: {
-          sound: 'default',
-        },
-      },
     },
   };
 

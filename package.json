@@ -12,6 +12,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@capacitor-community/facebook-login": "^8.0.0",
     "@capacitor/android": "^8.0.2",
     "@capacitor/app": "^8.0.1",
     "@capacitor/cli": "^8.0.2",

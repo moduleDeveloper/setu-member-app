@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient.js';
 
 // Force local backend for current development flow.
 const resolveDevApiBaseUrl = () => {
-  return 'http://localhost:5005/api';
+  return 'http://localhost:5003/api';
 };
 
 const RAW_API_BASE_URL =

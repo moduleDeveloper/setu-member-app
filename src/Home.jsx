@@ -1678,7 +1678,7 @@ const Home = ({ onNavigate, onLogout }) => {
       if (!notificationContext.userId) return;
       const channel = supabase
         .channel('notifications-realtime-home')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notification' }, (payload) => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
           const newNotif = payload.new;
           const isForMe = matchesNotificationForContext(newNotif, notificationContext);
           if (isForMe) {
@@ -1699,7 +1699,7 @@ const Home = ({ onNavigate, onLogout }) => {
             });
           }
         })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notification' }, (payload) => {
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, (payload) => {
           const updatedNotif = payload.new;
           const isForMe = matchesNotificationForContext(updatedNotif, notificationContext);
           if (isForMe) {

@@ -165,7 +165,7 @@ const Notifications = ({ onNavigate }) => {
       .channel('notifications-realtime')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notification' },
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
         (payload) => {
           const newNotif = payload.new;
           const isForMe = matchesNotificationForContext(newNotif, notificationContext);
@@ -181,7 +181,7 @@ const Notifications = ({ onNavigate }) => {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notification' },
+        { event: 'UPDATE', schema: 'public', table: 'notifications' },
         (payload) => {
           const updatedNotif = payload.new;
           const isForMe = matchesNotificationForContext(updatedNotif, notificationContext);
@@ -197,7 +197,7 @@ const Notifications = ({ onNavigate }) => {
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'notification' },
+        { event: 'DELETE', schema: 'public', table: 'notifications' },
         (payload) => {
           const deletedNotif = payload.old;
           const trustKey = String(localStorage.getItem('selected_trust_id') || '').trim();

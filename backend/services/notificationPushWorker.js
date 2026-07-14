@@ -15,7 +15,7 @@ export const startNotificationPushWorker = () => {
       {
         event: 'INSERT',
         schema: 'public',
-        table: 'notification',
+        table: 'notifications',
       },
       async (payload) => {
         try {

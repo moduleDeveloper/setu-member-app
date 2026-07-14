@@ -47,7 +47,6 @@ import TrustIdCard from './TrustIdCard';
 import AppVersionUpdatePrompt from './components/AppVersionUpdatePrompt';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
 import { initPushNotifications } from './services/pushNotificationService';
-import { getUserNotifications } from './services/api';
 import { syncTrustVersion } from './services/trustVersionService';
 import { logUserSessionEvent } from './services/sessionAuditService';
 import { applyThemeCssVariables, scopeCustomCss } from './utils/themeUtils';
@@ -701,7 +700,7 @@ const HospitalTrusteeApp = () => {
         }
 
         const notificationContext = getCurrentNotificationContext();
-        const { userId, userIdVariants } = notificationContext;
+        const { userId, userIdVariants, audienceVariants } = notificationContext;
 
         if (!userId) {
           return;
@@ -714,6 +713,10 @@ const HospitalTrusteeApp = () => {
         const trackerKey = `shownNotifications_${userId}`;
         const normalizeId = (value) => String(value || '').trim().toLowerCase();
         const fallbackUserIdSet = new Set();
+        const fallbackUserIdRawSet = new Set();
+        let canQueryNotificationUserId = true;
+        const isMissingUserIdColumnError = (error) =>
+          /column\s+notifications\.user_id\s+does not exist/i.test(String(error?.message || ''));
 
         const refreshFallbackUserIds = async () => {
           try {
@@ -724,18 +727,22 @@ const HospitalTrusteeApp = () => {
               .limit(500);
 
             fallbackUserIdSet.clear();
+            fallbackUserIdRawSet.clear();
             (linkedAppointments || []).forEach((row) => {
               const patientName = String(row?.patient_name || '').trim();
               const membershipNumber = String(row?.membership_number || '').trim();
               const appointmentUserId = String(row?.user_id || '').trim();
 
               if (patientName) {
+                fallbackUserIdRawSet.add(patientName);
                 fallbackUserIdSet.add(normalizeId(patientName));
               }
               if (membershipNumber) {
+                fallbackUserIdRawSet.add(membershipNumber);
                 fallbackUserIdSet.add(normalizeId(membershipNumber));
               }
               if (appointmentUserId) {
+                fallbackUserIdRawSet.add(appointmentUserId);
                 fallbackUserIdSet.add(normalizeId(appointmentUserId));
               }
             });
@@ -760,14 +767,13 @@ const HospitalTrusteeApp = () => {
 
           try {
             window.dispatchEvent(new CustomEvent('pushNotificationArrived', { detail: notification }));
-            const notificationType = notification.type || notification.click_action || 'general';
 
             await LocalNotifications.createChannel({
-              id: `notif_channel_${notificationType}`,
-              name: notificationType === 'appointment_insert' ? 'Appointment Updates'
-                : notificationType === 'referral' ? 'Referral Updates'
-                  : notificationType === 'birthday' ? 'Birthday Wishes'
-                    : notificationType === 'test' ? 'Test Notifications'
+              id: `notif_channel_${notification.type || 'general'}`,
+              name: notification.type === 'appointment_insert' ? 'Appointment Updates'
+                : notification.type === 'referral' ? 'Referral Updates'
+                  : notification.type === 'birthday' ? 'Birthday Wishes'
+                    : notification.type === 'test' ? 'Test Notifications'
                       : 'Hospital Notifications',
               description: 'Updates from Mah-Setu app',
               importance: 5,
@@ -791,7 +797,7 @@ const HospitalTrusteeApp = () => {
                   id: notifId,
                   title: notification.title || 'New Notification',
                   body: (notification.message || notification.body || 'You have a new notification').substring(0, 200),
-                  channelId: `notif_channel_${notificationType}`,
+                  channelId: `notif_channel_${notification.type || 'general'}`,
                   schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true },
                   sound: null,
                   attachments: null,
@@ -813,21 +819,54 @@ const HospitalTrusteeApp = () => {
           try {
             if (isDisposed) return;
 
-            const fiveSecondsAgoMs = Date.now() - 5000;
-            const response = await getUserNotifications(notificationContext.trustId);
-            if (!response.success) {
-              console.error('[NotifListener] API polling error:', response.message);
+            const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+
+            const notificationUserIds = [
+              ...new Set([
+                ...userIdVariants,
+                ...Array.from(fallbackUserIdRawSet),
+              ]),
+            ];
+
+            let userNotifications = [];
+            if (canQueryNotificationUserId) {
+              const { data, error: userNotifError } = await supabase
+                .from('notifications')
+                .select('*')
+                .in('user_id', notificationUserIds)
+                .gte('created_at', fiveSecondsAgo)
+                .order('created_at', { ascending: false });
+
+              if (userNotifError) {
+                if (isMissingUserIdColumnError(userNotifError)) {
+                  canQueryNotificationUserId = false;
+                  console.warn('[NotifListener] notifications.user_id column missing; skipping direct user polling.');
+                } else {
+                  console.error('[NotifListener] User polling error:', userNotifError.message);
+                  return;
+                }
+              } else {
+                userNotifications = data || [];
+              }
+            }
+
+            const { data: audienceNotifications, error: audienceError } = await supabase
+              .from('notifications')
+              .select('*')
+              .in('target_audience', audienceVariants)
+              .gte('created_at', fiveSecondsAgo)
+              .order('created_at', { ascending: false });
+
+            if (audienceError) {
+              console.error('[NotifListener] Audience polling error:', audienceError.message);
               return;
             }
 
-            const uniqueRecent = (response.data || []).filter((item) => {
-              const createdAt = new Date(item.created_at || item.createdAt || 0).getTime();
-              return Number.isFinite(createdAt) && createdAt >= fiveSecondsAgoMs;
-            });
+            const merged = [...(userNotifications || []), ...(audienceNotifications || [])];
+            const uniqueRecent = [...new Map(merged.map((item) => [item.id, item])).values()];
 
             for (const notif of uniqueRecent) {
-              const notificationType = notif.type || notif.click_action || 'general';
-              if (notificationType !== 'birthday' && !notificationTracker.has(notif.id)) {
+              if (notif.type !== 'birthday' && !notificationTracker.has(notif.id)) {
                 await showPushNotification(notif);
               }
             }
@@ -841,15 +880,14 @@ const HospitalTrusteeApp = () => {
             .channel(`notifications_channel_${userId}`)
             .on(
               'postgres_changes',
-              { event: 'INSERT', schema: 'public', table: 'notification' },
+              { event: 'INSERT', schema: 'public', table: 'notifications' },
               (payload) => {
                 const newNotification = payload.new;
                 const directMatch = matchesNotificationForContext(newNotification, notificationContext);
                 const fallbackMatch = fallbackUserIdSet.has(normalizeId(newNotification?.user_id));
                 const isForThisUser = directMatch || fallbackMatch;
-                const notificationType = newNotification.type || newNotification.click_action || 'general';
 
-                if (isForThisUser && notificationType !== 'birthday') {
+                if (isForThisUser && newNotification.type !== 'birthday') {
                   showPushNotification(newNotification);
                 }
               }

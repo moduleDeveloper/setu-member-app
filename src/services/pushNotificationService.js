@@ -25,8 +25,7 @@ export const initPushNotifications = async () => {
     return null;
   }
 
-  const platform = Capacitor.getPlatform();
-  if (!['android', 'ios'].includes(platform)) {
+  if (Capacitor.getPlatform() !== 'android') {
     return null;
   }
 
@@ -46,7 +45,7 @@ export const initPushNotifications = async () => {
         await api.post('/notifications/device-token', {
           userId,
           token: token.value,
-          platform,
+          platform: 'android',
         });
       } catch (error) {
         console.error('Failed to save push token:', error?.message || error);

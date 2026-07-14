@@ -109,15 +109,5 @@ export const matchesNotificationForContext = (notification, context) => {
   const audience = normalizeAudience(notification.target_audience);
   if (audience && context.audienceNormalizedSet.has(audience)) return true;
 
-  const payload = notification.audience_payload && typeof notification.audience_payload === 'object'
-    ? notification.audience_payload
-    : {};
-
-  const payloadUserIds = Array.isArray(payload.user_ids) ? payload.user_ids : [];
-  if (payloadUserIds.some((userId) => context.userIdSet.has(normalizeIdentity(userId)))) return true;
-
-  const payloadAudience = normalizeAudience(payload.target_audience);
-  if (payloadAudience && context.audienceNormalizedSet.has(payloadAudience)) return true;
-
   return false;
 };
