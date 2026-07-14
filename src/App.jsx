@@ -67,13 +67,17 @@ import {
   useInAppUpdate
 } from './hooks';
 
-const LAST_THEME_CACHE_KEY = 'last_theme_cache_v2';
-const LEGACY_LAST_THEME_CACHE_KEY = 'last_theme_cache_v1';
+const LAST_THEME_CACHE_KEY = 'last_theme_cache_v3';
+const LEGACY_LAST_THEME_CACHE_KEYS = ['last_theme_cache_v2', 'last_theme_cache_v1'];
+const THEME_CACHE_VERSION = 'v3';
+const LEGACY_THEME_CACHE_VERSIONS = ['v2'];
 const LAST_SELECTED_TRUST_ID_KEY = 'last_selected_trust_id';
 const TRUST_ID_CARD_CACHE_KEY = 'trust_id_card_payload_v1';
 const AUTO_LOGOUT_MINUTES = Number(import.meta.env.VITE_AUTO_LOGOUT_MINUTES || 30);
 const AUTO_LOGOUT_MS = Math.max(1, AUTO_LOGOUT_MINUTES) * 60 * 1000;
-const getPersistTrustCacheIndexKey = (trustId) => `theme_cache_persist_trust_v2_${trustId}`;
+const getPersistTrustCacheIndexKey = (trustId) => `theme_cache_persist_trust_${THEME_CACHE_VERSION}_${trustId}`;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuid = (value) => UUID_RE.test(String(value || '').trim());
 
 const safeParse = (value) => {
   try {
@@ -84,9 +88,11 @@ const safeParse = (value) => {
 };
 
 const readLastKnownThemeTrust = () => {
-  const parsedV2 = safeParse(localStorage.getItem('last_theme_cache_v2') || '');
-  const parsedLegacy = safeParse(localStorage.getItem('last_theme_cache_v1') || '');
-  const parsed = parsedV2 || parsedLegacy;
+  const parsedCurrent = safeParse(localStorage.getItem(LAST_THEME_CACHE_KEY) || '');
+  const parsedLegacy = LEGACY_LAST_THEME_CACHE_KEYS
+    .map((key) => safeParse(localStorage.getItem(key) || ''))
+    .find(Boolean);
+  const parsed = parsedCurrent || parsedLegacy;
   if (!parsed || typeof parsed !== 'object') return { id: '', name: '' };
   const id = String(parsed.selectedTrustId || parsed.trustId || '').trim();
   const name = String(parsed.selectedTrustName || parsed.trustName || '').trim();
@@ -97,7 +103,7 @@ const readBootThemeCache = (trustId) => {
   const normalizedTrustId = String(trustId || '').trim();
   if (!normalizedTrustId) return null;
 
-  const trustIndexKey = `theme_cache_trust_v2_${normalizedTrustId}`;
+  const trustIndexKey = `theme_cache_trust_${THEME_CACHE_VERSION}_${normalizedTrustId}`;
   const activeEntryKey = sessionStorage.getItem(trustIndexKey);
   if (activeEntryKey) {
     const parsedEntry = safeParse(sessionStorage.getItem(activeEntryKey) || '');
@@ -124,17 +130,23 @@ const readBootThemeCache = (trustId) => {
   }
 
   const lastTheme = safeParse(localStorage.getItem(LAST_THEME_CACHE_KEY) || '')
-    || safeParse(localStorage.getItem(LEGACY_LAST_THEME_CACHE_KEY) || '');
+    || LEGACY_LAST_THEME_CACHE_KEYS.map((key) => safeParse(localStorage.getItem(key) || '')).find(Boolean);
   if (!lastTheme || typeof lastTheme !== 'object') {
     // Recovery path when index keys are missing but trust cache entries exist.
-    const sessionPrefix = `theme_cache_v2_${normalizedTrustId}_`;
-    const persistPrefix = `theme_cache_persist_v2_${normalizedTrustId}_`;
+    const sessionPrefixes = [
+      `theme_cache_${THEME_CACHE_VERSION}_${normalizedTrustId}_`,
+      ...LEGACY_THEME_CACHE_VERSIONS.map((version) => `theme_cache_${version}_${normalizedTrustId}_`)
+    ];
+    const persistPrefixes = [
+      `theme_cache_persist_${THEME_CACHE_VERSION}_${normalizedTrustId}_`,
+      ...LEGACY_THEME_CACHE_VERSIONS.map((version) => `theme_cache_persist_${version}_${normalizedTrustId}_`)
+    ];
     let recoveredTheme = null;
     let recoveredTs = 0;
 
     for (let i = 0; i < sessionStorage.length; i += 1) {
       const key = sessionStorage.key(i);
-      if (!key || !key.startsWith(sessionPrefix)) continue;
+      if (!key || !sessionPrefixes.some((prefix) => key.startsWith(prefix))) continue;
       const parsed = safeParse(sessionStorage.getItem(key) || '');
       const candidateTheme = parsed?.theme;
       const candidateTs = Number(parsed?.ts) || 0;
@@ -146,7 +158,7 @@ const readBootThemeCache = (trustId) => {
 
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
-      if (!key || !key.startsWith(persistPrefix)) continue;
+      if (!key || !persistPrefixes.some((prefix) => key.startsWith(prefix))) continue;
       const parsed = safeParse(localStorage.getItem(key) || '');
       const candidateTheme = parsed?.theme;
       const candidateTs = Number(parsed?.ts) || 0;
@@ -554,7 +566,7 @@ const HospitalTrusteeApp = () => {
 
         const mobileForSearch = parsedUser.Mobile || parsedUser.mobile || parsedUser.phone || '';
         const membershipId = parsedUser['Membership number'] || parsedUser.membershipNumber || parsedUser['membership_number'] || '';
-        const membersId = parsedUser.members_id || parsedUser.member_id || parsedUser.id || '';
+        const membersId = [parsedUser.members_id, parsedUser.member_id, parsedUser.id].find(isUuid) || '';
         // Primary userId for notifications table
         const userId = mobileForSearch || membershipId || String(membersId || '');
 
@@ -717,13 +729,22 @@ const HospitalTrusteeApp = () => {
         let canQueryNotificationUserId = true;
         const isMissingUserIdColumnError = (error) =>
           /column\s+notifications\.user_id\s+does not exist/i.test(String(error?.message || ''));
+        const isUserIdTypeMismatchError = (error) =>
+          /invalid input syntax for type uuid/i.test(String(error?.message || ''))
+          || /operator does not exist/i.test(String(error?.message || ''));
+        const phoneLikeUserIdVariants = userIdVariants.filter((value) => {
+          if (!/^\d+$/.test(String(value || '').trim())) return false;
+          const digits = String(value || '').replace(/\D/g, '');
+          return digits.length >= 10;
+        });
 
         const refreshFallbackUserIds = async () => {
+          if (phoneLikeUserIdVariants.length === 0) return;
           try {
             const { data: linkedAppointments } = await supabase
               .from('appointments')
               .select('patient_name, membership_number, user_id')
-              .in('patient_phone', userIdVariants)
+              .in('patient_phone', phoneLikeUserIdVariants)
               .limit(500);
 
             fallbackUserIdSet.clear();
@@ -825,11 +846,11 @@ const HospitalTrusteeApp = () => {
               ...new Set([
                 ...userIdVariants,
                 ...Array.from(fallbackUserIdRawSet),
-              ]),
+              ].filter(isUuid)),
             ];
 
             let userNotifications = [];
-            if (canQueryNotificationUserId) {
+            if (canQueryNotificationUserId && notificationUserIds.length > 0) {
               const { data, error: userNotifError } = await supabase
                 .from('notifications')
                 .select('*')
@@ -838,9 +859,9 @@ const HospitalTrusteeApp = () => {
                 .order('created_at', { ascending: false });
 
               if (userNotifError) {
-                if (isMissingUserIdColumnError(userNotifError)) {
+                if (isMissingUserIdColumnError(userNotifError) || isUserIdTypeMismatchError(userNotifError)) {
                   canQueryNotificationUserId = false;
-                  console.warn('[NotifListener] notifications.user_id column missing; skipping direct user polling.');
+                  console.warn('[NotifListener] notifications.user_id cannot be queried with current identifiers; skipping direct user polling.');
                 } else {
                   console.error('[NotifListener] User polling error:', userNotifError.message);
                   return;
