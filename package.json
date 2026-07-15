@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "resize-icon": "node resize_icon.js"
+    "resize-icon": "node resize_icon.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@capacitor-community/facebook-login": "^8.0.0",
@@ -29,6 +30,7 @@
     "firebase": "^12.7.0",
     "lucide-react": "^0.562.0",
     "msg91-sms": "^1.0.1",
+    "pdfjs-dist": "^6.1.200",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.11.0"

@@ -1,4 +1,4 @@
-import { checkVipNoticeEligibility, fetchNoticeboardById, fetchNoticeboardPage } from './communityService';
+import { fetchNoticeboardById, fetchNoticeboardPage } from './communityService';
 
 const NOTICEBOARD_TTL_MS = 5 * 60 * 1000;
 const NOTICEBOARD_CTX_TTL_MS = 5 * 60 * 1000;
@@ -52,10 +52,10 @@ const resolveCurrentMemberId = () => {
   }
 };
 
-const buildScopeKey = ({ trustId, memberId, vipEligible }) => {
+const buildScopeKey = ({ trustId, memberId }) => {
   const normalizedTrustId = normalizeId(trustId) || 'unknown-trust';
   const normalizedMemberId = normalizeId(memberId) || 'anon';
-  return `${normalizedTrustId}__${normalizedMemberId}__${vipEligible ? 'vip' : 'gen'}`;
+  return `${normalizedTrustId}__${normalizedMemberId}`;
 };
 
 const now = () => Date.now();
@@ -225,39 +225,26 @@ async function resolveNoticeboardContext(trustId, trustName = null, forceRefresh
   const normalizedTrustId = normalizeId(trustId);
   const memberId = resolveCurrentMemberId();
   if (!normalizedTrustId) {
-    return { trustId: null, memberId, vipEligible: false, regMemberMatch: null, scopeKey: null };
+    return { trustId: null, memberId, scopeKey: null };
   }
 
   const ctxKey = KEY_CONTEXT(normalizedTrustId, memberId);
   const cached = readJson(ctxKey, null);
   if (!forceRefresh && cached && isFresh(cached.ts)) {
-    const scopeKey = buildScopeKey({
-      trustId: normalizedTrustId,
-      memberId,
-      vipEligible: Boolean(cached.vipEligible)
-    });
+    const scopeKey = buildScopeKey({ trustId: normalizedTrustId, memberId });
     writeJson(KEY_ACTIVE_SCOPE(normalizedTrustId, memberId), scopeKey);
     return {
       trustId: normalizedTrustId,
       memberId,
-      vipEligible: Boolean(cached.vipEligible),
-      regMemberMatch: cached.regMemberMatch || null,
       scopeKey,
       fromCache: true
     };
   }
 
-  const eligibility = await checkVipNoticeEligibility({
-    trustId: normalizedTrustId,
-    trustName,
-    memberId
-  });
-  const vipEligible = Boolean(eligibility?.vipEligible);
-  const regMemberMatch = eligibility?.regMemberMatch || null;
-  const scopeKey = buildScopeKey({ trustId: normalizedTrustId, memberId, vipEligible });
-  writeJson(ctxKey, { vipEligible, regMemberMatch, ts: now() });
+  const scopeKey = buildScopeKey({ trustId: normalizedTrustId, memberId });
+  writeJson(ctxKey, { ts: now() });
   writeJson(KEY_ACTIVE_SCOPE(normalizedTrustId, memberId), scopeKey);
-  return { trustId: normalizedTrustId, memberId, vipEligible, regMemberMatch, scopeKey, fromCache: false };
+  return { trustId: normalizedTrustId, memberId, scopeKey, fromCache: false };
 }
 
 export async function loadNoticeboardPage({ trustId, trustName = null, page = 1, pageSize = noticeboardConfig.PAGE_SIZE, forceRefresh = false }) {
@@ -272,7 +259,7 @@ export async function loadNoticeboardPage({ trustId, trustName = null, page = 1,
 
   const cache = getCachedPage(scopeKey, pageNo);
   if (!forceRefresh && cache.isFresh && cache.notices.length > 0) {
-    console.log('[Noticeboard][Cache] hit trust=', normalizedTrustId, 'member=', context.memberId, 'vip=', context.vipEligible, 'page=', pageNo, 'count=', cache.notices.length);
+    console.log('[Noticeboard][Cache] hit trust=', normalizedTrustId, 'member=', context.memberId, 'page=', pageNo, 'count=', cache.notices.length);
     return { notices: cache.notices, hasMore: readState(scopeKey).hasMoreNotices, fromCache: true };
   }
 
@@ -280,15 +267,12 @@ export async function loadNoticeboardPage({ trustId, trustName = null, page = 1,
   if (inflight[inflightKey]) return inflight[inflightKey];
 
   writeState(scopeKey, { isNoticeboardLoading: true });
-  console.log('[Noticeboard][Cache] miss trust=', normalizedTrustId, 'member=', context.memberId, 'vip=', context.vipEligible, 'page=', pageNo, 'fetch=api');
+  console.log('[Noticeboard][Cache] miss trust=', normalizedTrustId, 'member=', context.memberId, 'page=', pageNo, 'fetch=api');
   inflight[inflightKey] = (async () => {
     try {
       const res = await fetchNoticeboardPage({
         trustId: normalizedTrustId,
         trustName,
-        memberId: context.memberId,
-        vipEligible: context.vipEligible,
-        regMemberMatch: context.regMemberMatch,
         page: pageNo,
         pageSize: limit
       });
@@ -338,9 +322,6 @@ export async function loadNoticeDetail({ trustId, trustName = null, noticeId, fo
     noticeId: normalizedNoticeId,
     trustId: normalizedTrustId,
     trustName,
-    memberId: context.memberId,
-    vipEligible: context.vipEligible,
-    regMemberMatch: context.regMemberMatch
   });
 
   if (!res?.success) {
