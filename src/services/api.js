@@ -866,7 +866,7 @@ const isRowActive = (row) => {
   if (typeof value === 'number') return value === 1;
   const normalized = String(value).trim().toLowerCase();
   if (!normalized) return true;
-  return !['false', '0', 'no', 'inactive'].includes(normalized);
+  return !['false', '0', 'no', 'inactive', 'paused'].includes(normalized);
 };
 
 // Get sponsor information
