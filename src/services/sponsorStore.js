@@ -29,7 +29,7 @@ export const sponsorConfig = {
   CAROUSEL_SLIDE_SECONDS: 5
 };
 
-const STORAGE_VERSION = 'v4';
+const STORAGE_VERSION = 'v5';
 const SPONSOR_TIMEZONE = 'Asia/Kolkata';
 const KEY_BY_ID_PREFIX = `sp_by_id_${STORAGE_VERSION}_`;
 const KEY_ORDER_PREFIX = `sp_order_${STORAGE_VERSION}_`;

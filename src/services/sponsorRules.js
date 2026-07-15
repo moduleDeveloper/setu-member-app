@@ -21,13 +21,17 @@ export const isDateValidForToday = (row, todayYmd) => {
 };
 
 export const isRowActive = (row) => {
-  const value = row?.is_active ?? row?.status;
+  if (row?.status !== undefined && row?.status !== null) {
+    return String(row.status).trim().toLowerCase() === 'active';
+  }
+
+  const value = row?.is_active;
   if (value === undefined || value === null) return true;
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value === 1;
   const normalized = String(value).trim().toLowerCase();
   if (!normalized) return true;
-  return !['false', '0', 'no', 'inactive', 'paused'].includes(normalized);
+  return !['false', '0', 'no', 'inactive'].includes(normalized);
 };
 
 export const isFresh = (timestamp, ttlMs, nowMs = Date.now()) =>

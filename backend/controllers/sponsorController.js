@@ -149,7 +149,7 @@ const buildSponsorPayload = async ({ trustId, today, view, page, limit, offset, 
 
     sponsorsById = (Array.isArray(sponsorRows) ? sponsorRows : []).reduce((acc, sponsor) => {
       const sid = sanitizeId(sponsor?.id);
-      if (sid && isRowActive(sponsor)) acc[sid] = sponsor;
+      if (sid) acc[sid] = sponsor;
       return acc;
     }, {});
   }
@@ -331,13 +331,6 @@ export const getSponsorById = async (req, res) => {
     if (error) throw error;
 
     if (!data) {
-      return res.status(404).json({
-        success: false,
-        message: 'Sponsor not found'
-      });
-    }
-
-    if (!isRowActive(data)) {
       return res.status(404).json({
         success: false,
         message: 'Sponsor not found'
