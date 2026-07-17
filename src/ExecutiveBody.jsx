@@ -38,15 +38,88 @@ const normalizePriorityValue = (value) => {
 };
 
 const isPrivacyRestricted = (value) => value === true || String(value || '').trim().toLowerCase() === 'true';
+const EXECUTIVE_BODY_SEARCH_FIELDS = {
+  committee: [
+    (item) => item?.Name,
+    (item) => item?.committee_name_english,
+    (item) => item?.committee_name_hindi,
+    (item) => item?.member_role,
+    (item) => item?.title,
+    (item) => item?.subtitle,
+    (item) => item?.position,
+    (item) => item?.location,
+    (item) => item?.Mobile,
+    (item) => item?.Email,
+    (item) => item?.['Membership number'],
+  ],
+  member: [
+    (item) => item?.Name,
+    (item) => item?.member_name_english,
+    (item) => item?.committee_name_english,
+    (item) => item?.committee_name_hindi,
+    (item) => item?.member_role,
+    (item) => item?.title,
+    (item) => item?.subtitle,
+    (item) => item?.position,
+    (item) => item?.location,
+    (item) => item?.Mobile,
+    (item) => item?.Email,
+    (item) => item?.['Membership number'],
+  ],
+};
+
+const getExecutiveBodySearchFields = (item, tab) => {
+  const fields = [...(EXECUTIVE_BODY_SEARCH_FIELDS[tab] || EXECUTIVE_BODY_SEARCH_FIELDS.member)];
+
+  if (tab === 'committee' && Array.isArray(item?.committee_members)) {
+    item.committee_members.forEach((member) => {
+      fields.push(
+        member?.Name,
+        member?.member_name_english,
+        member?.committee_name_english,
+        member?.committee_name_hindi,
+        member?.member_role,
+        member?.title,
+        member?.subtitle,
+        member?.position,
+        member?.location,
+        member?.Mobile,
+        member?.Email,
+        member?.['Membership number']
+      );
+    });
+  }
+
+  return fields;
+};
+
+const getSearchRankFromFields = (fields, query) => {
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  if (!normalizedQuery) return fields.length;
+
+  for (let index = 0; index < fields.length; index += 1) {
+    if (String(fields[index] ?? '').toLowerCase().includes(normalizedQuery)) {
+      return index;
+    }
+  }
+
+  return fields.length;
+};
+
+const getExecutiveBodySearchRank = (item, query, tab) => {
+  const fields = getExecutiveBodySearchFields(item, tab);
+  return getSearchRankFromFields(fields, query);
+};
 
 const buildCommitteeGroups = (items = []) => {
   const groups = new Map();
 
   (items || []).forEach((item, index) => {
     const displayName = getCommitteeDisplayName(item);
+    const normalizedDisplayName = normalizeCommitteeText(displayName).toLowerCase();
     const baseKey = getCommitteeGroupKey(item);
-    const fallbackKey = `${displayName.toLowerCase()}__${String(item?.id || item?.reg_id || item?.original_id || index)}`;
-    const key = baseKey || fallbackKey;
+    const fallbackKey = `${normalizedDisplayName || 'committee'}__${String(item?.id || item?.reg_id || item?.original_id || index)}`;
+    const key = normalizedDisplayName && normalizedDisplayName !== 'committee' ? baseKey : fallbackKey;
     const existing = groups.get(key);
     const committeeMembers = [...(existing?.committee_members || []), item];
 
@@ -101,7 +174,6 @@ const ExecutiveBody = ({ onNavigate }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const primaryColor = theme?.primary || 'var(--brand-red)';
   const secondaryColor = theme?.secondary || 'var(--brand-navy)';
-    const titleColor = 'var(--advertisement-title)';
 
   useEffect(() => {
     let mounted = true;
@@ -161,43 +233,22 @@ const ExecutiveBody = ({ onNavigate }) => {
     const source = tab === 'committee' ? committeeGroups : (data[tab] || []);
     const normalizedQuery = String(query || '').trim().toLowerCase();
     if (!normalizedQuery) return source;
-    return source.filter((item) => {
-      const haystackParts = [
-        item?.Name,
-        item?.member_name_english,
-        item?.committee_name_english,
-        item?.committee_name_hindi,
-        item?.member_role,
-        item?.title,
-        item?.subtitle,
-        item?.position,
-        item?.location,
-        item?.Mobile,
-        item?.Email,
-        item?.['Membership number'],
-      ];
-
-      if (tab === 'committee' && Array.isArray(item?.committee_members)) {
-        item.committee_members.forEach((member) => {
-          haystackParts.push(
-            member?.Name,
-            member?.member_name_english,
-            member?.member_role,
-            member?.title,
-            member?.subtitle,
-            member?.Mobile,
-            member?.Email,
-            member?.['Membership number']
-          );
-        });
-      }
-
-      const haystack = haystackParts
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(normalizedQuery);
-    });
+    return source
+      .map((item, index) => {
+        const fields = getExecutiveBodySearchFields(item, tab);
+        return {
+          item,
+          index,
+          rank: getExecutiveBodySearchRank(item, normalizedQuery, tab),
+          fieldCount: fields.length,
+        };
+      })
+      .filter((entry) => entry.rank < entry.fieldCount)
+      .sort((left, right) => {
+        if (left.rank !== right.rank) return left.rank - right.rank;
+        return left.index - right.index;
+      })
+      .map((entry) => entry.item);
   }, [committeeGroups, data, query, tab]);
 
   const totalByTab = useMemo(
@@ -286,6 +337,8 @@ const ExecutiveBody = ({ onNavigate }) => {
     const start = (currentPage - 1) * MEMBERS_PER_PAGE;
     return activeMembers.slice(start, start + MEMBERS_PER_PAGE);
   }, [activeMembers, currentPage]);
+
+  const hasSearchQuery = Boolean(String(query || '').trim());
 
   const openCommitteeGroup = (item) => {
     sessionStorage.setItem(EXEC_BODY_ACTIVE_TAB_KEY, tab);
@@ -453,7 +506,11 @@ const ExecutiveBody = ({ onNavigate }) => {
           <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
             <Users className="h-8 w-8 mx-auto mb-2" style={{ color: 'var(--advertisement-subtitle)' }} />
             <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>
-              {tab === 'committee' ? 'No committees found' : 'No members found'}
+              {hasSearchQuery
+                ? `No ${tab === 'committee' ? 'committees' : 'members'} match your search`
+                : tab === 'committee'
+                  ? 'No committees found'
+                  : 'No members found'}
             </p>
           </div>
         ) : (

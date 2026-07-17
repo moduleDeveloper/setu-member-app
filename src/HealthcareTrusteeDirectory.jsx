@@ -5,7 +5,7 @@ import { getAllCommitteeMembers, getAllDoctors, getAllElectedMembers, getProfile
 import { getExecutiveBodyMembers, getTrusteesAndPatrons } from './services/supabaseService';
 import { registerSidebarState, useAndroidBack } from './hooks';
 import { useAppTheme } from './context/ThemeContext';
-import { fetchFeatureFlags, subscribeFeatureFlags } from './services/featureFlags';
+import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureVisible } from './services/featureFlags';
 import { fetchSubFeatureFlags, subscribeSubFeatureFlags } from './services/subFeatureFlags';
 import { getNavbarThemeStyles } from './utils/themeUtils';
 
@@ -143,7 +143,6 @@ const HealthcareTrusteeDirectory = ({ onNavigate }) => {
   // Ref for the content area to scroll to
   const contentRef = useRef(null);
 
-  const isFeatureEnabled = (key) => featureFlags[key] !== false;
   const hasSubFeatureConfig = Object.keys(subFeatureFlags || {}).length > 0;
   const isSubFeatureEnabled = (key) => {
     if (!hasSubFeatureConfig) return true;
@@ -163,9 +162,9 @@ const HealthcareTrusteeDirectory = ({ onNavigate }) => {
     return Number.isFinite(parsed) ? parsed : fallback;
   };
 
-  const isDirectoryEnabled = isFeatureEnabled('feature_directory');
-  const isCommitteeEnabled = isFeatureEnabled('feature_committee');
-  const isElectedEnabled = isFeatureEnabled('feature_elected_members');
+  const isDirectoryEnabled = isFeatureVisible(featureFlags, 'feature_directory');
+  const isCommitteeEnabled = isFeatureVisible(featureFlags, 'feature_committee');
+  const isElectedEnabled = isFeatureVisible(featureFlags, 'feature_elected_members');
 
   const isMembersTabEnabled = hasSubFeatureConfig ? isSubFeatureEnabled('members') : true;
   const isDoctorsTabEnabled = hasSubFeatureConfig

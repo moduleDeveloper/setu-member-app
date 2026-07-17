@@ -16,6 +16,7 @@ import {
 } from './services/eventsStore';
 import { formatEventDate, formatTimeRange } from './services/eventsService';
 import { applyOpacity } from './utils/colorUtils';
+import { downloadAttachmentFile } from './utils/attachmentDownload';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -657,29 +658,12 @@ const Events = ({ onNavigate }) => {
     if (!url) return;
 
     const fileName = attachment?.downloadName || getAttachmentDownloadName(attachment, attachment?.index || 0);
-
-    try {
-      const response = await fetch(url, { credentials: 'omit' });
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      link.rel = 'noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
-    } catch {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.rel = 'noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    }
+    return downloadAttachmentFile({
+      url,
+      fileName,
+      shareTitle: 'Event attachment',
+      shareText: fileName,
+    });
   };
 
   const openEventDetail = (eventId) => {

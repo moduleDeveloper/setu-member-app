@@ -5,6 +5,7 @@ import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { useAppTheme } from './context/ThemeContext';
 import { getNoticeboardSnapshot, loadNoticeDetail } from './services/noticeboardStore';
+import { downloadAttachmentFile } from './utils/attachmentDownload';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -558,29 +559,12 @@ const NoticeDetail = ({ onNavigate }) => {
     if (!url) return;
 
     const fileName = attachment?.downloadName || getAttachmentDownloadName(attachment, idx);
-
-    try {
-      const response = await fetch(url, { credentials: 'omit' });
-      if (!response.ok) throw new Error('Download failed');
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      link.rel = 'noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
-    } catch {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.rel = 'noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    }
+    return downloadAttachmentFile({
+      url,
+      fileName,
+      shareTitle: 'Notice attachment',
+      shareText: fileName,
+    });
   };
 
   const hasCarousel = Array.isArray(noticeList) && noticeList.length > 0;
@@ -778,9 +762,39 @@ const NoticeDetail = ({ onNavigate }) => {
                       )}
 
                       {attachment.type === 'other' && (
-                        <div className="flex items-center gap-2 p-3 bg-slate-50 text-slate-700">
-                          <FileText className="h-4 w-4 shrink-0" />
-                          <span className="truncate flex-1">File attachment</span>
+                        <div className="p-4 sm:p-5" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--surface-color)', borderRadius: '12px' }}>
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                              style={{ background: 'color-mix(in srgb, var(--app-button-bg) 16%, var(--surface-color))' }}
+                            >
+                              <FileText className="h-5 w-5" style={{ color: 'var(--app-button-icon)' }} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-bold" style={{ color: 'var(--advertisement-title)' }}>
+                                {attachment.label}
+                              </p>
+                              <p className="mt-1 text-xs font-medium" style={{ color: 'var(--advertisement-subtitle)' }}>
+                                Document file
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => downloadAttachment(attachment, attachment.index)}
+                              className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all active:scale-[0.98]"
+                              style={{
+                                background: 'var(--app-button-bg)',
+                                color: 'var(--app-button-text)',
+                                borderColor: 'transparent'
+                              }}
+                              aria-label={`Download ${attachment.label}`}
+                            >
+                              <Download className="h-4 w-4" />
+                              Download
+                            </button>
+                          </div>
                         </div>
                       )}
 

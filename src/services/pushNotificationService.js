@@ -19,13 +19,14 @@ const getCurrentUserId = () => {
 };
 
 export const initPushNotifications = async () => {
-  // Default OFF. Enable only after Firebase is configured for Android.
+  // Default OFF. Enable only after native push is configured for the target platform.
   if (!isFcmPushEnabled()) {
     console.warn('FCM push is disabled. Set VITE_ENABLE_FCM_PUSH=true after Firebase setup.');
     return null;
   }
 
-  if (Capacitor.getPlatform() !== 'android') {
+  const platform = Capacitor.getPlatform();
+  if (platform !== 'android' && platform !== 'ios') {
     return null;
   }
 
@@ -45,7 +46,7 @@ export const initPushNotifications = async () => {
         await api.post('/notifications/device-token', {
           userId,
           token: token.value,
-          platform: 'android',
+          platform,
         });
       } catch (error) {
         console.error('Failed to save push token:', error?.message || error);

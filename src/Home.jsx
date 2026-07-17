@@ -11,7 +11,7 @@ import { supabase } from './services/supabaseClient';
 import { clearLoginTermsPromptPending, isLoginTermsPromptPending, resolveLegalTrustId } from './utils/legalContent';
 import { readNotificationCache, writeNotificationCache } from './services/notificationCache';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
-import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureEnabled } from './services/featureFlags';
+import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureVisible } from './services/featureFlags';
 import { fetchMemberTrusts, fetchTrustById, fetchDefaultTrust } from './services/trustService';
 import {
   ensureAllSponsorsLoaded,
@@ -1213,51 +1213,57 @@ const Home = ({ onNavigate, onLogout }) => {
 
   const handleTrustChipClick = async (trust) => {
     const trustId = normalizeTrustId(trust?.id);
-    const trustUnreadCount = Number(unreadCountByTrust[trustId] || 0);
+    if (!trustId) return;
 
-    if (trustId && trustUnreadCount > 0) {
-      try {
-        const response = await getUserNotifications(trustId);
-        const trustNotifications = Array.isArray(response?.data) ? response.data : [];
-        const unreadNotifications = trustNotifications
-          .filter((notification) => !notification?.is_read)
-          .sort((a, b) => {
-            const aTime = Date.parse(a?.created_at || '') || 0;
-            const bTime = Date.parse(b?.created_at || '') || 0;
-            return bTime - aTime;
-          });
-
-        for (const notification of unreadNotifications) {
-          const redirectRoute = await resolveNotificationRedirectRoute(notification);
-          if (!redirectRoute) continue;
-
-          try {
-            await markNotificationAsRead(notification.id);
-            setNotifications((prev) => prev.map((item) => (
-              item.id === notification.id ? { ...item, is_read: true } : item
-            )));
-            setUnreadCount((prev) => Math.max(0, prev - 1));
-            setUnreadCountByTrust((prev) => ({
-              ...prev,
-              [trustId]: Math.max(0, Number(prev[trustId] || 0) - 1),
-            }));
-          } catch {
-            // Redirect should still work even if read-state sync fails.
-          }
-
-          if (typeof onNavigate === 'function') {
-            onNavigate(redirectRoute);
-          } else {
-            window.location.href = redirectRoute;
-          }
-          return;
-        }
-      } catch (error) {
-        console.warn('Failed to resolve trust notification redirect:', error?.message || error);
-      }
-    }
-
+    // Switch trust first so the UI and cache state are correct before any redirect.
     await handleTrustSelect(trust?.id);
+
+    const trustUnreadCount = Number(unreadCountByTrust[trustId] || 0);
+    if (trustUnreadCount <= 0) return;
+
+    try {
+      const response = await getUserNotifications(trustId);
+      const trustNotifications = Array.isArray(response?.data) ? response.data : [];
+      const unreadNotifications = trustNotifications
+        .filter((notification) => !notification?.is_read)
+        .sort((a, b) => {
+          const aTime = Date.parse(a?.created_at || '') || 0;
+          const bTime = Date.parse(b?.created_at || '') || 0;
+          return bTime - aTime;
+        });
+
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+      }
+
+      for (const notification of unreadNotifications) {
+        const redirectRoute = await resolveNotificationRedirectRoute(notification);
+        if (!redirectRoute) continue;
+
+        try {
+          await markNotificationAsRead(notification.id);
+          setNotifications((prev) => prev.map((item) => (
+            item.id === notification.id ? { ...item, is_read: true } : item
+          )));
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+          setUnreadCountByTrust((prev) => ({
+            ...prev,
+            [trustId]: Math.max(0, Number(prev[trustId] || 0) - 1),
+          }));
+        } catch {
+          // Redirect should still work even if read-state sync fails.
+        }
+
+        if (typeof onNavigate === 'function') {
+          onNavigate(redirectRoute);
+        } else {
+          window.location.href = redirectRoute;
+        }
+        return;
+      }
+    } catch (error) {
+      console.warn('Failed to resolve trust notification redirect:', error?.message || error);
+    }
   };
 
   // Marquee updates
@@ -1923,7 +1929,7 @@ const Home = ({ onNavigate, onLogout }) => {
     }
   };
 
-  const ff = (key) => isFeatureEnabled(featureFlags, key);
+  const ff = (key) => isFeatureVisible(featureFlags, key);
   const normalizeQuickRoute = (route) => {
     const raw = String(route || '').trim().toLowerCase();
     const value = raw
@@ -1995,7 +2001,7 @@ const Home = ({ onNavigate, onLogout }) => {
       quick_order: data.quick_order ?? null,
     }));
 
-  // Fallback tiles ensure quick-access is still visible even when flag rows are partially seeded.
+  // Fallback tiles only mirror existing enabled rows. Deleted rows are not resurrected here.
   const fallbackQuickActions = [
     ff('feature_directory') ? {
       id: 'feature_directory_fallback',

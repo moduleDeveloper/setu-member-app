@@ -3,6 +3,18 @@ import { sendPushForNotification } from './pushService.js';
 
 let notificationChannel = null;
 
+const handleNotificationInsert = async (payload) => {
+  try {
+    await sendPushForNotification(payload?.new || {});
+  } catch (error) {
+    console.error(
+      'Push worker failed for notification:',
+      payload?.new?.id,
+      error?.message || error
+    );
+  }
+};
+
 export const startNotificationPushWorker = () => {
   if (notificationChannel) {
     return notificationChannel;
@@ -15,15 +27,18 @@ export const startNotificationPushWorker = () => {
       {
         event: 'INSERT',
         schema: 'public',
+        table: 'notification',
+      },
+      handleNotificationInsert
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
         table: 'notifications',
       },
-      async (payload) => {
-        try {
-          await sendPushForNotification(payload.new);
-        } catch (error) {
-          console.error('Push worker failed for notification:', payload.new?.id, error?.message || error);
-        }
-      }
+      handleNotificationInsert
     )
     .subscribe((status) => {
       console.log('Notification push worker status:', status);
@@ -31,4 +46,3 @@ export const startNotificationPushWorker = () => {
 
   return notificationChannel;
 };
-
