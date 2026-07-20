@@ -204,11 +204,11 @@ const FacilityImagePreviewModal = ({ images, initialIndex = 0, theme, onClose })
           }}
         >
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>
+            {/* <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>
               Image Preview
-            </p>
-            <h3 className="truncate text-sm font-bold sm:text-base w-[9rem] sm:w-[32rem] lg:w-full" style={{ color: 'var(--advertisement-title)' }}>
-              {currentImage?.label || 'Facility Image'}
+            </p> */}
+            <h3 className="truncate uppercase text-sm font-bold sm:text-base w-[9rem] sm:w-[32rem] lg:w-full" style={{ color: 'var(--advertisement-title)' }}>
+              Image Preview
             </h3>
           </div>
 
@@ -217,7 +217,7 @@ const FacilityImagePreviewModal = ({ images, initialIndex = 0, theme, onClose })
               className="rounded-full px-3 py-1 text-xs font-semibold"
               style={{
                 background: 'color-mix(in srgb, var(--surface-color) 90%, var(--app-accent-bg))',
-                color: 'var(--advertisement-title)'
+                color: 'var(--advertisement-card-bg)'
               }}
             >
               {activeIndex + 1} / {images.length}

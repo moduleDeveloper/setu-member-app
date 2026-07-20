@@ -1,9 +1,10 @@
 ﻿// authService.js - Frontend auth helpers
 
+import { resolveAuthApiUrl } from './apiBaseUrl.js';
+
 const USE_MOCK_AUTH = import.meta.env.VITE_AUTH_MOCK === 'true';
 const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || (API_BASE_URL ? `${String(API_BASE_URL).replace(/\/$/, '')}/auth` : '');
+const AUTH_API_URL = resolveAuthApiUrl();
 
 const postAuthJson = async (endpoint, payload) => {
   if (!AUTH_API_URL) {

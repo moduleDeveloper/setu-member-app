@@ -4,3 +4,4 @@ dist/
 backend/.env
 .vite/
 android/.idea/
+android/.idea/deploymentTargetSelector.xml

@@ -98,7 +98,7 @@ const TrustCardField = ({
       {value=='null'? '': value || '-'}
     </p>
     {value=='null' && <div
-                  className="hidden shrink-0 flex items-center justify-center rounded-[7px] absolute right-4 top-[30%]"
+                  className="hidden shrink-0 flex items-center justify-center rounded-[7px] absolute right-4 top-[37%]"
                   style={{ width: '74px', height: '74px', background: 'white'}}
                 >
                   <QrCode className="h-12 w-12" style={{ color: 'black' }} />
@@ -446,17 +446,18 @@ const TrustIdCard = ({ onNavigate, cardData: cardDataProp = null, embedded = fal
                   >
                     <span>{trustName}</span>
                     <span
-                      className="ml-2 inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border"
+                      className="ml-2 inline-flex h-[2.85rem] w-[2.85rem] shrink-0 items-center justify-center overflow-hidden rounded-full border "
                       style={{
                         borderColor: applyOpacity(cardBorder, 0.42),
                         background: applyOpacity(surface, 0.9),
+                        boxShadow: `0 0 5px ${cardBorder}, 0 0 10px ${cardBorder}`
                       }}
                     >
                       {trustLogoUrl ? (
                         <img
                           src={trustLogoUrl}
                           alt={trustName}
-                          className="h-full w-full object-contain p-0.5"
+                          className="h-full w-full rounded-full object-contain"
                           onError={(event) => {
                             event.currentTarget.style.display = 'none';
                           }}
@@ -554,25 +555,27 @@ const TrustIdCard = ({ onNavigate, cardData: cardDataProp = null, embedded = fal
    
                   
                   
-                  <p className="hidden mt-0.5 absolute bottom-[30%] right-3 text-[7px] font-bold uppercase tracking-[0.12em] " style={{ color: fieldLabelColor }}>
+                  {/* <p className="hidden mt-0.5 absolute bottom-[30%] right-3 text-[7px] font-bold uppercase tracking-[0.12em] " style={{ color: fieldLabelColor }}>
                     Scan to Verify
-                  </p>
+                  </p> */}
 
 
-                  <div className='flex align-center justify-center absolute bottom-2 right-3'>
+                  <div className='flex align-center justify-center absolute bottom-2 right-3 gap-2'>
                     <p className="mt-0.5 relative top-[25px] text-[7px] font-bold uppercase tracking-[0.12em] " style={{ color: fieldLabelColor }}>
                     POWERED BY
                   </p>
                     <p className="mt-0.5 " style={{ fontSize: '13px', fontWeight: 700, color: titleColor, }}>
                     {footerTrustLogoUrl ? (
-                      <div className="h-11 w-11 object-contain p-0.5 rounded-full"
+                      <div className="h-9 w-9 object-contain rounded-full"
                           onError={(event) => {
                             event.currentTarget.style.display = 'none';
-                          }} style={{borderRadius: '50%'}}>
+                          }} style={{borderRadius: '50%',
+                            boxShadow: `0 0 5px ${cardBorder}, 0 0 10px ${cardBorder}`
+                          }}>
                       <img
                         src={footerTrustLogoUrl}
                         alt={trustName}
-                        className="setu-image h-full w-full object-contain p-0.5 rounded-full relat"
+                        className="setu-image h-full w-full object-contain rounded-full relat"
                         onError={(event) => {
                           event.currentTarget.style.display = 'none';
                         }}

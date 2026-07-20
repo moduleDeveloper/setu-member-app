@@ -1,18 +1,8 @@
 import axios from 'axios';
 import { supabase } from './supabaseClient.js';
+import { resolveApiBaseUrl } from './apiBaseUrl.js';
 
-// Force local backend for current development flow.
-const resolveDevApiBaseUrl = () => {
-  return 'http://localhost:5003/api';
-};
-
-const RAW_API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV
-    ? resolveDevApiBaseUrl()
-    : 'https://test-mahila-mandal.vercel.app/api');
-
-const API_BASE_URL = String(RAW_API_BASE_URL || '').replace(/\/auth\/?$/i, '');
+const API_BASE_URL = resolveApiBaseUrl();
 
 const normalizeTrustId = (value) => {
   if (value === null || value === undefined) return '';

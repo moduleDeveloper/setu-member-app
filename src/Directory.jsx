@@ -30,6 +30,35 @@ const compareDirectoryText = (left, right) => {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 };
 
+const DIRECTORY_SEARCH_PRIORITY_FIELDS = [
+  { key: 'name', getValue: (item) => item?.Name },
+  { key: 'company', getValue: (item) => item?.['Company Name'] },
+  { key: 'role', getValue: (item) => item?.role },
+  { key: 'type', getValue: (item) => item?.type },
+  { key: 'mobile', getValue: (item) => item?.Mobile },
+  { key: 'email', getValue: (item) => item?.Email },
+  { key: 'membership', getValue: (item) => item?.['Membership number'] },
+];
+
+const matchesQuery = (value, query) => {
+  if (!query) return false;
+  return String(value ?? '').toLowerCase().includes(query);
+};
+
+const getDirectorySearchRank = (item, query) => {
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  if (!normalizedQuery) return DIRECTORY_SEARCH_PRIORITY_FIELDS.length;
+
+  for (let index = 0; index < DIRECTORY_SEARCH_PRIORITY_FIELDS.length; index += 1) {
+    const field = DIRECTORY_SEARCH_PRIORITY_FIELDS[index];
+    if (matchesQuery(field.getValue(item), normalizedQuery)) {
+      return index;
+    }
+  }
+
+  return DIRECTORY_SEARCH_PRIORITY_FIELDS.length;
+};
+
 const readCurrentUserPhotoCache = () => {
   try {
     const userRaw = localStorage.getItem('user');
@@ -377,18 +406,32 @@ const Directory = ({ onNavigate }) => {
     const isDesc = sortMode.endsWith('-desc');
     const isMembershipSort = sortMode.startsWith('membership');
     const sortField = isMembershipSort ? 'Membership number' : 'Name';
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const hasSearchQuery = Boolean(normalizedQuery);
 
-    items.sort((left, right) => {
+    const compareBySelectedSort = (left, right) => {
       const primary = compareDirectoryText(left?.[sortField], right?.[sortField]);
       if (primary !== 0) {
         return isDesc ? -primary : primary;
       }
       const fallback = compareDirectoryText(left?.Name, right?.Name);
       return isDesc ? -fallback : fallback;
+    };
+
+    items.sort((left, right) => {
+      if (hasSearchQuery) {
+        const leftRank = getDirectorySearchRank(left, normalizedQuery);
+        const rightRank = getDirectorySearchRank(right, normalizedQuery);
+        if (leftRank !== rightRank) {
+          return leftRank - rightRank;
+        }
+      }
+
+      return compareBySelectedSort(left, right);
     });
 
     return items;
-  }, [filteredMembers, sortMode]);
+  }, [filteredMembers, sortMode, query]);
 
   const isSearchActive = Boolean(String(query || '').trim()) || activeRole !== 'all';
   const effectiveTotalForPagination = isSearchActive
@@ -664,12 +707,12 @@ const Directory = ({ onNavigate }) => {
                         </span>
                       ) : null}
 
-                      {item?.['Company Name'] ? (
+                      {item?.['Company Name'] && item?.['Company Name'] !== 'null' && item?.['Company Name'] !== 'N/A' ? (
                         <span className="inline-flex items-center gap-[0.1rem] text-[11px]" style={{ color: 'var(--advertisement-description)' }}>
                           <Building className="h-3 w-3" />
                           {item['Company Name']}
                         </span>
-                      ) : null}
+                      ): null }
                     </div>
 
                     {item?.Email ? (

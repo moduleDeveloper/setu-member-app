@@ -19,6 +19,38 @@ const normalizePriorityValue = (value) => {
 const isPrivacyRestricted = (value) => value === true || String(value || '').trim().toLowerCase() === 'true';
 const MEMBERS_PER_PAGE = 20;
 const EMPTY_MEMBERS = [];
+const COMMITTEE_SEARCH_FIELDS = [
+  (member) => member?.member_name_english,
+  (member) => member?.Name,
+  (member) => member?.member_role,
+  (member) => member?.title,
+  (member) => member?.subtitle,
+  (member) => member?.committee_name_english,
+  (member) => member?.committee_name_hindi,
+  (member) => member?.['Membership number'],
+  (member) => member?.membership_number,
+  (member) => member?.membership_no,
+  (member) => member?.Mobile,
+  (member) => member?.Email,
+  (member) => member?.type,
+  (member) => member?.role,
+  (member) => member?.['Address Home'],
+  (member) => member?.['Address Office'],
+];
+
+const getCommitteeMemberSearchRank = (member, query) => {
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  if (!normalizedQuery) return COMMITTEE_SEARCH_FIELDS.length;
+
+  for (let index = 0; index < COMMITTEE_SEARCH_FIELDS.length; index += 1) {
+    const fieldValue = COMMITTEE_SEARCH_FIELDS[index](member);
+    if (String(fieldValue ?? '').toLowerCase().includes(normalizedQuery)) {
+      return index;
+    }
+  }
+
+  return COMMITTEE_SEARCH_FIELDS.length;
+};
 
 const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName }) => {
   // Get screen name for back button
@@ -107,36 +139,19 @@ const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName })
     const query = normalizeText(searchQuery).toLowerCase();
     if (!query) return committeeMembers;
 
-    return committeeMembers.filter((member) => {
-      const fields = [
-        member?.member_name_english,
-        member?.Name,
-        member?.member_role,
-        member?.title,
-        member?.subtitle,
-        member?.committee_name_english,
-        member?.committee_name_hindi,
-        member?.['Membership number'],
-        member?.membership_number,
-        member?.membership_no,
-        member?.Mobile,
-        member?.Email,
-        member?.type,
-        member?.role,
-        member?.['Address Home'],
-        member?.['Address Office'],
-      ];
-
-      return fields
-        .filter(Boolean)
-        .map((value) => normalizeText(value).toLowerCase())
-        .some((value) => value.includes(query));
-    });
+    return committeeMembers
+      .map((member, index) => ({
+        member,
+        index,
+        rank: getCommitteeMemberSearchRank(member, query),
+      }))
+      .filter((item) => item.rank < COMMITTEE_SEARCH_FIELDS.length)
+      .sort((left, right) => {
+        if (left.rank !== right.rank) return left.rank - right.rank;
+        return left.index - right.index;
+      })
+      .map((item) => item.member);
   }, [committeeMembers, searchQuery]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -155,7 +170,7 @@ const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName })
       Email: member?.Email || 'N/A',
       type: member?.type || 'N/A',
       role: member?.role || 'N/A',
-      member_role: member?.member_role || member?.title || 'N/A',
+      member_role: member?.subtitle || member?.role_type || 'N/A',
       title: member?.title || 'N/A',
       subtitle: member?.subtitle || 'N/A',
       'Membership number': member?.['Membership number'] || member?.membership_number || member?.membership_no || 'N/A',
@@ -236,11 +251,14 @@ const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName })
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search by name, role, membership, email, phone"
               className="w-full bg-transparent outline-none text-sm"
               style={{
-                color: titleColor,
+                color: 'var(--advertisement-description)',
                 caretColor: primaryColor,
               }}
             />
@@ -268,8 +286,7 @@ const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName })
             {paginatedMembers.map((member, index) => {
               const memberName = normalizeText(member.member_name_english || member.Name || 'N/A');
               const memberCommitteeName = normalizeText(member.committee_name_english || committeeData.committee_name_english || committeeName || 'N/A');
-              const memberRole = normalizeText(member.member_role || member.title || member.subtitle || '');
-              const membershipNumber = normalizeText(member['Membership number'] || member.membership_number || member.membership_no || '');
+              const memberRole = normalizeText(member.subtitle || member.title || member.subtitle || '');
               // const phoneNumber = normalizeText(member.Mobile || member.phone1 || member.phone2 || '');
               const emailAddress = normalizeText(member.Email || '');
               const privacyLocked = isPrivacyRestricted(member?.privacy);
@@ -326,8 +343,8 @@ const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName })
                         ) : null}
                       </div>
 
-                      {/* <div className="flex flex-wrap gap-1.5 justify-start">
-                        {membershipNumber ? (
+                      <div className="flex flex-wrap gap-1.5 justify-start">
+                        {/* {membershipNumber ? (
                           <span
                             className="self-start text-[10px] font-semibold px-2 py-1 rounded-full"
                             style={{
@@ -337,7 +354,7 @@ const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName })
                           >
                             M No: {membershipNumber}
                           </span>
-                        ) : null}
+                        ) : null} */}
 
                         {memberRole && memberRole.toLowerCase() !== memberCommitteeName.toLowerCase() ? (
                           <span
@@ -350,7 +367,7 @@ const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName })
                             {memberRole}
                           </span>
                         ) : null}
-                      </div> */}
+                      </div> 
 
                       <div className="flex items-center gap-2 text-[11px] flex-wrap">
                         {/* {phoneNumber ? (
@@ -377,7 +394,7 @@ const CommitteeMembers = ({ committeeData, onNavigateBack, previousScreenName })
           </div>
         ) : null}
 
-        {committeeMembers.length > 1 ? (
+        {paginatedMembers.length > 1 ? (
           <div className="mt-2 pt-2 flex items-center justify-between gap-2">
             <button
               type="button"

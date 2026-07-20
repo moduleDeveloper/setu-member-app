@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { flushSync } from 'react-dom';
 import { Users, ChevronRight, LogOut, Share2, PhoneCall, FileText, CirclePlus, Lock, Facebook, Instagram, Linkedin, MessageCircle } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
 import { getProfile, updateMemberPrivacy } from '../services/api';
-import { fetchFeatureFlags, isFeatureEnabled } from '../services/featureFlags';
+import { fetchFeatureFlags, isFeatureVisible } from '../services/featureFlags';
 import { fetchShareAppLinksByTrustId } from '../services/trustService';
 import { logUserSessionEvent } from '../services/sessionAuditService';
 import { useTrustDataVersion } from '../hooks/useTrustDataVersion';
@@ -193,11 +194,6 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
     'sidebar.social_button_border',
     applyOpacity(sidebarTextColor, 0.12)
   );
-  const sidebarSocialSectionBg = getThemeToken(
-    theme,
-    'sidebar.social_section_bg',
-    'color-mix(in srgb, var(--surface-color) 78%, var(--sidebar-bg))'
-  );
   const { displayTrustVersion } = useTrustDataVersion();
   const sidebarRef = useRef(null);
   const touchStartX = useRef(0);
@@ -235,7 +231,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
     });
   }, [isOpen, selectedTrustId]);
 
-  const ff = (key) => isFeatureEnabled(featureFlags, key);
+  const ff = (key) => isFeatureVisible(featureFlags, key);
 
   const openExternalLink = async (url) => {
     const targetUrl = String(url || '').trim();
@@ -248,6 +244,49 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } catch {
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleShareApp = async () => {
+    try {
+      const platform = Capacitor.getPlatform();
+      const targetLink = getShareAppTargetLink(shareAppLinks, platform, APP_DOWNLOAD_URL);
+
+      if (!targetLink) {
+        setShareToast(true);
+        window.setTimeout(() => setShareToast(false), 2500);
+        return;
+      }
+
+      const sharePayload = {
+        title: 'Download the app',
+        text: 'Install the app from this link.',
+        url: targetLink,
+        dialogTitle: 'Share App',
+      };
+
+      if (Capacitor.isNativePlatform()) {
+        await Share.share(sharePayload);
+        return;
+      }
+
+      if (typeof navigator.share === 'function') {
+        await navigator.share(sharePayload);
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(targetLink);
+        setShareToast(true);
+        window.setTimeout(() => setShareToast(false), 2500);
+        return;
+      }
+
+      window.open(targetLink, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      setShareToast(true);
+      window.setTimeout(() => setShareToast(false), 2500);
     }
   };
 
@@ -397,20 +436,32 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
   useEffect(() => {
     if (!isOpen) return;
 
+    let isCancelled = false;
+
     const loadShareLinks = async () => {
       try {
-        const selectedTrustId = localStorage.getItem('selected_trust_id');
         const fallbackTrustId = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
-        const trustId = String(selectedTrustId || fallbackTrustId).trim();
+        const trustId = String(selectedTrustId || localStorage.getItem('selected_trust_id') || fallbackTrustId).trim();
+
+        if (!trustId) {
+          if (!isCancelled) setShareAppLinks(null);
+          return;
+        }
+
         const links = await fetchShareAppLinksByTrustId(trustId);
-        setShareAppLinks(links || null);
+        if (!isCancelled) setShareAppLinks(links || null);
       } catch {
-        setShareAppLinks(null);
+        if (!isCancelled) setShareAppLinks(null);
       }
     };
 
+    setShareAppLinks(null);
     loadShareLinks();
-  }, [isOpen]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, selectedTrustId]);
 
   // Load member trusts when sidebar opens (reg_members based payload from login)
   useEffect(() => {
@@ -961,37 +1012,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
 
               {/* Share Button - controlled by feature_share_app */}
               {ff('feature_share_app') && <button
-              onClick={async () => {
-                try {
-                  const platform = Capacitor.getPlatform();
-                  const targetLink = getShareAppTargetLink(shareAppLinks, platform, APP_DOWNLOAD_URL);
-
-                  if (!targetLink) {
-                    setShareToast(true);
-                    window.setTimeout(() => setShareToast(false), 2500);
-                    return;
-                  }
-
-                  if (Capacitor.isNativePlatform()) {
-                    if (typeof navigator.share === 'function') {
-                      await navigator.share({
-                        title: 'Download the app',
-                        text: 'Install the app from this link.',
-                        url: targetLink,
-                      });
-                    } else {
-                      window.location.href = targetLink;
-                    }
-                    return;
-                  }
-
-                  window.open(targetLink, '_blank', 'noopener,noreferrer');
-                } catch (err) {
-                  if (err?.name === 'AbortError') return;
-                  setShareToast(true);
-                  window.setTimeout(() => setShareToast(false), 2500);
-                }
-              }}
+              onClick={handleShareApp}
               className="w-full flex items-center gap-3 px-4 rounded-xl transition-all text-left active:scale-95 select-none relative"
               style={{
                 minHeight: '52px',
@@ -1011,12 +1032,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
               >
                 Share App
               </span>
-              {shareToast && (
-                <span className="absolute right-4 text-xs px-2 py-0.5 rounded-full"
-	                  style={{ color: sidebarToastTextColor, background: sidebarToastBgColor }}>
-                  Link unavailable
-                </span>
-              )}
+              
             </button>}
             </div>
           </div>

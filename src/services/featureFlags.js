@@ -103,7 +103,7 @@ export const fetchFeatureFlags = async (trustId = null, opts = {}) => {
 
     const { data: rows, error } = await supabase
       .from('feature_flags')
-      .select('is_enabled, display_name, tagline, icon_url, route, quick_order, name, features(name, subname)')
+      .select('is_enabled, display_name, tagline, icon_url, route, quick_order, features!inner(name, subname)')
       .eq('trust_id', trustId)
       .eq('tier', tier);
 
@@ -117,23 +117,19 @@ export const fetchFeatureFlags = async (trustId = null, opts = {}) => {
     const flags = {};
     const flagsData = {};
     (rows || []).forEach((row) => {
-      // Prefer features.name (join), fallback to name column
-      const key = normalizeFeatureKey(
-        row?.features?.name,
-        row?.name,
-        row?.features?.subname
-      );
-      if (key) {
-        flags[key] = !!row.is_enabled;
-        flagsData[key] = {
-          is_enabled: !!row.is_enabled,
-          display_name: row.display_name || null,
-          tagline: row.tagline || null,
-          icon_url: row.icon_url || null,
-          route: row.route || null,
-          quick_order: row.quick_order ?? null,
-        };
-      }
+      // Only keep rows whose feature master still exists.
+      const key = normalizeFeatureKey(row?.features?.name, row?.features?.subname);
+      if (!key) return;
+
+      flags[key] = !!row.is_enabled;
+      flagsData[key] = {
+        is_enabled: !!row.is_enabled,
+        display_name: row.display_name || null,
+        tagline: row.tagline || null,
+        icon_url: row.icon_url || null,
+        route: row.route || null,
+        quick_order: row.quick_order ?? null,
+      };
     });
 
     writeCache(flags, flagsData, trustId, tier);
@@ -147,15 +143,22 @@ export const fetchFeatureFlags = async (trustId = null, opts = {}) => {
 // ── Subscribe to real-time feature flag changes ────────────────────
 export const subscribeFeatureFlags = (trustId, onChange) => {
   try {
+    const handleChange = () => {
+      clearFeatureFlagsCache();
+      if (typeof onChange === 'function') onChange();
+    };
+
     const channel = supabase
       .channel(`feature-flags-${trustId || 'global'}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'feature_flags' },
-        () => {
-          clearFeatureFlagsCache();
-          if (typeof onChange === 'function') onChange();
-        }
+        handleChange
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'features' },
+        handleChange
       )
       .subscribe();
 
@@ -174,4 +177,12 @@ export const isFeatureEnabled = (flags, key) => {
   const normalizedKey = normalizeFeatureKey(key) || String(key || '').trim();
   if (!(normalizedKey in flags)) return true; // not configured = enabled by default
   return flags[normalizedKey] !== false;
+};
+
+// Strict helper for UI that should hide anything not explicitly enabled.
+export const isFeatureVisible = (flags, key) => {
+  if (!flags || typeof flags !== 'object') return false;
+  const normalizedKey = normalizeFeatureKey(key) || String(key || '').trim();
+  if (!normalizedKey) return false;
+  return Object.prototype.hasOwnProperty.call(flags, normalizedKey) && flags[normalizedKey] === true;
 };
