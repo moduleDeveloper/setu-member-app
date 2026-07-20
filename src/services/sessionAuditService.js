@@ -1,8 +1,9 @@
+import { resolveAuthApiUrl } from './apiBaseUrl.js';
+
 const EVENT_TYPES = new Set(['login', 'logout', 'autologout']);
 const LOGIN_METHODS = new Set(['otp', 'secret_code']);
 const LAST_LOGIN_METHOD_KEY = 'last_login_method';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || (API_BASE_URL ? `${String(API_BASE_URL).replace(/\/$/, '')}/auth` : '');
+const AUTH_API_URL = resolveAuthApiUrl();
 
 const normalize = (value) => String(value || '').trim();
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';

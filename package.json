@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "postinstall": "node scripts/fix-capacitor-proguard.js",
     "resize-icon": "node resize_icon.js",
     "test": "node --test"
   },
