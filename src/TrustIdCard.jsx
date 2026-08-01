@@ -99,7 +99,7 @@ const TrustCardField = ({
       {/* {value || '-'} */}
       {value=='null'? '': value || '-'}
     </p>
-    {value=='null' && qrValue && <div
+    {qrValue && <div
                   className="shrink-0 flex items-center justify-center rounded-[7px] absolute right-4 top-[37%]"
                   style={{ width: '74px', height: '74px', background: 'white'}}
                 >
@@ -255,8 +255,7 @@ const TrustIdCard = ({ onNavigate, cardData: cardDataProp = null, embedded = fal
     profileData.joinedDate
   );
   const joinedDateText = formatDisplayDate(joinedDate);
-  const qrCodeValue = normalizeText(cardData.qr_code);
-  console.log('[QR DEBUG] TrustIdCard render: cardData =', cardData, '| cardData.qr_code =', cardData.qr_code, '| qrCodeValue =', qrCodeValue);
+  const qrCodeValue = pickFirstText(cardData.qr_code, cardData.qrCode);
   const memberPhotoUrl = pickFirstText(
     profileData.profile_photo_url,
     cardData.member_photo_url,

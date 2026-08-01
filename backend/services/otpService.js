@@ -365,6 +365,7 @@ export const checkPhoneExists = async (phoneNumber) => {
             role,
             joined_date,
             is_active,
+            qr_code,
             "Membership number",
             trust:Trust (
               id,
@@ -387,6 +388,7 @@ export const checkPhoneExists = async (phoneNumber) => {
             role: row.role || null,
             joined_date: row.joined_date || null,
             is_active: row.is_active,
+            qr_code: row.qr_code || null,
             membership_number: row['Membership number'] || null
           }));
 

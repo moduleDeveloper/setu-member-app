@@ -30,7 +30,7 @@ export const fetchMemberTrusts = async (membersId) => {
 
   const regQuery = supabase
     .from('reg_members')
-    .select('id, trust_id, "Membership number", role, joined_date, is_active, members_id');
+    .select('id, trust_id, "Membership number", role, joined_date, is_active, members_id, qr_code');
 
   const { data: regMembershipsRaw, error: regError } = isUuid(normalizedMemberId)
     ? await regQuery.eq('members_id', normalizedMemberId)
@@ -72,6 +72,7 @@ export const fetchMemberTrusts = async (membersId) => {
       membership_number: m['Membership number'] || null,
       role: m.role || null,
       members_id: m.members_id || null,
+      qr_code: m.qr_code || null,
       source: 'reg_members'
     };
   });
@@ -93,6 +94,7 @@ const mapMembershipRowsWithTrusts = (regMemberships = [], trustById = {}) =>
       membership_number: m?.['Membership number'] || null,
       role: m?.role || null,
       members_id: m?.members_id || null,
+      qr_code: m?.qr_code || null,
       source: 'reg_members'
     };
   });
@@ -108,7 +110,7 @@ export const fetchMemberTrustMemberships = async ({ membersId = null, membership
   if (isUuid(normalizedMembersId)) {
     const { data, error } = await supabase
       .from('reg_members')
-      .select('id, trust_id, "Membership number", role, joined_date, is_active, members_id')
+      .select('id, trust_id, "Membership number", role, joined_date, is_active, members_id, qr_code')
       .eq('members_id', normalizedMembersId);
 
     if (error) {
@@ -122,7 +124,7 @@ export const fetchMemberTrustMemberships = async ({ membersId = null, membership
   if (membershipLookupValue) {
     let membershipNoQuery = supabase
       .from('reg_members')
-      .select('id, trust_id, "Membership number", role, joined_date, is_active, members_id')
+      .select('id, trust_id, "Membership number", role, joined_date, is_active, members_id, qr_code')
       .eq('Membership number', membershipLookupValue);
 
     // Critical guard:

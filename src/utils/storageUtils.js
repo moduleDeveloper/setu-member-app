@@ -50,6 +50,7 @@ const compactMembership = (membership = {}) => ({
   member_id: membership?.member_id || membership?.members_id || null,
   members_id: membership?.members_id || membership?.member_id || null,
   membership_number: membership?.membership_number || membership?.['Membership number'] || null,
+  qr_code: membership?.qr_code || null,
 });
 
 const normalizeTrustId = (value) => String(value || '').trim();

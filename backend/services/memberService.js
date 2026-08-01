@@ -1648,6 +1648,7 @@ export const getMemberTrustLinks = async (memberId) => {
         role,
         joined_date,
         is_active,
+        qr_code,
         Trust:trust_id (
           id,
           name,
@@ -1675,6 +1676,7 @@ export const getMemberTrustLinks = async (memberId) => {
       joined_date: row.joined_date || null,
       is_active: row.is_active,
       created_at: row.joined_date || null,
+      qr_code: row.qr_code || null,
       Trust: row.Trust || null
     }));
 

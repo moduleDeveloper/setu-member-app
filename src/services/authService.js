@@ -337,8 +337,6 @@ export const checkPhoneNumber = async (phoneNumber) => {
         return { success: false, message: 'Unable to verify membership. Please try again.' };
       }
 
-      console.log('[QR DEBUG] raw reg_members rows from Supabase:', regResult.data);
-
       regMemberships = (Array.isArray(regResult.data) ? regResult.data : []).filter(
         (m) => m?.trust_id && membersIds.includes(String(m.members_id))
       );
@@ -377,8 +375,6 @@ export const checkPhoneNumber = async (phoneNumber) => {
           source: 'reg_members'
         };
       });
-
-      console.log('[QR DEBUG] mapped hospitalMemberships:', hospitalMemberships);
 
       hospitalMemberships.sort((a, b) => {
         const activeScore = Number(Boolean(b?.is_active)) - Number(Boolean(a?.is_active));
@@ -481,8 +477,6 @@ export const checkPhoneNumber = async (phoneNumber) => {
     console.log(
       `User check complete: accounts=${accounts.length}, trusts=${hospitalMemberships.length}, selectedMember=${user?.members_id || user?.id}`
     );
-    console.log('[QR DEBUG] selected user.hospital_memberships (about to be saved to localStorage):', user?.hospital_memberships);
-
     const otpSendResult = await triggerOtpSend(last10);
     if (!otpSendResult.success) {
       return {

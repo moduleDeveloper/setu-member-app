@@ -404,6 +404,7 @@ function OrderHistory() {
   }, [activeTrustKey, orders]);
 
   const visibleOrders = useMemo(() => visibleOrdersSource.slice(0, visibleCount), [visibleCount, visibleOrdersSource]);
+  
   const hasMoreOrders = visibleCount < visibleOrdersSource.length;
   const orderHistoryTrustScope = resolveOrderHistoryTrustScope();
   const isAllTrustsMode = orderHistoryTrustScope.isDefaultTrustSelected;
@@ -747,9 +748,10 @@ function OrderHistory() {
               {visibleOrders.map((order) => {
                 const previewChips = order.items.slice(0, 3);
                 const remainingCount = Math.max(0, order.items.length - previewChips.length);
-
+                
                 return (
                   <article key={order.id} className="order-history-card">
+                    {console.log('orders', visibleOrders)}
                     <div className="order-history-card-top">
                       <div className="min-w-0">
                         <p className="order-history-card-id" style={{ color: navbarTextColor }}>{order.id}</p>
