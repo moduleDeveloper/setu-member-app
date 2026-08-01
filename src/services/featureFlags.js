@@ -28,6 +28,17 @@ const FEATURE_KEY_ALIASES = {
   add_community: 'feature_add_community',
   'add-community': 'feature_add_community',
   feature_add_community: 'feature_add_community',
+  product: 'feature_product',
+  products: 'feature_product',
+  categoriesproducts: 'feature_product',
+  categories_products: 'feature_product',
+  'categories-products': 'feature_product',
+  feature_product: 'feature_product',
+  feature_products: 'feature_product',
+  orderhistory: 'feature_order_history',
+  order_history: 'feature_order_history',
+  'order-history': 'feature_order_history',
+  feature_order_history: 'feature_order_history',
 };
 
 export const normalizeFeatureKey = (...values) => {

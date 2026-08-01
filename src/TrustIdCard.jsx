@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { Home as HomeIcon, Menu, QrCode, User, X } from 'lucide-react';
+import { Home as HomeIcon, Menu, User, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import Sidebar from './components/Sidebar';
 import { useAppTheme } from './context/ThemeContext';
 import { getProfile } from './services/api';
@@ -72,6 +73,7 @@ const TrustCardField = ({
   valueColor,
   highlightBg,
   highlightBorder,
+  qrValue,
 }) => (
   <div className={fullWidth ? 'col-span-2 min-w-0' : 'min-w-0'}>
     <p
@@ -97,11 +99,11 @@ const TrustCardField = ({
       {/* {value || '-'} */}
       {value=='null'? '': value || '-'}
     </p>
-    {value=='null' && <div
-                  className="hidden shrink-0 flex items-center justify-center rounded-[7px] absolute right-4 top-[37%]"
+    {value=='null' && qrValue && <div
+                  className="shrink-0 flex items-center justify-center rounded-[7px] absolute right-4 top-[37%]"
                   style={{ width: '74px', height: '74px', background: 'white'}}
                 >
-                  <QrCode className="h-12 w-12" style={{ color: 'black' }} />
+                  <QRCodeSVG value={qrValue} size={62} level="M" />
                 </div>}
   </div>
 );
@@ -253,6 +255,8 @@ const TrustIdCard = ({ onNavigate, cardData: cardDataProp = null, embedded = fal
     profileData.joinedDate
   );
   const joinedDateText = formatDisplayDate(joinedDate);
+  const qrCodeValue = normalizeText(cardData.qr_code);
+  console.log('[QR DEBUG] TrustIdCard render: cardData =', cardData, '| cardData.qr_code =', cardData.qr_code, '| qrCodeValue =', qrCodeValue);
   const memberPhotoUrl = pickFirstText(
     profileData.profile_photo_url,
     cardData.member_photo_url,
@@ -524,6 +528,7 @@ const TrustIdCard = ({ onNavigate, cardData: cardDataProp = null, embedded = fal
                   value={'null'}
                   labelColor={fieldLabelColor}
                   valueColor={fieldValueColor}
+                  qrValue={qrCodeValue}
                 />
                 <TrustCardField
                   label="Contact No."

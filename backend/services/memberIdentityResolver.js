@@ -1,5 +1,8 @@
 import { supabase } from '../config/supabase.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+
+const normalizeText = (value) => String(value || '').trim();
 const toDigits = (value) => String(value || '').replace(/\D/g, '');
 
 // Members."Mobile" is numeric and stores plain 10-digit numbers, but the
@@ -23,31 +26,64 @@ const buildMobileCandidates = (userId) => {
 // which always points back to the master Members.members_id. So we resolve
 // mobile -> Members.members_id first, then fan out to every reg_members.id
 // via that members_id instead of matching reg_members.Mobile directly.
-const resolveMasterMembersId = async (userId) => {
-  const mobileCandidates = buildMobileCandidates(userId);
-  if (!mobileCandidates.length) {
-    return null;
-  }
+const resolveMasterMembersIdFromUuid = async (value) => {
+  const normalized = normalizeText(value);
+  if (!UUID_RE.test(normalized)) return null;
 
-  const { data, error } = await supabase
+  const { data: memberRow, error: memberError } = await supabase
     .from('Members')
     .select('members_id')
-    .in('Mobile', mobileCandidates)
+    .eq('members_id', normalized)
     .limit(1)
     .maybeSingle();
 
-  if (error) {
-    return null;
+  if (!memberError && memberRow?.members_id) {
+    return memberRow.members_id;
   }
 
-  return data?.members_id || null;
+  const { data: regMemberRow, error: regMemberError } = await supabase
+    .from('reg_members')
+    .select('members_id')
+    .or(`members_id.eq.${normalized},id.eq.${normalized}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (!regMemberError && regMemberRow?.members_id) {
+    return regMemberRow.members_id;
+  }
+
+  return null;
+};
+
+const resolveMasterMembersId = async (userId, fallbackMembersId = null) => {
+  const mobileCandidates = buildMobileCandidates(userId);
+
+  if (mobileCandidates.length) {
+    const { data, error } = await supabase
+      .from('Members')
+      .select('members_id')
+      .in('Mobile', mobileCandidates)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data?.members_id) {
+      return data.members_id;
+    }
+  }
+
+  const fallbackResolved = await resolveMasterMembersIdFromUuid(fallbackMembersId);
+  if (fallbackResolved) {
+    return fallbackResolved;
+  }
+
+  return await resolveMasterMembersIdFromUuid(userId);
 };
 
 // notification_recipients.member_id references reg_members.id — a per-trust
 // membership row. A member with memberships in multiple trusts has a
 // distinct reg_members.id per trust, so this returns all of them.
-export const resolveMemberIdsForUser = async (userId) => {
-  const masterMembersId = await resolveMasterMembersId(userId);
+export const resolveMemberIdsForUser = async (userId, fallbackMembersId = null) => {
+  const masterMembersId = await resolveMasterMembersId(userId, fallbackMembersId);
   if (!masterMembersId) return [];
 
   const { data, error } = await supabase
@@ -68,8 +104,8 @@ export const resolveMemberIdsForUser = async (userId) => {
 
 // Returns a single reg_members.id, scoped to trustId when provided
 // (needed when creating a notification for a specific trust).
-export const resolveMemberIdForUser = async (userId, trustId = null) => {
-  const masterMembersId = await resolveMasterMembersId(userId);
+export const resolveMemberIdForUser = async (userId, trustId = null, fallbackMembersId = null) => {
+  const masterMembersId = await resolveMasterMembersId(userId, fallbackMembersId);
   if (!masterMembersId) return null;
 
   let query = supabase.from('reg_members').select('id').eq('members_id', masterMembersId);

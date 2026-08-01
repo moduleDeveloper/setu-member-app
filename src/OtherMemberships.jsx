@@ -297,6 +297,8 @@ const buildTrustLinksFromUserPayload = (parsedUser = {}) => {
     ? parsedUser.hospital_memberships
     : [];
 
+  console.log('[QR DEBUG] buildTrustLinksFromUserPayload: parsedUser.hospital_memberships =', hospitalMemberships);
+
   const normalizedSelectedTrustId = normalizeId(selectedTrustId);
   const merged = hospitalMemberships.map((hm, idx) => {
     const trustId = normalizeText(hm?.trust_id);
@@ -324,11 +326,14 @@ const buildTrustLinksFromUserPayload = (parsedUser = {}) => {
       member_name: memberName || null,
       member_phone: memberPhone || null,
       member_photo_url: memberPhotoUrl || null,
+      qr_code: hm.qr_code || null,
       source: 'reg_members',
       is_vip: true,
       is_current_trust: isCurrentTrust,
     };
   });
+
+  console.log('[QR DEBUG] buildTrustLinksFromUserPayload: merged output (with qr_code) =', merged);
 
   const hasSelectedTrustCard = merged.some((item) => normalizeId(item?.trust_id) === normalizedSelectedTrustId);
   if (!hasSelectedTrustCard && (selectedTrustId || selectedTrustName) && selectedTrustMembershipNo) {
@@ -589,7 +594,9 @@ const OtherMemberships = ({ onNavigate }) => {
   };
 
   const openTrustIdCard = (link) => {
+    console.log('[QR DEBUG] openTrustIdCard: link clicked =', link);
     const cardData = enrichTrustCardData(link);
+    console.log('[QR DEBUG] openTrustIdCard: cardData being sent to TrustIdCard =', cardData);
     try {
       sessionStorage.setItem(TRUST_ID_CARD_CACHE_KEY, JSON.stringify(cardData));
     } catch {

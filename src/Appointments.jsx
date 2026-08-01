@@ -3,6 +3,7 @@ import { User, Phone, Menu, X, Calendar, Stethoscope, Home as HomeIcon, Mail, Al
 
 import { getDoctorsWithSchedule } from './services/supabaseService';
 import { bookAppointment } from './services/appointmentService';
+import { createUserNotification } from './services/api';
 import { supabase } from './services/supabaseClient';
 import Sidebar from './components/Sidebar';
 import { registerSidebarState, useAndroidBack } from './hooks';
@@ -922,8 +923,9 @@ const Appointments = ({ onNavigate, appointmentForm, setAppointmentForm }) => {
         };
 
         if (recipientId) {
-          const { error: notifError } = await supabase.from('notifications').insert(notificationPayload);
-          if (notifError) {
+          try {
+            await createUserNotification(notificationPayload);
+          } catch (notifError) {
             console.error('âš ï¸ Fallback booking notification failed:', notifError);
           }
         }
@@ -964,14 +966,18 @@ const Appointments = ({ onNavigate, appointmentForm, setAppointmentForm }) => {
         appointmentHistory.find(a => a.id === apptId)?.patient_name ||
         'Patient';
       const cancelMsg = `âŒ Appointment Cancelled\nðŸ‘¤ ${patientName}\nðŸ†” #${apptId || ''}`;
-      await supabase.from('notifications').insert({
+      try {
+        await createUserNotification({
         user_id: patientPhone,
         title: 'âŒ Appointment Cancelled',
         message: cancelMsg,
         type: 'appointment_update',
         is_read: false,
         created_at: new Date().toISOString(),
-      });
+        });
+      } catch (notifError) {
+        console.error('Cancellation notification failed:', notifError);
+      }
 
       setConfirmModal(null);
       if (fromSuccess) {

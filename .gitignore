@@ -2,6 +2,3 @@ node_modules/
 dist/
 .env
 backend/.env
-.vite/
-android/.idea/
-android/.idea/deploymentTargetSelector.xml

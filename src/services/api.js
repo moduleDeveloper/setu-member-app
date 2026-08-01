@@ -1,8 +1,18 @@
 import axios from 'axios';
 import { supabase } from './supabaseClient.js';
-import { resolveApiBaseUrl } from './apiBaseUrl.js';
 
-const API_BASE_URL = resolveApiBaseUrl();
+// Force local backend for current development flow.
+const resolveDevApiBaseUrl = () => {
+  return 'http://localhost:5005/api';
+};
+
+const RAW_API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV
+    ? resolveDevApiBaseUrl()
+    : 'https://test-mahila-mandal.vercel.app/api');
+
+const API_BASE_URL = String(RAW_API_BASE_URL || '').replace(/\/auth\/?$/i, '');
 
 const normalizeTrustId = (value) => {
   if (value === null || value === undefined) return '';
@@ -856,7 +866,7 @@ const isRowActive = (row) => {
   if (typeof value === 'number') return value === 1;
   const normalized = String(value).trim().toLowerCase();
   if (!normalized) return true;
-  return !['false', '0', 'no', 'inactive', 'paused'].includes(normalized);
+  return !['false', '0', 'no', 'inactive'].includes(normalized);
 };
 
 // Get sponsor information
@@ -1250,6 +1260,19 @@ export const markAllNotificationsAsRead = async () => {
 };
 
 // Get member trust links Ã¢â‚¬â€ direct Supabase query (no backend needed)
+// Create a notification through the backend so push delivery uses the new schema
+export const createUserNotification = async (notificationPayload = {}) => {
+  try {
+    const response = await api.post('/notifications', notificationPayload, {
+      headers: resolveAuthHeaders(notificationPayload?.members_id || notificationPayload?.member_id || null),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    throw error;
+  }
+};
+
 export const getMemberTrustLinks = async (memberId) => {
   try {
     if (!memberId) {

@@ -7,6 +7,11 @@ import { getProfilePhotos } from './services/api';
 import { getNavbarThemeStyles } from './utils/themeUtils';
 import { applyOpacity } from './utils/colorUtils';
 import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from './utils/memberIdentity';
+import {
+  buildExecutiveBodyCommitteeSearchResults,
+  getExecutiveBodySearchFields,
+  getSearchRankFromFields,
+} from './utils/executiveBodySearch';
 import Sidebar from './components/Sidebar';
 
 const TAB_OPTIONS = [
@@ -38,78 +43,9 @@ const normalizePriorityValue = (value) => {
 };
 
 const isPrivacyRestricted = (value) => value === true || String(value || '').trim().toLowerCase() === 'true';
-const EXECUTIVE_BODY_SEARCH_FIELDS = {
-  committee: [
-    (item) => item?.Name,
-    (item) => item?.committee_name_english,
-    (item) => item?.committee_name_hindi,
-    (item) => item?.member_role,
-    (item) => item?.title,
-    (item) => item?.subtitle,
-    (item) => item?.position,
-    (item) => item?.location,
-    (item) => item?.Mobile,
-    (item) => item?.Email,
-    (item) => item?.['Membership number'],
-  ],
-  member: [
-    (item) => item?.Name,
-    (item) => item?.member_name_english,
-    (item) => item?.committee_name_english,
-    (item) => item?.committee_name_hindi,
-    (item) => item?.member_role,
-    (item) => item?.title,
-    (item) => item?.subtitle,
-    (item) => item?.position,
-    (item) => item?.location,
-    (item) => item?.Mobile,
-    (item) => item?.Email,
-    (item) => item?.['Membership number'],
-  ],
-};
-
-const getExecutiveBodySearchFields = (item, tab) => {
-  const fields = [...(EXECUTIVE_BODY_SEARCH_FIELDS[tab] || EXECUTIVE_BODY_SEARCH_FIELDS.member)];
-
-  if (tab === 'committee' && Array.isArray(item?.committee_members)) {
-    item.committee_members.forEach((member) => {
-      fields.push(
-        member?.Name,
-        member?.member_name_english,
-        member?.committee_name_english,
-        member?.committee_name_hindi,
-        member?.member_role,
-        member?.title,
-        member?.subtitle,
-        member?.position,
-        member?.location,
-        member?.Mobile,
-        member?.Email,
-        member?.['Membership number']
-      );
-    });
-  }
-
-  return fields;
-};
-
-const getSearchRankFromFields = (fields, query) => {
-  const normalizedQuery = String(query || '').trim().toLowerCase();
-  if (!normalizedQuery) return fields.length;
-
-  for (let index = 0; index < fields.length; index += 1) {
-    if (String(fields[index] ?? '').toLowerCase().includes(normalizedQuery)) {
-      return index;
-    }
-  }
-
-  return fields.length;
-};
-
-const getExecutiveBodySearchRank = (item, query, tab) => {
-  const fields = getExecutiveBodySearchFields(item, tab);
-  return getSearchRankFromFields(fields, query);
-};
+const getExecutiveBodyResultKey = (item = {}, fallback = '') => String(
+  item?.id || item?.reg_id || item?.members_id || item?.['S. No.'] || item?.['Membership number'] || fallback
+);
 
 const buildCommitteeGroups = (items = []) => {
   const groups = new Map();
@@ -229,17 +165,32 @@ const ExecutiveBody = ({ onNavigate }) => {
 
   const committeeGroups = useMemo(() => buildCommitteeGroups(data.committee), [data.committee]);
 
-  const activeMembers = useMemo(() => {
-    const source = tab === 'committee' ? committeeGroups : (data[tab] || []);
+  const activeResults = useMemo(() => {
     const normalizedQuery = String(query || '').trim().toLowerCase();
-    if (!normalizedQuery) return source;
+
+    if (tab === 'committee') {
+      return buildExecutiveBodyCommitteeSearchResults(committeeGroups, normalizedQuery);
+    }
+
+    const source = data[tab] || [];
+    if (!normalizedQuery) {
+      return source.map((item, index) => ({
+        result_type: 'member',
+        key: `member:${getExecutiveBodyResultKey(item, index)}`,
+        item,
+        rank: index,
+      }));
+    }
+
     return source
       .map((item, index) => {
         const fields = getExecutiveBodySearchFields(item, tab);
         return {
+          result_type: 'member',
+          key: `member:${getExecutiveBodyResultKey(item, index)}`,
           item,
           index,
-          rank: getExecutiveBodySearchRank(item, normalizedQuery, tab),
+          rank: getSearchRankFromFields(fields, normalizedQuery),
           fieldCount: fields.length,
         };
       })
@@ -248,7 +199,12 @@ const ExecutiveBody = ({ onNavigate }) => {
         if (left.rank !== right.rank) return left.rank - right.rank;
         return left.index - right.index;
       })
-      .map((entry) => entry.item);
+      .map((entry) => ({
+        result_type: entry.result_type,
+        key: entry.key,
+        item: entry.item,
+        rank: entry.rank,
+      }));
   }, [committeeGroups, data, query, tab]);
 
   const totalByTab = useMemo(
@@ -325,7 +281,7 @@ const ExecutiveBody = ({ onNavigate }) => {
     };
   }, [data]);
 
-  const totalPages = Math.max(1, Math.ceil(activeMembers.length / MEMBERS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(activeResults.length / MEMBERS_PER_PAGE));
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -333,10 +289,10 @@ const ExecutiveBody = ({ onNavigate }) => {
     }
   }, [currentPage, totalPages]);
 
-  const paginatedMembers = useMemo(() => {
+  const paginatedResults = useMemo(() => {
     const start = (currentPage - 1) * MEMBERS_PER_PAGE;
-    return activeMembers.slice(start, start + MEMBERS_PER_PAGE);
-  }, [activeMembers, currentPage]);
+    return activeResults.slice(start, start + MEMBERS_PER_PAGE);
+  }, [activeResults, currentPage]);
 
   const hasSearchQuery = Boolean(String(query || '').trim());
 
@@ -452,13 +408,24 @@ const ExecutiveBody = ({ onNavigate }) => {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, role, membership, mobile"
+            placeholder={tab === 'committee' ? 'Search committees or members' : 'Search by name, role, membership, mobile'}
             className="w-full bg-transparent outline-none text-sm"
             style={{
                 color: `${theme.primary || 'var(--brand-red)'}`,
                 caretColor: primaryColor,
               }}
           />
+          {hasSearchQuery ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="p-1 rounded-full"
+              style={{ color: primaryColor, background: 'transparent' }}
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -502,12 +469,14 @@ const ExecutiveBody = ({ onNavigate }) => {
           <div className="rounded-2xl p-6 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid color-mix(in srgb, var(--brand-red) 20%, transparent)' }}>
             <p className="text-sm font-semibold" style={{ color: 'var(--brand-red-dark)' }}>{error}</p>
           </div>
-        ) : activeMembers.length === 0 ? (
+        ) : activeResults.length === 0 ? (
           <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
             <Users className="h-8 w-8 mx-auto mb-2" style={{ color: 'var(--advertisement-subtitle)' }} />
             <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>
               {hasSearchQuery
-                ? `No ${tab === 'committee' ? 'committees' : 'members'} match your search`
+                ? tab === 'committee'
+                  ? 'No committees or members match your search'
+                  : 'No members match your search'
                 : tab === 'committee'
                   ? 'No committees found'
                   : 'No members found'}
@@ -515,12 +484,14 @@ const ExecutiveBody = ({ onNavigate }) => {
           </div>
         ) : (
           <>
-            {paginatedMembers.map((item) => {
+            {paginatedResults.map((result) => {
+              const item = result?.item || {};
+              const resultType = result?.result_type || (tab === 'committee' ? 'committee' : 'member');
               const privacyLocked = isPrivacyRestricted(item?.privacy);
-              return tab === 'committee' ? (
+              return resultType === 'committee' ? (
                 <button
                   type="button"
-                  key={item?.id || item?.committee_name_english || item?.Name}
+                  key={result?.key || item?.id || item?.committee_name_english || item?.Name}
                   onClick={() => openCommitteeGroup(item)}
                   className="w-full text-left rounded-2xl overflow-hidden"
                   style={{
@@ -549,7 +520,7 @@ const ExecutiveBody = ({ onNavigate }) => {
               ) : (
                 <button
                   type="button"
-                  key={item?.id || item?.reg_id || item?.['S. No.']}
+                  key={result?.key || item?.id || item?.reg_id || item?.['S. No.']}
                   onClick={() => openMemberDetails(item)}
                   disabled={privacyLocked}
                   className="w-full text-left rounded-2xl overflow-hidden"
@@ -615,6 +586,12 @@ const ExecutiveBody = ({ onNavigate }) => {
                       <p className="text-[11px] leading-[1.2]" style={{ color: 'var(--advertisement-description)' }}>
                         {item?.member_role || item?.title || item?.type || 'N/A'}
                       </p>
+
+                      {resultType === 'committee-member' && item?.parent_committee_name ? (
+                        <p className="text-[10px] font-semibold leading-[1.2]" style={{ color: 'var(--advertisement-subtitle)' }}>
+                          {item.parent_committee_name}
+                        </p>
+                      ) : null}
 
                       {/* {(item?.['Membership number'] || item?.subtitle) && (
                         <div className="flex flex-wrap gap-1 justify-start">

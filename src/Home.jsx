@@ -47,7 +47,7 @@ const BASE_TRUST_ID = String(import.meta.env.VITE_DEFAULT_TRUST_ID || '').trim()
 const buildNotificationContentKey = (notification) => {
   const title = String(notification?.title || '').trim().toLowerCase();
   const message = String(notification?.message || notification?.body || '').trim().toLowerCase();
-  const type = String(notification?.type || '').trim().toLowerCase();
+  const type = String(notification?.click_action || notification?.type || '').trim().toLowerCase();
   const createdAt = String(notification?.created_at || '').trim();
   const createdAtSecond = createdAt ? createdAt.slice(0, 19) : '';
   return `${type}|${title}|${message}|${createdAtSecond}`;
@@ -1684,7 +1684,7 @@ const Home = ({ onNavigate, onLogout }) => {
       if (!notificationContext.userId) return;
       const channel = supabase
         .channel('notifications-realtime-home')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notification' }, (payload) => {
           const newNotif = payload.new;
           const isForMe = matchesNotificationForContext(newNotif, notificationContext);
           if (isForMe) {
@@ -1705,7 +1705,7 @@ const Home = ({ onNavigate, onLogout }) => {
             });
           }
         })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, (payload) => {
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notification' }, (payload) => {
           const updatedNotif = payload.new;
           const isForMe = matchesNotificationForContext(updatedNotif, notificationContext);
           if (isForMe) {
@@ -1947,11 +1947,16 @@ const Home = ({ onNavigate, onLogout }) => {
     if (value === 'referral' || value === 'reference' || value === 'references') return 'reference';
     if (value === 'report' || value === 'reports') return 'reports';
     if (value === 'directory' || value === 'healthcare-trustee-directory') return 'directory';
+    if (value === 'product' || value === 'products' || value === 'categories-products' || value === 'categoriesproducts') return 'products';
+    if (value === 'order-history' || value === 'order_history' || value === 'order history' || value === 'orderhistory') return 'order-history';
     return value || '';
   };
 
   const fallbackQuickRouteByFeatureKey = {
     feature_executive_body: 'executive-body',
+    feature_product: 'products',
+    feature_products: 'products',
+    feature_order_history: 'order-history',
   };
 
   const resolveQuickRoute = (route, featureKey = '') => {
@@ -1975,6 +1980,8 @@ const Home = ({ onNavigate, onLogout }) => {
       appointment: '/icons/quick-access/opd.svg',
       reference: '/icons/quick-access/referral.svg',
       reports: '/icons/quick-access/reports.svg',
+      products: '/icons/quick-access/products.svg',
+      'order-history': '/icons/quick-access/order-history.svg',
     };
     return iconByRoute[normalized] || '/icons/quick-access/directory.svg';
   };
@@ -1992,14 +1999,17 @@ const Home = ({ onNavigate, onLogout }) => {
       && normalizeQuickRoute(data?.route) !== 'nomination'
       && Boolean(resolveQuickRoute(data?.route, key))
     ))
-    .map(([key, data]) => ({
-      id: key,
-      route: resolveQuickRoute(data.route, key),
-      displayName: data.display_name || key,
-      tagline: data.tagline || '',
-      icon_url: resolveQuickIcon(data.route, data.icon_url),
-      quick_order: data.quick_order ?? null,
-    }));
+    .map(([key, data]) => {
+      const route = resolveQuickRoute(data.route, key);
+      return {
+        id: key,
+        route,
+        displayName: data.display_name,
+        tagline: data.tagline,
+        icon_url: resolveQuickIcon(route, data.icon_url),
+        quick_order: data.quick_order ?? null,
+      };
+    });
 
   // Fallback tiles only mirror existing enabled rows. Deleted rows are not resurrected here.
   const fallbackQuickActions = [

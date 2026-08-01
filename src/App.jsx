@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { ThemeContext } from './context/ThemeContext';
 import { GalleryProvider } from './context/GalleryContext';
@@ -23,6 +23,13 @@ import Achievements from './Achievements';
 import AchievementDetail from './AchievementDetail';
 import Donation from './Donation';
 import DonationForm from './DonationForm';
+import CategoriesProducts from './CategoriesProducts';
+import ProductList from './ProductList';
+import ProductDetail from './ProductDetail';
+import Wishlist from './Wishlist';
+import Cart from './Cart';
+import CreateOrder from './CreateOrder';
+import OrderHistory from './OrderHistory';
 import ExecutiveBody from './ExecutiveBody';
 import Notifications from './Notifications';
 import HealthcareTrusteeDirectory from './HealthcareTrusteeDirectory';
@@ -47,6 +54,7 @@ import TrustIdCard from './TrustIdCard';
 import AppVersionUpdatePrompt from './components/AppVersionUpdatePrompt';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
 import { initPushNotifications } from './services/pushNotificationService';
+import { createUserNotification } from './services/api';
 import { syncTrustVersion } from './services/trustVersionService';
 import { logUserSessionEvent } from './services/sessionAuditService';
 import { applyThemeCssVariables, scopeCustomCss } from './utils/themeUtils';
@@ -76,8 +84,13 @@ const TRUST_ID_CARD_CACHE_KEY = 'trust_id_card_payload_v1';
 const AUTO_LOGOUT_MINUTES = Number(import.meta.env.VITE_AUTO_LOGOUT_MINUTES || 30);
 const AUTO_LOGOUT_MS = Math.max(1, AUTO_LOGOUT_MINUTES) * 60 * 1000;
 const getPersistTrustCacheIndexKey = (trustId) => `theme_cache_persist_trust_${THEME_CACHE_VERSION}_${trustId}`;
+const SHOP_ROOT_PATH = '/categories-products';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isUuid = (value) => UUID_RE.test(String(value || '').trim());
+const resolvePositiveId = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
 
 const safeParse = (value) => {
   try {
@@ -193,6 +206,47 @@ const applyThemeToDocument = (theme) => {
   document.head.appendChild(style);
 };
 
+const CategoriesProductListRoute = () => {
+  const navigate = useNavigate();
+  const { categoryId } = useParams();
+  const resolvedCategoryId = resolvePositiveId(categoryId);
+
+  if (!resolvedCategoryId) {
+    return <Navigate to={SHOP_ROOT_PATH} replace />;
+  }
+
+  return (
+    <ProductList
+      categoryId={resolvedCategoryId}
+      onBack={() => navigate(-1)}
+      onOpenProduct={(productId) => {
+        const resolvedProductId = resolvePositiveId(productId);
+        if (!resolvedProductId) return;
+        navigate(`${SHOP_ROOT_PATH}/list/${resolvedCategoryId}/detail/${resolvedProductId}`);
+      }}
+    />
+  );
+};
+
+const CategoriesProductDetailRoute = () => {
+  const navigate = useNavigate();
+  const { categoryId, productId } = useParams();
+  const resolvedCategoryId = resolvePositiveId(categoryId);
+  const resolvedProductId = resolvePositiveId(productId);
+
+  if (!resolvedCategoryId || !resolvedProductId) {
+    return <Navigate to={SHOP_ROOT_PATH} replace />;
+  }
+
+  return (
+    <ProductDetail
+      categoryId={resolvedCategoryId}
+      productId={resolvedProductId}
+      onBack={() => navigate(-1)}
+    />
+  );
+};
+
 const HospitalTrusteeApp = () => {
   const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
   const BASE_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
@@ -304,7 +358,6 @@ const HospitalTrusteeApp = () => {
     applyThemeToDocument(cachedTheme);
   }, [resolvedThemeTrustId]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const rootBrand = typeof window !== 'undefined'
       ? window.getComputedStyle(document.documentElement).getPropertyValue('--brand-red').trim()
@@ -608,34 +661,10 @@ const HospitalTrusteeApp = () => {
 
         const userName = parsedUser.name || parsedUser.Name || 'Member';
 
-        const isMissingUserIdColumnError = (error) =>
-          /column\s+notifications\.user_id\s+does not exist/i.test(String(error?.message || ''));
-
-        let existing = [];
-        let canUseUserIdColumn = true;
-        const { data: existingData, error: existingError } = await supabase
-          .from('notifications')
-          .select('id')
-          .eq('user_id', String(userId))
-          .eq('type', 'birthday')
-          .gte('created_at', `${today}T00:00:00.000Z`)
-          .limit(1);
-
-        if (existingError) {
-          if (isMissingUserIdColumnError(existingError)) {
-            canUseUserIdColumn = false;
-            console.warn('[Birthday] notifications.user_id column missing; skipping birthday DB sync.');
-          } else {
-            throw existingError;
-          }
-        } else {
-          existing = existingData || [];
-        }
-
         const birthdayMessage = `ðŸŽ‚ Maharaja Agrasen Samiti ki taraf se aapko janamdin ki hardik shubhkamnayein, ${userName} ji! Aapka yeh din bahut khaas ho! ðŸŽ‰ðŸŽŠ`;
 
-        if (canUseUserIdColumn && (!existing || existing.length === 0)) {
-          const { error: insertErr } = await supabase.from('notifications').insert({
+        try {
+          await createUserNotification({
             user_id: String(userId),
             title: 'ðŸŽ‚ Happy Birthday!',
             message: birthdayMessage,
@@ -643,9 +672,8 @@ const HospitalTrusteeApp = () => {
             is_read: false,
             created_at: new Date().toISOString(),
           });
-          if (insertErr) {
+        } catch (insertErr) {
             console.error('ðŸŽ‚ [Birthday] DB insert error:', insertErr.message);
-          }
         }
 
         localStorage.setItem(localKey, '1');
@@ -712,7 +740,7 @@ const HospitalTrusteeApp = () => {
         }
 
         const notificationContext = getCurrentNotificationContext();
-        const { userId, userIdVariants, audienceVariants } = notificationContext;
+        const { userId } = notificationContext;
 
         if (!userId) {
           return;
@@ -723,56 +751,6 @@ const HospitalTrusteeApp = () => {
 
         const notificationTracker = new Set();
         const trackerKey = `shownNotifications_${userId}`;
-        const normalizeId = (value) => String(value || '').trim().toLowerCase();
-        const fallbackUserIdSet = new Set();
-        const fallbackUserIdRawSet = new Set();
-        let canQueryNotificationUserId = true;
-        const isMissingUserIdColumnError = (error) =>
-          /column\s+notifications\.user_id\s+does not exist/i.test(String(error?.message || ''));
-        const isUserIdTypeMismatchError = (error) =>
-          /invalid input syntax for type uuid/i.test(String(error?.message || ''))
-          || /operator does not exist/i.test(String(error?.message || ''));
-        const phoneLikeUserIdVariants = userIdVariants.filter((value) => {
-          if (!/^\d+$/.test(String(value || '').trim())) return false;
-          const digits = String(value || '').replace(/\D/g, '');
-          return digits.length >= 10;
-        });
-
-        const refreshFallbackUserIds = async () => {
-          if (phoneLikeUserIdVariants.length === 0) return;
-          try {
-            const { data: linkedAppointments } = await supabase
-              .from('appointments')
-              .select('patient_name, membership_number, user_id')
-              .in('patient_phone', phoneLikeUserIdVariants)
-              .limit(500);
-
-            fallbackUserIdSet.clear();
-            fallbackUserIdRawSet.clear();
-            (linkedAppointments || []).forEach((row) => {
-              const patientName = String(row?.patient_name || '').trim();
-              const membershipNumber = String(row?.membership_number || '').trim();
-              const appointmentUserId = String(row?.user_id || '').trim();
-
-              if (patientName) {
-                fallbackUserIdRawSet.add(patientName);
-                fallbackUserIdSet.add(normalizeId(patientName));
-              }
-              if (membershipNumber) {
-                fallbackUserIdRawSet.add(membershipNumber);
-                fallbackUserIdSet.add(normalizeId(membershipNumber));
-              }
-              if (appointmentUserId) {
-                fallbackUserIdRawSet.add(appointmentUserId);
-                fallbackUserIdSet.add(normalizeId(appointmentUserId));
-              }
-            });
-          } catch (fallbackErr) {
-            console.warn('[NotifListener] Fallback user-id refresh failed:', fallbackErr?.message || fallbackErr);
-          }
-        };
-
-        await refreshFallbackUserIds();
         const existing = localStorage.getItem(trackerKey);
         if (existing) {
           try {
@@ -783,18 +761,21 @@ const HospitalTrusteeApp = () => {
           }
         }
 
+        const getNotificationType = (notification) => String(notification?.click_action || notification?.type || 'general').trim() || 'general';
+
         const showPushNotification = async (notification) => {
           if (isDisposed || notificationTracker.has(notification.id)) return;
 
           try {
             window.dispatchEvent(new CustomEvent('pushNotificationArrived', { detail: notification }));
 
+            const notificationType = getNotificationType(notification);
             await LocalNotifications.createChannel({
-              id: `notif_channel_${notification.type || 'general'}`,
-              name: notification.type === 'appointment_insert' ? 'Appointment Updates'
-                : notification.type === 'referral' ? 'Referral Updates'
-                  : notification.type === 'birthday' ? 'Birthday Wishes'
-                    : notification.type === 'test' ? 'Test Notifications'
+              id: `notif_channel_${notificationType}`,
+              name: notificationType === 'appointment_insert' ? 'Appointment Updates'
+                : notificationType === 'referral' ? 'Referral Updates'
+                  : notificationType === 'birthday' ? 'Birthday Wishes'
+                    : notificationType === 'test' ? 'Test Notifications'
                       : 'Hospital Notifications',
               description: 'Updates from Mah-Setu app',
               importance: 5,
@@ -818,7 +799,7 @@ const HospitalTrusteeApp = () => {
                   id: notifId,
                   title: notification.title || 'New Notification',
                   body: (notification.message || notification.body || 'You have a new notification').substring(0, 200),
-                  channelId: `notif_channel_${notification.type || 'general'}`,
+                  channelId: `notif_channel_${notificationType}`,
                   schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true },
                   sound: null,
                   attachments: null,
@@ -842,52 +823,32 @@ const HospitalTrusteeApp = () => {
 
             const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
 
-            const notificationUserIds = [
-              ...new Set([
-                ...userIdVariants,
-                ...Array.from(fallbackUserIdRawSet),
-              ].filter(isUuid)),
-            ];
+            let recentNotificationQuery = supabase
+              .from('notification')
+              .select('*')
+              .gte('created_at', fiveSecondsAgo)
+              .order('created_at', { ascending: false })
+              .limit(25);
 
-            let userNotifications = [];
-            if (canQueryNotificationUserId && notificationUserIds.length > 0) {
-              const { data, error: userNotifError } = await supabase
-                .from('notifications')
-                .select('*')
-                .in('user_id', notificationUserIds)
-                .gte('created_at', fiveSecondsAgo)
-                .order('created_at', { ascending: false });
-
-              if (userNotifError) {
-                if (isMissingUserIdColumnError(userNotifError) || isUserIdTypeMismatchError(userNotifError)) {
-                  canQueryNotificationUserId = false;
-                  console.warn('[NotifListener] notifications.user_id cannot be queried with current identifiers; skipping direct user polling.');
-                } else {
-                  console.error('[NotifListener] User polling error:', userNotifError.message);
-                  return;
-                }
-              } else {
-                userNotifications = data || [];
-              }
+            if (notificationContext.trustId) {
+              recentNotificationQuery = recentNotificationQuery.eq('trust_id', notificationContext.trustId);
             }
 
-            const { data: audienceNotifications, error: audienceError } = await supabase
-              .from('notifications')
-              .select('*')
-              .in('target_audience', audienceVariants)
-              .gte('created_at', fiveSecondsAgo)
-              .order('created_at', { ascending: false });
+            const { data: recentNotifications, error: recentError } = await recentNotificationQuery;
 
-            if (audienceError) {
-              console.error('[NotifListener] Audience polling error:', audienceError.message);
+            if (recentError) {
+              console.error('[NotifListener] Notification polling error:', recentError.message);
               return;
             }
 
-            const merged = [...(userNotifications || []), ...(audienceNotifications || [])];
-            const uniqueRecent = [...new Map(merged.map((item) => [item.id, item])).values()];
+            const uniqueRecent = [...new Map(
+              (recentNotifications || [])
+                .filter((item) => matchesNotificationForContext(item, notificationContext))
+                .map((item) => [item.id, item])
+            ).values()];
 
             for (const notif of uniqueRecent) {
-              if (notif.type !== 'birthday' && !notificationTracker.has(notif.id)) {
+              if (getNotificationType(notif) !== 'birthday' && !notificationTracker.has(notif.id)) {
                 await showPushNotification(notif);
               }
             }
@@ -901,14 +862,12 @@ const HospitalTrusteeApp = () => {
             .channel(`notifications_channel_${userId}`)
             .on(
               'postgres_changes',
-              { event: 'INSERT', schema: 'public', table: 'notifications' },
+              { event: 'INSERT', schema: 'public', table: 'notification' },
               (payload) => {
                 const newNotification = payload.new;
-                const directMatch = matchesNotificationForContext(newNotification, notificationContext);
-                const fallbackMatch = fallbackUserIdSet.has(normalizeId(newNotification?.user_id));
-                const isForThisUser = directMatch || fallbackMatch;
+                const isForThisUser = matchesNotificationForContext(newNotification, notificationContext);
 
-                if (isForThisUser && newNotification.type !== 'birthday') {
+                if (isForThisUser && getNotificationType(newNotification) !== 'birthday') {
                   showPushNotification(newNotification);
                 }
               }
@@ -1044,6 +1003,10 @@ const HospitalTrusteeApp = () => {
         'donation': '/donation',
         'executive-body': '/executive-body',
         'donation-form': '/donation-form',
+        'products': '/categories-products',
+        'categories-products': '/categories-products',
+        'wishlist': '/wishlist',
+        'cart': '/cart',
         'notifications': '/notifications',
         'committee-members': '/committee-members',
         'sponsor-details': '/sponsor-details',
@@ -1057,6 +1020,8 @@ const HospitalTrusteeApp = () => {
         'add-community': '/add-community',
         'trust-id-card': '/trust-id-card',
         'other-memberships': '/other-memberships',
+        'order-history': '/order-history',
+        'orderhistory': '/order-history',
       };
       const route = routeMap[screen] || '/';
       console.log('Navigating to route:', screen, '->', route);
@@ -1065,7 +1030,6 @@ const HospitalTrusteeApp = () => {
   };
 
   // Load member data from sessionStorage on mount if on member-details or committee-members route
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (
       location.pathname === '/member-details'
@@ -1331,6 +1295,86 @@ const HospitalTrusteeApp = () => {
             <ProtectedRoute>
               <FeatureGuard featureKey="feature_donation">
                 <DonationForm />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categories-products"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <CategoriesProducts />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categoriesproducts"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <Navigate to="/categories-products" replace />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categories-products/list/:categoryId"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <CategoriesProductListRoute />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categories-products/list/:categoryId/detail/:productId"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <CategoriesProductDetailRoute />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/wishlist"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <Wishlist />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cart"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <Cart />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/create-order"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <CreateOrder />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/order-history"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_order_history">
+                <OrderHistory />
               </FeatureGuard>
             </ProtectedRoute>
           }

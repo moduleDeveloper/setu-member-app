@@ -78,7 +78,11 @@ export const createCompatibleNotification = async (input = {}) => {
 
   if (newNotification?.id && userId) {
     try {
-      const memberId = await resolveMemberIdForUser(userId, trustId);
+      const memberId = await resolveMemberIdForUser(
+        userId,
+        trustId,
+        input.members_id || input.member_id || null
+      );
 
       if (memberId) {
         await supabase

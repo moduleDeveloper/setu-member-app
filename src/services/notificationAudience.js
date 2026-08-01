@@ -103,11 +103,29 @@ export const matchesNotificationForContext = (notification, context) => {
   const notificationTrustId = String(notification.trust_id || '').trim();
   if (contextTrustId && notificationTrustId && notificationTrustId !== contextTrustId) return false;
 
-  const notificationUserId = normalizeIdentity(notification.user_id);
-  if (notificationUserId && context.userIdSet.has(notificationUserId)) return true;
+  const audiencePayload = notification?.audience_payload || notification?.payload?.audience_payload || {};
+  const audienceType = normalizeAudience(notification?.audience_type || audiencePayload?.audience_type);
+  const targetUserIds = [
+    notification.user_id,
+    ...(Array.isArray(audiencePayload.user_ids) ? audiencePayload.user_ids : []),
+    ...(Array.isArray(audiencePayload.member_ids) ? audiencePayload.member_ids : []),
+  ];
 
-  const audience = normalizeAudience(notification.target_audience);
+  if (targetUserIds.some((id) => context.userIdSet.has(normalizeIdentity(id)))) return true;
+
+  if (audienceType === 'all') return true;
+
+  const audience = normalizeAudience(notification.target_audience || audiencePayload.target_audience);
   if (audience && context.audienceNormalizedSet.has(audience)) return true;
+
+  if (audienceType === 'role') {
+    const roles = [
+      ...(Array.isArray(audiencePayload.roles) ? audiencePayload.roles : []),
+      audiencePayload.role,
+    ].map(normalizeAudience).filter(Boolean);
+    if (roles.includes('app')) return Boolean(context.userId);
+    if (roles.some((role) => context.audienceNormalizedSet.has(role))) return true;
+  }
 
   return false;
 };

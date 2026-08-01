@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { flushSync } from 'react-dom';
-import { Users, ChevronRight, LogOut, Share2, PhoneCall, FileText, CirclePlus, Lock, Facebook, Instagram, Linkedin, MessageCircle } from 'lucide-react';
+import { Users, ChevronRight, LogOut, Share2, PhoneCall, FileText, CirclePlus, Clock3, Lock, Facebook, Instagram, Linkedin, MessageCircle } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { getProfile, updateMemberPrivacy } from '../services/api';
@@ -35,6 +35,8 @@ const normalizeSidebarRoute = (route = '', featureKey = '') => {
   if (featureValue === 'nominationdetails' || featureValue === 'nomination-details' || featureValue === 'feature-nomination-details' || featureValue === 'feature_nomination_details') return 'nomination-details';
   if (routeValue === 'add-community' || routeValue === 'addcommunity') return 'add-community';
   if (featureValue === 'addcommunity' || featureValue === 'add-community' || featureValue === 'feature-add-community' || featureValue === 'feature_add_community') return 'add-community';
+  if (routeValue === 'order-history' || routeValue === 'orderhistory') return 'order-history';
+  if (featureValue === 'orderhistory' || featureValue === 'order-history' || featureValue === 'feature-order-history' || featureValue === 'feature_order_history') return 'order-history';
   return routeValue;
 };
 
@@ -44,6 +46,7 @@ const resolveSidebarIcon = (featureKey, route) => {
   if (normalizedRoute === 'my-family') return Users;
   if (normalizedRoute === 'nomination-details') return FileText;
   if (normalizedRoute === 'add-community') return CirclePlus;
+  if (normalizedRoute === 'order-history') return Clock3;
   return PhoneCall;
 };
 
@@ -664,7 +667,11 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
         || normalizedKey === 'addcommunity'
         || normalizedKey === 'add-community'
         || normalizedKey === 'feature-add-community';
-      return Boolean(key) && meta?.is_enabled && (isContactUs || isMyFamily || isNominationDetails || isAddCommunity);
+      const isOrderHistory = resolvedRoute === 'order-history'
+        || normalizedKey === 'orderhistory'
+        || normalizedKey === 'order-history'
+        || normalizedKey === 'feature-order-history';
+      return Boolean(key) && meta?.is_enabled && (isContactUs || isMyFamily || isNominationDetails || isAddCommunity || isOrderHistory);
     })
     .map(([key, meta]) => ({
       id: normalizeSidebarRoute(meta?.route, key),
@@ -852,7 +859,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
           <div className="py-3 px-3">
             <div className="space-y-1">
               {primaryMenuItems.map((item) => {
-                const cp = (currentPage || '').toLowerCase();
+                const cp = String(currentPage || '').trim().toLowerCase().replace(/_/g, '-');
                 const aliasMap = {
                   'healthcare-directory': 'directory',
                   'healthcare-trustee-directory': 'directory',
@@ -863,7 +870,8 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
                   'reports': 'reports',
                   'gallery': 'gallery',
                   'reference': 'reference',
-                  'profile': 'profile'
+                  'profile': 'profile',
+                  'orderhistory': 'order-history'
                 };
                 let normalized = aliasMap[cp] || cp;
                 if (!normalized) normalized = '';

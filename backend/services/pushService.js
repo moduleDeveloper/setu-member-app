@@ -32,6 +32,16 @@ const getNotificationTrustId = (notification = {}) => {
   );
 };
 
+const getNotificationAction = (notification = {}) =>
+  normalizeText(
+    notification?.click_action ||
+    notification?.action ||
+    notification?.type ||
+    notification?.payload?.click_action ||
+    notification?.payload?.type ||
+    'general'
+  );
+
 const getNotificationAudienceLabels = (notification = {}) => {
   const payload = getNotificationPayload(notification);
   const labels = [];
@@ -228,7 +238,8 @@ const buildMulticastMessage = (notification, tokens) => ({
   },
   data: {
     notificationId: String(notification?.id || ''),
-    type: String(notification?.type || 'general'),
+    type: String(getNotificationAction(notification) || 'general'),
+    clickAction: String(getNotificationAction(notification) || ''),
     trustId: String(getNotificationTrustId(notification) || ''),
     open: 'notifications',
   },

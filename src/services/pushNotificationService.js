@@ -6,15 +6,19 @@ import { api } from './api';
 // Safety default: keep FCM registration OFF unless explicitly enabled.
 // This avoids native crash when Firebase config (google-services.json) is missing.
 const isFcmPushEnabled = () => import.meta.env.VITE_ENABLE_FCM_PUSH === 'true';
+const LAST_SELECTED_TRUST_ID_KEY = 'last_selected_trust_id';
 
-const getCurrentUserId = () => {
+const getCurrentUserContext = () => {
   try {
     const userStr = localStorage.getItem('user');
-    if (!userStr) return null;
+    if (!userStr) return { userId: null, trustId: null };
     const user = JSON.parse(userStr);
-    return String(user.Mobile || user.mobile || user.phone || user.id || '').trim() || null;
+    return {
+      userId: String(user.Mobile || user.mobile || user.phone || user.id || '').trim() || null,
+      trustId: String(localStorage.getItem('selected_trust_id') || '').trim() || null,
+    };
   } catch {
-    return null;
+    return { userId: null, trustId: null };
   }
 };
 
@@ -39,7 +43,7 @@ export const initPushNotifications = async () => {
     await PushNotifications.register();
 
     const registration = await PushNotifications.addListener('registration', async (token) => {
-      const userId = getCurrentUserId();
+      const { userId, trustId } = getCurrentUserContext();
       if (!userId || !token?.value) return;
 
       try {
@@ -47,6 +51,7 @@ export const initPushNotifications = async () => {
           userId,
           token: token.value,
           platform,
+          trustId,
         });
       } catch (error) {
         console.error('Failed to save push token:', error?.message || error);
@@ -59,26 +64,42 @@ export const initPushNotifications = async () => {
 
     // Listen for push notifications arriving while the app is in the foreground
     const foregroundListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      const data = notification?.data || notification?.notification?.data || {};
       // Emit a custom event to notify Home.jsx (and other components) to refetch notifications
       const event = new CustomEvent('pushNotificationArrived', {
         detail: {
-          notificationId: notification?.notification?.data?.notificationId || null,
-          title: notification?.notification?.title,
-          body: notification?.notification?.body,
+          notificationId: data?.notificationId || data?.notification_id || null,
+          trustId: data?.trustId || data?.trust_id || null,
+          clickAction: data?.clickAction || data?.click_action || data?.type || null,
+          title: notification?.title || notification?.notification?.title,
+          body: notification?.body || notification?.notification?.body,
         }
       });
       window.dispatchEvent(event);
     });
 
     const actionListener = await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      const data = action?.notification?.data || {};
       const notificationId =
-        action?.notification?.data?.notificationId ||
-        action?.notification?.data?.notification_id ||
+        data?.notificationId ||
+        data?.notification_id ||
         action?.notification?.id ||
         null;
+      const trustId = data?.trustId || data?.trust_id || null;
+      const clickAction = data?.clickAction || data?.click_action || data?.type || null;
+
+      if (trustId) {
+        localStorage.setItem('selected_trust_id', String(trustId));
+        localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, String(trustId));
+        window.dispatchEvent(new CustomEvent('trust-changed', { detail: { trustId: String(trustId) } }));
+        sessionStorage.setItem('openNotificationTrustId', String(trustId));
+      }
 
       if (notificationId) {
         sessionStorage.setItem('openNotificationId', String(notificationId));
+      }
+      if (clickAction) {
+        sessionStorage.setItem('openNotificationClickAction', String(clickAction));
       }
       localStorage.setItem('openNotificationsFromPush', '1');
       window.dispatchEvent(new CustomEvent('pushNotificationClicked'));

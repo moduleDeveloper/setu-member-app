@@ -1,10 +1,9 @@
 ﻿// authService.js - Frontend auth helpers
 
-import { resolveAuthApiUrl } from './apiBaseUrl.js';
-
 const USE_MOCK_AUTH = import.meta.env.VITE_AUTH_MOCK === 'true';
 const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
-const AUTH_API_URL = resolveAuthApiUrl();
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || (API_BASE_URL ? `${String(API_BASE_URL).replace(/\/$/, '')}/auth` : '');
 
 const postAuthJson = async (endpoint, payload) => {
   if (!AUTH_API_URL) {
@@ -330,13 +329,15 @@ export const checkPhoneNumber = async (phoneNumber) => {
     if (membersIds.length > 0) {
       const regResult = await supabase
         .from('reg_members')
-        .select('id, trust_id, "Membership number", role, is_active, members_id, joined_date')
+        .select('id, trust_id, "Membership number", role, is_active, members_id, joined_date, qr_code')
         .in('members_id', membersIds);
 
       if (regResult.error) {
         console.error('Supabase membership lookup error:', regResult.error);
         return { success: false, message: 'Unable to verify membership. Please try again.' };
       }
+
+      console.log('[QR DEBUG] raw reg_members rows from Supabase:', regResult.data);
 
       regMemberships = (Array.isArray(regResult.data) ? regResult.data : []).filter(
         (m) => m?.trust_id && membersIds.includes(String(m.members_id))
@@ -371,9 +372,13 @@ export const checkPhoneNumber = async (phoneNumber) => {
           membership_number: m['Membership number'] || null,
           role: m.role || null,
           members_id: m.members_id || null,
+          joined_date: m.joined_date || null,
+          qr_code: m.qr_code || null,
           source: 'reg_members'
         };
       });
+
+      console.log('[QR DEBUG] mapped hospitalMemberships:', hospitalMemberships);
 
       hospitalMemberships.sort((a, b) => {
         const activeScore = Number(Boolean(b?.is_active)) - Number(Boolean(a?.is_active));
@@ -476,6 +481,7 @@ export const checkPhoneNumber = async (phoneNumber) => {
     console.log(
       `User check complete: accounts=${accounts.length}, trusts=${hospitalMemberships.length}, selectedMember=${user?.members_id || user?.id}`
     );
+    console.log('[QR DEBUG] selected user.hospital_memberships (about to be saved to localStorage):', user?.hospital_memberships);
 
     const otpSendResult = await triggerOtpSend(last10);
     if (!otpSendResult.success) {

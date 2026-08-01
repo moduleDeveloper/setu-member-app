@@ -11,7 +11,7 @@ import { useAppTheme } from './context/ThemeContext';
 const buildNotificationContentKey = (notification) => {
   const title = String(notification?.title || '').trim().toLowerCase();
   const message = String(notification?.message || notification?.body || '').trim().toLowerCase();
-  const type = String(notification?.type || '').trim().toLowerCase();
+  const type = String(notification?.click_action || notification?.type || '').trim().toLowerCase();
   const createdAt = String(notification?.created_at || '').trim();
   const createdAtSecond = createdAt ? createdAt.slice(0, 19) : '';
   return `${type}|${title}|${message}|${createdAtSecond}`;
@@ -165,7 +165,7 @@ const Notifications = ({ onNavigate }) => {
       .channel('notifications-realtime')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        { event: 'INSERT', schema: 'public', table: 'notification' },
         (payload) => {
           const newNotif = payload.new;
           const isForMe = matchesNotificationForContext(newNotif, notificationContext);
@@ -181,7 +181,7 @@ const Notifications = ({ onNavigate }) => {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notifications' },
+        { event: 'UPDATE', schema: 'public', table: 'notification' },
         (payload) => {
           const updatedNotif = payload.new;
           const isForMe = matchesNotificationForContext(updatedNotif, notificationContext);
@@ -197,7 +197,7 @@ const Notifications = ({ onNavigate }) => {
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'notifications' },
+        { event: 'DELETE', schema: 'public', table: 'notification' },
         (payload) => {
           const deletedNotif = payload.old;
           const trustKey = String(localStorage.getItem('selected_trust_id') || '').trim();

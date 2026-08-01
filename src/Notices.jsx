@@ -308,7 +308,7 @@ const PdfPreviewModal = ({ attachment, theme, onClose, onDownload }) => {
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>PDF Preview</p>
             <h3 className="truncate text-sm font-bold sm:text-base" style={{ color: 'var(--advertisement-title)' }}>
-              {attachment?.label || 'Document'}
+              Document
             </h3>
           </div>
 
@@ -355,7 +355,7 @@ const PdfPreviewModal = ({ attachment, theme, onClose, onDownload }) => {
           {!loadingPdf && loadError && (
             <div className="overflow-hidden rounded-2xl border bg-white" style={{ borderColor: 'var(--advertisement-card-border)' }}>
               <iframe
-                title={attachment?.label || 'PDF preview'}
+                title={'PDF preview'}
                 src={pdfSrc}
                 className="h-[70vh] w-full border-0"
               />
@@ -1014,9 +1014,7 @@ const Notices = ({ onNavigate }) => {
                           <FileText className="h-5 w-5" style={{ color: 'var(--app-button-icon)' }} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold" style={{ color: 'var(--advertisement-title)' }}>
-                            {firstAttachment.label}
-                          </p>
+
                           <p className="mt-1 text-xs font-medium" style={{ color: 'var(--advertisement-subtitle)' }}>
                             Document file
                           </p>

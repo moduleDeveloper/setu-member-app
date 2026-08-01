@@ -18,14 +18,16 @@ const getTodayIST = () => {
 const isNotExpired = (row) => !row?.expires_at || new Date(row.expires_at) > new Date();
 const normalizeText = (value) => String(value ?? '').trim();
 
-const buildNotificationAccessContext = async (userId, trustId = null) => {
+const buildNotificationAccessContext = async (userId, trustId = null, membersId = null) => {
   const normalizedUserId = normalizeText(userId);
   const normalizedTrustId = normalizeText(trustId);
-  const memberIds = await resolveMemberIdsForUser(normalizedUserId);
+  const normalizedMembersId = normalizeText(membersId);
+  const memberIds = await resolveMemberIdsForUser(normalizedUserId, normalizedMembersId);
   const memberType = await resolveMemberTypeForUser(normalizedUserId);
 
   return {
     userId: normalizedUserId,
+    membersId: normalizedMembersId || null,
     memberIds,
     memberType,
     trustId: normalizedTrustId || null,
@@ -43,6 +45,32 @@ const isNotificationVisibleToContext = (notification, context) => {
   if (!notification || !context) return false;
   if (!matchesTrustScope(notification, context.trustId)) return false;
   return isNotificationRelevantForUser(notification, context);
+};
+
+const hasRecipientAccess = async (notificationId, context) => {
+  if (!notificationId || !context?.memberIds?.length) return false;
+
+  const { data, error } = await supabase
+    .from('notification_recipients')
+    .select('id, status')
+    .eq('notification_id', notificationId)
+    .in('member_id', context.memberIds)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Unable to verify notification recipient access:', error?.message || error);
+    return false;
+  }
+
+  return Boolean(data?.id && data?.status !== 'dismissed');
+};
+
+const canAccessNotification = async (notification, context) => {
+  if (!notification || !context) return false;
+  if (!matchesTrustScope(notification, context.trustId)) return false;
+  if (isNotificationRelevantForUser(notification, context)) return true;
+  return await hasRecipientAccess(notification.id, context);
 };
 
 const resolveMemberTypeForUser = async (userId) => {
@@ -65,15 +93,15 @@ const resolveMemberTypeForUser = async (userId) => {
   return null;
 };
 
-const syncRecipientReadState = async ({ userId, trustId = null, notificationIds, isRead }) => {
+const syncRecipientStatus = async ({ userId, membersId = null, trustId = null, notificationIds, status }) => {
   if (!userId || !notificationIds?.length) return;
 
-  const memberIds = await resolveMemberIdsForUser(userId);
-  const preferredMemberId = await resolveMemberIdForUser(userId, trustId);
+  const normalizedStatus = normalizeText(status) || 'unread';
+  const memberIds = await resolveMemberIdsForUser(userId, membersId);
+  const preferredMemberId = await resolveMemberIdForUser(userId, trustId, membersId);
   const fallbackMemberId = preferredMemberId || memberIds[0] || null;
   if (!memberIds.length && !fallbackMemberId) return;
 
-  const status = isRead ? 'read' : 'unread';
   const updatedAt = new Date().toISOString();
 
   const syncPromises = notificationIds.map(async (notificationId) => {
@@ -93,7 +121,7 @@ const syncRecipientReadState = async ({ userId, trustId = null, notificationIds,
     if (existingRecipients?.id) {
       await supabase
         .from('notification_recipients')
-        .update({ status, updated_at: updatedAt })
+        .update({ status: normalizedStatus, updated_at: updatedAt })
         .eq('id', existingRecipients.id);
       return;
     }
@@ -102,10 +130,20 @@ const syncRecipientReadState = async ({ userId, trustId = null, notificationIds,
 
     await supabase
       .from('notification_recipients')
-      .insert([{ notification_id: notificationId, member_id: fallbackMemberId, status, created_at: updatedAt, updated_at: updatedAt }]);
+      .insert([{ notification_id: notificationId, member_id: fallbackMemberId, status: normalizedStatus, created_at: updatedAt, updated_at: updatedAt }]);
   });
 
   await Promise.all(syncPromises);
+};
+
+const syncRecipientReadState = async ({ userId, membersId = null, trustId = null, notificationIds, isRead }) => {
+  await syncRecipientStatus({
+    userId,
+    membersId,
+    trustId,
+    notificationIds,
+    status: isRead ? 'read' : 'unread',
+  });
 };
 
 export const registerDeviceToken = async (req, res) => {
@@ -160,17 +198,72 @@ export const unregisterDeviceToken = async (req, res) => {
   }
 };
 
+export const createNotification = async (req, res) => {
+  try {
+    const callerUserId = req.headers['user-id'];
+    const callerMembersId = req.headers['members-id'];
+    const requestTrustId = normalizeText(req.body?.trust_id || req.headers['trust-id']);
+
+    if (!callerUserId) {
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    const targetUserId = normalizeText(req.body?.user_id || req.body?.userId || callerUserId);
+    const title = normalizeText(req.body?.title);
+    const message = normalizeText(req.body?.message || req.body?.body);
+
+    if (!targetUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'user_id, title, and message are required' });
+    }
+
+    const compatibilityResult = await createCompatibleNotification({
+      user_id: targetUserId,
+      members_id: req.body?.members_id || req.body?.member_id || callerMembersId || null,
+      trust_id: requestTrustId || null,
+      title,
+      message,
+      type: req.body?.type || req.body?.click_action || 'general',
+      click_action: req.body?.click_action || req.body?.type || 'general',
+      audience_type: req.body?.audience_type,
+      audience_payload: req.body?.audience_payload,
+      target_audience: req.body?.target_audience,
+      expires_at: req.body?.expires_at || null,
+      created_at: req.body?.created_at || new Date().toISOString(),
+    });
+
+    if (!compatibilityResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: compatibilityResult.legacyError || 'Failed to create notification',
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: buildNotificationViewModel({
+        ...compatibilityResult.legacyNotification,
+        recipient_status: 'unread',
+        source: 'new_schema',
+      }, callerUserId),
+    });
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // Get user notifications
 export const getNotifications = async (req, res) => {
   try {
     const userId = req.headers['user-id'];
     const trustId = req.headers['trust-id'];
+    const membersId = req.headers['members-id'];
 
     if (!userId) {
       return res.status(400).json({ success: false, message: 'User ID is required' });
     }
 
-    const context = await buildNotificationAccessContext(userId, trustId);
+    const context = await buildNotificationAccessContext(userId, trustId, membersId);
     const normalizedUserId = context.userId;
     const { memberIds } = context;
 
@@ -195,7 +288,7 @@ export const getNotifications = async (req, res) => {
 
     const recipientStatusByNotification = new Map();
     recipientRows.forEach((row) => {
-      if (row?.notification_id) {
+      if (row?.notification_id && !recipientStatusByNotification.has(row.notification_id)) {
         recipientStatusByNotification.set(row.notification_id, row.status);
       }
     });
@@ -210,7 +303,14 @@ export const getNotifications = async (req, res) => {
         .order('created_at', { ascending: false });
 
       if (!directError && directRows?.length) {
-        directNotifications = directRows.filter((row) => isNotExpired(row) && isNotificationVisibleToContext(row, context));
+        directNotifications = directRows.filter((row) => {
+          const recipientStatus = recipientStatusByNotification.get(row.id);
+          return (
+            recipientStatus !== 'dismissed' &&
+            isNotExpired(row) &&
+            matchesTrustScope(row, context.trustId)
+          );
+        });
       }
     }
 
@@ -225,6 +325,7 @@ export const getNotifications = async (req, res) => {
 
     const relevantNotifications = (allNotificationRows || []).filter((row) => {
       if (!isNotExpired(row)) return false;
+      if (recipientStatusByNotification.get(row.id) === 'dismissed') return false;
       const isRelevant = isNotificationVisibleToContext(row, context);
       return isRelevant;
     });
@@ -251,6 +352,7 @@ export const markAsRead = async (req, res) => {
     const { id } = req.params;
     const userId = req.headers['user-id'];
     const trustId = req.headers['trust-id'];
+    const membersId = req.headers['members-id'];
 
     if (!userId) {
       return res.status(400).json({ success: false, message: 'User ID is required' });
@@ -271,13 +373,14 @@ export const markAsRead = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Notification not found' });
     }
 
-    const context = await buildNotificationAccessContext(userId, trustId);
-    if (!isNotificationVisibleToContext(existingNotification, context)) {
+    const context = await buildNotificationAccessContext(userId, trustId, membersId);
+    if (!(await canAccessNotification(existingNotification, context))) {
       return res.status(403).json({ success: false, message: 'Unauthorized to update this notification' });
     }
 
     await syncRecipientReadState({
       userId,
+      membersId,
       trustId,
       notificationIds: [id],
       isRead: true,
@@ -295,17 +398,47 @@ export const markAllAsRead = async (req, res) => {
   try {
     const userId = req.headers['user-id'];
     const trustId = req.headers['trust-id'];
+    const membersId = req.headers['members-id'];
 
     if (!userId) {
       return res.status(400).json({ success: false, message: 'User ID is required' });
     }
 
-    const context = await buildNotificationAccessContext(userId, trustId);
+    const context = await buildNotificationAccessContext(userId, trustId, membersId);
     const normalizedUserId = context.userId;
+    const { memberIds } = context;
+
+    let recipientRows = [];
+    if (memberIds.length) {
+      const { data, error: recipientError } = await supabase
+        .from('notification_recipients')
+        .select('notification_id, status')
+        .in('member_id', memberIds)
+        .order('updated_at', { ascending: false });
+
+      if (recipientError) {
+        console.warn('Unable to read notification recipient rows for mark-all:', recipientError?.message || recipientError);
+      } else {
+        recipientRows = data || [];
+      }
+    }
+
+    const recipientStatusByNotification = new Map();
+    recipientRows.forEach((row) => {
+      if (row?.notification_id && !recipientStatusByNotification.has(row.notification_id)) {
+        recipientStatusByNotification.set(row.notification_id, row.status);
+      }
+    });
+    const directNotificationIdSet = new Set(
+      recipientRows
+        .filter((row) => row?.status !== 'dismissed')
+        .map((row) => row.notification_id)
+        .filter(Boolean)
+    );
 
     const { data: allNotifications, error: fetchError } = await supabase
       .from('notification')
-      .select('id, audience_type, audience_payload')
+      .select('id, trust_id, audience_type, audience_payload, expires_at')
       .order('created_at', { ascending: false });
 
     if (fetchError) {
@@ -313,7 +446,12 @@ export const markAllAsRead = async (req, res) => {
     }
 
     const relevantNotificationIds = (allNotifications || [])
-      .filter((notification) => isNotificationVisibleToContext(notification, context))
+      .filter((notification) => {
+        if (!isNotExpired(notification)) return false;
+        if (!matchesTrustScope(notification, context.trustId)) return false;
+        if (recipientStatusByNotification.get(notification.id) === 'dismissed') return false;
+        return directNotificationIdSet.has(notification.id) || isNotificationRelevantForUser(notification, context);
+      })
       .map((notification) => notification.id);
 
     if (!relevantNotificationIds.length) {
@@ -324,6 +462,7 @@ export const markAllAsRead = async (req, res) => {
 
     await syncRecipientReadState({
       userId: normalizedUserId,
+      membersId,
       trustId,
       notificationIds: uniqueNotificationIds,
       isRead: true,
@@ -340,6 +479,8 @@ export const markAllAsRead = async (req, res) => {
 export const checkBirthdayNotifications = async (req, res) => {
   try {
     const userId = req.headers['user-id'];
+    const trustId = req.headers['trust-id'];
+    const membersId = req.headers['members-id'];
 
     if (!userId) {
       return res.status(400).json({ success: false, message: 'User ID is required' });
@@ -382,12 +523,15 @@ export const checkBirthdayNotifications = async (req, res) => {
     // 3. Check if birthday notification already sent today
     const { data: existing, error: checkError } = await supabase
       .from('notification')
-      .select('id')
+      .select('id, trust_id, audience_type, audience_payload')
       .eq('click_action', 'birthday')
       .gte('created_at', `${todayStr}T00:00:00.000Z`)
-      .limit(1);
+      .limit(1000);
 
-    if (!checkError && existing && existing.length > 0) {
+    const context = await buildNotificationAccessContext(userId, trustId, membersId);
+    const alreadySentForUser = !checkError && (existing || []).some((row) => isNotificationVisibleToContext(row, context));
+
+    if (alreadySentForUser) {
       return res.json({ success: true, birthdayToday: true, alreadySent: true, name: userName });
     }
 
@@ -399,6 +543,8 @@ export const checkBirthdayNotifications = async (req, res) => {
       title: '🎂 Happy Birthday!',
       message: birthdayMessage,
       type: 'birthday',
+      trust_id: trustId || null,
+      members_id: membersId || null,
       is_read: false,
       created_at: new Date().toISOString(),
     });
@@ -463,13 +609,13 @@ export const deleteNotification = async (req, res) => {
     const { id } = req.params;
     const userId = req.headers['user-id'];
     const trustId = req.headers['trust-id'];
+    const membersId = req.headers['members-id'];
 
     if (!userId) {
       return res.status(400).json({ success: false, message: 'User ID is required' });
     }
 
-    const context = await buildNotificationAccessContext(userId, trustId);
-    const { memberIds } = context;
+    const context = await buildNotificationAccessContext(userId, trustId, membersId);
 
     const { data: existingNotification, error: fetchError } = await supabase
       .from('notification')
@@ -486,41 +632,19 @@ export const deleteNotification = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Notification not found' });
     }
 
-    const isAuthorized = isNotificationVisibleToContext(existingNotification, context);
+    const isAuthorized = await canAccessNotification(existingNotification, context);
 
     if (!isAuthorized) {
       return res.status(403).json({ success: false, message: 'Unauthorized to delete this notification' });
     }
 
-    if (memberIds.length) {
-      await supabase
-        .from('notification_recipients')
-        .delete()
-        .eq('notification_id', id)
-        .in('member_id', memberIds);
-    }
-
-    const { data: remainingRecipients, error: recipientCheckError } = await supabase
-      .from('notification_recipients')
-      .select('id')
-      .eq('notification_id', id)
-      .limit(1)
-      .maybeSingle();
-
-    if (recipientCheckError) {
-      throw recipientCheckError;
-    }
-
-    if (!remainingRecipients?.id) {
-      const { error: deleteError } = await supabase
-        .from('notification')
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) {
-        throw deleteError;
-      }
-    }
+    await syncRecipientStatus({
+      userId,
+      membersId,
+      trustId,
+      notificationIds: [id],
+      status: 'dismissed',
+    });
 
     res.json({ success: true, message: 'Notification deleted successfully' });
   } catch (error) {
