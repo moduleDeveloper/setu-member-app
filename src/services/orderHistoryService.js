@@ -1,4 +1,4 @@
-import { api } from './api.js';
+import { supabase } from './supabaseClient.js';
 import { getUserHospitalMemberships } from '../utils/storageUtils.js';
 
 const ORDER_HISTORY_STORAGE_KEYS = ['order_history_v1', 'order_history', 'orders_v1'];
@@ -277,14 +277,18 @@ export const fetchOrdersForTrust = async ({ memberId, trustId, trustName = null 
   const normalizedTrustId = normalizeText(trustId);
   if (!normalizedMemberId || !normalizedTrustId) return [];
 
-  const response = await api.post('/order-history/purchases', {
+  const request = {
     p_member_id: normalizedMemberId,
     p_trust_id: normalizedTrustId,
     p_action: 'get',
     p_payload: {},
-  });
+  };
 
-  const data = response?.data || {};
+  const { data, error } = await supabase.rpc('manage_purchase_by_member', request);
+  if (error) {
+    throw error;
+  }
+
   if (data && typeof data === 'object' && data.success === false) {
     throw new Error(normalizeText(data.message) || `Failed to load order history for trust ${normalizedTrustId}`);
   }
@@ -305,6 +309,44 @@ export const fetchOrdersForTrust = async ({ memberId, trustId, trustName = null 
         source_trust_name: resolvedTrustName,
       };
     });
+};
+
+export const subscribeOrderHistory = (onEvent = () => {}) => {
+  if (typeof window === 'undefined') return () => {};
+
+  const storedUser = readStoredUser();
+  const memberId = resolveOrderHistoryMemberId(storedUser);
+  const normalizedMemberId = normalizeText(memberId);
+  if (!normalizedMemberId || !supabase?.channel) return () => {};
+
+  const createChannelForTable = (tableName) => supabase
+    .channel(`order-history-${normalizedMemberId}-${tableName}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: tableName, filter: `member_id=eq.${normalizedMemberId}` },
+      () => onEvent()
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: tableName, filter: `member_id=eq.${normalizedMemberId}` },
+      () => onEvent()
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: tableName, filter: `member_id=eq.${normalizedMemberId}` },
+      () => onEvent()
+    )
+    .subscribe();
+
+  const channels = ['purchase', 'purchases'].map(createChannelForTable);
+
+  return () => {
+    channels.forEach((channel) => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    });
+  };
 };
 
 export const loadOrderHistorySnapshot = async ({ user = null } = {}) => {

@@ -15,6 +15,7 @@ import {
   clearOrderHistoryCache,
   loadOrderHistorySnapshot,
   resolveOrderHistoryTrustScope,
+  subscribeOrderHistory,
 } from './services/orderHistoryService';
 import { useAppTheme } from './context/ThemeContext';
 import { getNavbarThemeStyles } from './utils/themeUtils';
@@ -337,6 +338,7 @@ function OrderHistory() {
     };
 
     refresh();
+    const unsubscribeRealtime = subscribeOrderHistory(refresh);
 
     window.addEventListener('storage', handleStorage);
     window.addEventListener('focus', refresh);
@@ -345,6 +347,7 @@ function OrderHistory() {
 
     return () => {
       active = false;
+      unsubscribeRealtime();
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('trust-changed', refresh);
@@ -404,6 +407,11 @@ function OrderHistory() {
   }, [activeTrustKey, orders]);
 
   const visibleOrders = useMemo(() => visibleOrdersSource.slice(0, visibleCount), [visibleCount, visibleOrdersSource]);
+
+  useEffect(() => {
+    console.log('OrderHistory visibleOrders:', visibleOrders);
+  }, [visibleOrders]);
+
   const hasMoreOrders = visibleCount < visibleOrdersSource.length;
   const orderHistoryTrustScope = resolveOrderHistoryTrustScope();
   const isAllTrustsMode = orderHistoryTrustScope.isDefaultTrustSelected;
