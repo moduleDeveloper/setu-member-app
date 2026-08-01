@@ -751,7 +751,7 @@ function OrderHistory() {
                 
                 return (
                   <article key={order.id} className="order-history-card">
-                    {console.log('orders', visibleOrders)}
+                    
                     <div className="order-history-card-top">
                       <div className="min-w-0">
                         <p className="order-history-card-id" style={{ color: navbarTextColor }}>{order.id}</p>
