@@ -4,17 +4,17 @@ import { flushSync } from 'react-dom';
 import { Users, ChevronRight, LogOut, Share2, PhoneCall, FileText, CirclePlus, Clock3, Lock, Facebook, Instagram, Linkedin, MessageCircle } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
-import { getProfile, updateMemberPrivacy } from '../services/api';
-import { fetchFeatureFlags, isFeatureVisible } from '../services/featureFlags';
-import { fetchShareAppLinksByTrustId } from '../services/trustService';
-import { logUserSessionEvent } from '../services/sessionAuditService';
-import { useTrustDataVersion } from '../hooks/useTrustDataVersion';
-import { useAppTheme } from '../context/ThemeContext';
-import { applyOpacity } from '../utils/colorUtils';
-import { getThemeToken } from '../utils/themeUtils';
-import { getShareAppTargetLink } from '../utils/shareApp';
-import { resolveSelectedTrustMembership } from '../utils/storageUtils';
-import { MEMBER_PRIVACY_UPDATED_EVENT } from '../utils/memberIdentity';
+import { getProfile, updateMemberPrivacy } from '../../services/api';
+import { fetchFeatureFlags, isFeatureVisible } from '../../services/featureFlags';
+import { fetchShareAppLinksByTrustId } from '../../services/trustService';
+import { logUserSessionEvent } from '../../services/sessionAuditService';
+import { useTrustDataVersion } from '../../hooks/useTrustDataVersion';
+import { useAppTheme } from '../../context/ThemeContext';
+import { applyOpacity } from '../../utils/colorUtils';
+import { getThemeToken } from '../../utils/themeUtils';
+import { getShareAppTargetLink } from '../../utils/shareApp';
+import { resolveSelectedTrustMembership } from '../../utils/storageUtils';
+import { MEMBER_PRIVACY_UPDATED_EVENT } from '../../utils/memberIdentity';
 
 const normalizeSidebarRoute = (route = '', featureKey = '') => {
   const routeValue = String(route || '')

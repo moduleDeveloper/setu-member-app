@@ -456,6 +456,62 @@ test('cart move to wishlist keeps cart item and logs when API fails', async () =
   assert.deepEqual(wishlistUtils.readWishlistItems('trust-cart-move-fail'), []);
 });
 
+test('cart move to wishlist removes the cart row when product is already wishlisted elsewhere', async () => {
+  createEnvironment({
+    selected_trust_id: 'trust-cart-move-dup',
+    last_selected_trust_id: 'trust-cart-move-dup',
+    user: createUserEntry(),
+    'product_cart_v2_trust-cart-move-dup': JSON.stringify([
+      {
+        key: 'trust-cart-move-dup:tunic2',
+        id: 'tunic2',
+        trust_id: 'trust-cart-move-dup',
+        product_name: 'Tunic2',
+        purchase_id: '307',
+        product_price_id: '173',
+        quantity: 1,
+        price: {
+          id: '173',
+          member_price: 360
+        }
+      }
+    ])
+  });
+
+  const requests = [];
+  cartUtils.setCartPurchaseRpcOverrideForTests(async (request) => {
+    requests.push(request);
+    if (request.p_payload.type === 'wishlist') {
+      return {
+        data: {
+          success: false,
+          error: 'duplicate key value violates unique constraint "idx_unique_wishlist_item"'
+        }
+      };
+    }
+
+    return {
+      data: {
+        success: true,
+        purchases: [
+          {
+            id: request.p_payload.id,
+            status: request.p_payload.status,
+            quantity: request.p_payload.quantity
+          }
+        ]
+      }
+    };
+  });
+
+  const result = await cartUtils.moveCartProductToWishlist('tunic2', 'trust-cart-move-dup');
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].p_payload.status, 'remove_from_cart');
+  assert.equal(result.alreadyInWishlist, true);
+  assert.deepEqual(cartUtils.readCartItems('trust-cart-move-dup'), []);
+});
+
 test('wishlist reads keep only wishlist rows and order them newest first', () => {
   createEnvironment({
     selected_trust_id: 'trust-wishlist-sort',
@@ -887,6 +943,44 @@ test('wishlist async add uses snake case product price id from context', async (
     wishlistUtils.isWishlistProductInItems(items, product, { trustId, product_price_id: 'price-kurta-context' }),
     true
   );
+});
+
+test('wishlist async add treats duplicate backend row as already wished', async () => {
+  const trustId = 'trust-wishlist-duplicate';
+  createEnvironment({
+    selected_trust_id: trustId,
+    last_selected_trust_id: trustId,
+    user: createUserEntry()
+  });
+
+  const requests = [];
+  wishlistUtils.setWishlistPurchaseRpcOverrideForTests(async (request) => {
+    requests.push(request);
+    return {
+      data: {
+        success: false,
+        error: 'duplicate key value violates unique constraint "idx_unique_wishlist_item"'
+      }
+    };
+  });
+
+  const result = await wishlistUtils.toggleWishlistProductAsync(
+    {
+      id: 'kurta-duplicate',
+      product_name: 'Kurta Duplicate'
+    },
+    {
+      trustId,
+      product_price_id: 'price-duplicate',
+      price: { id: 'price-duplicate', member_price: 100 }
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.wished, true);
+  assert.equal(result.duplicateResolved, true);
+  assert.equal(requests[0].p_payload.product_price_id, 'price-duplicate');
+  assert.equal(wishlistUtils.isWishlistProduct('price-duplicate', trustId), true);
 });
 
 test('wishlist async add requires member identity and does not fake local success', async () => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar, Home as HomeIcon, Menu, X, ChevronRight, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { useAppTheme } from './context/ThemeContext';
 import {
   facilitiesConfig,

@@ -48,7 +48,6 @@ const getActiveTrustId = () => {
 export const getTrustCandidates = () => {
   const candidates = [
     getActiveTrustId(),
-    import.meta.env.VITE_DEFAULT_TRUST_ID,
   ]
     .map((value) => normalizeText(value))
     .filter(Boolean);

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Home as HomeIcon, Menu, Upload, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppTheme } from './context/ThemeContext';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { getNavbarThemeStyles, getThemeToken } from './utils/themeUtils';
 import { applyOpacity } from './utils/colorUtils';
 

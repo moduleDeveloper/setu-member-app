@@ -73,7 +73,10 @@ const getDisplayOrder = (category, displayType) => {
     ? category.display_orders
     : [];
 
-  return displayOrders.find((entry) => normalizeText(entry?.display_type) === displayType) || null;
+  return displayOrders.find((entry) => (
+    normalizeText(entry?.display_type) === displayType
+    && normalizeText(entry?.status).toLowerCase() === 'active'
+  )) || null;
 };
 
 const getDisplaySortValue = (category, displayType) => {
@@ -87,10 +90,6 @@ const hasDisplayType = (category, displayType) =>
 
 const getDisplayName = (category, displayType) =>
   normalizeText(getDisplayOrder(category, displayType)?.display_name);
-
-const hasRenderableDisplayOrder = (category) =>
-  Array.isArray(category?.display_orders)
-  && category.display_orders.some((entry) => normalizeText(entry?.status).toLowerCase() === 'active');
 
 const isVisibleCategory = (category) => {
   const status = normalizeText(category?.status).toLowerCase();
@@ -116,8 +115,10 @@ const sortByDisplayOrder = (displayType) => (a, b) => {
 
 const sortSliderCategories = sortByDisplayOrder('slider');
 
-const shouldShowCardSection = (category) =>
-  isVisibleCategory(category) && hasDisplayType(category, 'cards');
+const shouldShowCardSection = (category, cardCategoryIds) =>
+  isVisibleCategory(category)
+  && hasDisplayType(category, 'cards')
+  && !cardCategoryIds.has(category.parentId);
 
 const sortBySourceOrder = (a, b) =>
   a.sourceIndex - b.sourceIndex || a.label.localeCompare(b.label);
@@ -224,10 +225,15 @@ export const buildCategoryView = (categories) => {
     }))
     .filter((category) => Boolean(category.id));
 
-  const visibleCategories = normalized.filter((category) => isVisibleCategory(category) && hasRenderableDisplayOrder(category));
+  const activeCategories = normalized.filter(isVisibleCategory);
+  const cardCategoryIds = new Set(
+    activeCategories
+      .filter((category) => hasDisplayType(category, 'cards'))
+      .map((category) => category.id)
+  );
   const visibleChildrenByParent = new Map();
 
-  visibleCategories.forEach((category) => {
+  activeCategories.forEach((category) => {
     if (!category.parentId) return;
     if (!visibleChildrenByParent.has(category.parentId)) {
       visibleChildrenByParent.set(category.parentId, []);
@@ -239,27 +245,29 @@ export const buildCategoryView = (categories) => {
     children.sort(sortBySourceOrder);
   });
 
-  const sliderEntries = visibleCategories
+  const sliderEntries = activeCategories
     .filter((category) => hasDisplayType(category, 'slider'))
     .sort(sortSliderCategories)
     .map((category) => buildCategoryEntry(category, 'slider'));
 
-  const explicitCardSections = visibleCategories
-    .filter(shouldShowCardSection)
+  const explicitCardSections = activeCategories
+    .filter((category) => shouldShowCardSection(category, cardCategoryIds))
     .sort(sortByDisplayOrder('cards'))
     .map((section) => {
       const items = [...(visibleChildrenByParent.get(section.id) || [])]
-        .filter((category) => hasRenderableDisplayOrder(category))
         .sort(sortByDisplayOrder('cards'))
         .map((category) => buildCategoryEntry(category, 'cards'));
+      const displayItems = items.length > 0
+        ? items
+        : [buildCategoryEntry(section, 'cards')];
 
       return {
         id: section.id,
         label: getCategoryDisplayLabel(section, 'cards'),
         sourceIndex: section.sourceIndex,
         sortOrder: getDisplaySortValue(section, 'cards'),
-        items,
-        rowPattern: getCardRowPattern(items.length),
+        items: displayItems,
+        rowPattern: getCardRowPattern(displayItems.length),
       };
     })
     .filter((section) => section.items.length > 0);

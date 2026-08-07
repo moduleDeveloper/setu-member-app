@@ -4,7 +4,7 @@ import {
   ArrowLeft, Users, Plus, X, CheckCircle, Menu, Home as HomeIcon,
   AlertCircle, Building2, Hash, Tag, FileText, Loader2, Save, ChevronRight, BadgeCheck
 } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import TrustIdCard from './TrustIdCard';
 import { useAppTheme } from './context/ThemeContext';
 import { applyOpacity } from './utils/colorUtils';

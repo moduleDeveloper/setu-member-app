@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { User, Users, Clock, FileText, UserPlus, Bell, ChevronRight, Heart, Shield, Plus, ArrowRight, Pill, ShoppingCart, Calendar, Stethoscope, Building2, QrCode, Monitor, Brain, Package, FileCheck, Search, Filter, Star, HelpCircle, BookOpen, Video, Headphones, Menu, X, Home as HomeIcon, Settings, UserCircle, Image, Trash2, Code, FolderOpen, Crown } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import TermsModal from './components/TermsModal';
 import ImageSlider from './components/ImageSlider';
 import { getProfile, getMarqueeUpdates, getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification } from './services/api';

@@ -5,7 +5,7 @@ import {
   Image as ImageIcon, X, ChevronLeft, ChevronRight,
   Menu, Home as HomeIcon, FolderOpen, Play, Pause, ArrowLeft
 } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 
 function FolderCover({ photos, folderName }) {
   const [p1Err, setP1Err] = useState(false);

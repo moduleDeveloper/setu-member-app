@@ -67,7 +67,6 @@ const DESCRIPTION_COLLAPSE_LINES = 10;
 const SKELETON_BG = 'color-mix(in srgb, var(--brand-navy) 8%, transparent)';
 const SKELETON_BORDER = 'color-mix(in srgb, var(--brand-navy) 12%, transparent)';
 const SHADOW = '0 18px 36px color-mix(in srgb, var(--brand-navy) 10%, transparent)';
-const HIDDEN_STATUSES = new Set(['inactive', 'disabled', 'archived', 'hidden', 'draft']);
 const VISIBLE_CATEGORY_STATUSES = new Set(['active']);
 const IMAGE_ZOOM_MIN_SCALE = 1;
 const IMAGE_ZOOM_MAX_SCALE = 4;
@@ -597,7 +596,6 @@ const joinWithAnd = (values) => {
 const getTrustCandidates = () => {
   const candidates = [
     localStorage.getItem('selected_trust_id'),
-    import.meta.env.VITE_DEFAULT_TRUST_ID,
   ]
     .map((value) => pickText(value))
     .filter(Boolean);
@@ -778,8 +776,7 @@ const getApiCategoryPath = (categoryId, categoriesById) => {
 
 const isVisibleProduct = (product) => {
   const status = pickText(product?.status).toLowerCase();
-  if (!status) return true;
-  return !HIDDEN_STATUSES.has(status);
+  return status === 'active';
 };
 
 const getProductDisplayName = (product) =>

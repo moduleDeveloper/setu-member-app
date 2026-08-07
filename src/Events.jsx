@@ -3,7 +3,7 @@ import { Calendar, CheckCircle2, ChevronRight, Clock3, Download, Eye, FileText, 
 import { useNavigate } from 'react-router-dom';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { useAppTheme } from './context/ThemeContext';
 import { supabase } from './services/supabaseClient';
 import {

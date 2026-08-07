@@ -3,7 +3,7 @@ import { Calendar, ChevronRight, Download, Eye, FileText, Home as HomeIcon, Load
 import { useNavigate } from 'react-router-dom';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { useAppTheme } from './context/ThemeContext';
 import { downloadAttachmentFile } from './utils/attachmentDownload';
 import {

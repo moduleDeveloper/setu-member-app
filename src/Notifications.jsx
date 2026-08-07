@@ -5,7 +5,7 @@ import { supabase } from './services/supabaseClient';
 import { readNotificationCache, writeNotificationCache } from './services/notificationCache';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
 import { tryNavigateNotificationRoute } from './services/notificationRedirectService';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { useAppTheme } from './context/ThemeContext';
 
 const buildNotificationContentKey = (notification) => {

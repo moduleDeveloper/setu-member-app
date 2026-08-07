@@ -5,7 +5,7 @@ import { getDoctorsWithSchedule } from './services/supabaseService';
 import { bookAppointment } from './services/appointmentService';
 import { createUserNotification } from './services/api';
 import { supabase } from './services/supabaseClient';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { registerSidebarState, useAndroidBack } from './hooks';
 import { useAppTheme } from './context/ThemeContext';
 

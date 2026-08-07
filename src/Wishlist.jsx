@@ -875,7 +875,19 @@ function Wishlist() {
 
               return (
                 <article key={item.key} className="wishlist-card">
-                  <button type="button" className="wishlist-open" onClick={() => openItem(item)} aria-label={`Open ${productName || 'Wishlist Item'}`}>
+                  <div
+                    className="wishlist-open"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openItem(item)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openItem(item);
+                      }
+                    }}
+                    aria-label={`Open ${productName || 'Wishlist Item'}`}
+                  >
                     <div className="wishlist-image">
                       {imageUrl ? <img src={imageUrl} alt={productName || 'Wishlist Item'} loading="lazy" decoding="async" /> : <Heart className="h-8 w-8" />}
                     </div>
@@ -921,7 +933,7 @@ function Wishlist() {
                         </div>
                       ) : null}
                     </div>
-                  </button>
+                  </div>
                   <div className="wishlist-actions">
                     <button
                       type="button"

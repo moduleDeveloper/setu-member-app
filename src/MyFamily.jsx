@@ -17,7 +17,7 @@ import {
   Users,
   X
 } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { createFamilyMember, deleteFamilyMember, getFamilyMembers, updateFamilyMember } from './services/api';
 import { useAppTheme } from './context/ThemeContext';
 import { getNavbarThemeStyles } from './utils/themeUtils';

@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { User, Users, Stethoscope, Building2, Star, ChevronRight, ChevronLeft, Menu, X, Home as HomeIcon, Clock, FileText, UserPlus, Phone, Mail, MapPin, Search, Filter, ArrowLeft, ArrowRight } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { getAllCommitteeMembers, getAllDoctors, getAllElectedMembers, getProfilePhotos } from './services/api';
 import { getExecutiveBodyMembers, getTrusteesAndPatrons } from './services/supabaseService';
 import { registerSidebarState, useAndroidBack } from './hooks';

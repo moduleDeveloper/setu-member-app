@@ -6,7 +6,7 @@ import { applyOpacity } from './utils/colorUtils';
 import { getFamilyMembers } from './services/api';
 import { supabase } from './services/supabaseClient';
 import { getNavbarThemeStyles } from './utils/themeUtils';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 
 const resolveInitialMemberships = () => {
   try {

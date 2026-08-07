@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Home as HomeIcon, Menu, User, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { useAppTheme } from './context/ThemeContext';
 import { getProfile } from './services/api';
 import { fetchTrustById } from './services/trustService';

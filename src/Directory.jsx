@@ -7,7 +7,7 @@ import { getProfilePhotos } from './services/api';
 import { getNavbarThemeStyles } from './utils/themeUtils';
 import { applyOpacity } from './utils/colorUtils';
 import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from './utils/memberIdentity';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 
 const MEMBERS_PER_PAGE = 20;
 const DIRECTORY_CACHE_TTL_MS = 10 * 60 * 1000;

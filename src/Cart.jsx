@@ -930,7 +930,7 @@ function Cart() {
       }
 
       setItems(result?.cartItems || []);
-      showToast('Moved To Wishlist');
+      showToast(result?.alreadyInWishlist ? 'Already In Wishlist – Removed From Cart' : 'Moved To Wishlist');
     } catch (cartError) {
       showToast(cartError?.message || 'Unable To Move To Wishlist');
     }

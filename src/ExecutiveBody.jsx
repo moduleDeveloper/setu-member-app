@@ -12,7 +12,7 @@ import {
   getExecutiveBodySearchFields,
   getSearchRankFromFields,
 } from './utils/executiveBodySearch';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 
 const TAB_OPTIONS = [
   

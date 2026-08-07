@@ -135,7 +135,55 @@ const normalizeAttributes = (value) => {
       acc[normalizedKey] = normalizedValue;
     }
     return acc;
-  }, {});
+    }, {});
+};
+
+const redactId = (value) => {
+  const text = normalizeText(value);
+  if (!text) return '';
+  if (text.length <= 10) return text;
+  return `${text.slice(0, 6)}...${text.slice(-4)}`;
+};
+
+const getStoredUserDiagnostics = (user = {}) => ({
+  hasUser: Boolean(user && Object.keys(user).length > 0),
+  id: redactId(user?.id),
+  member_uuid: redactId(user?.member_uuid),
+  members_uuid: redactId(user?.members_uuid),
+  members_id: redactId(user?.members_id),
+  member_id: redactId(user?.member_id),
+  member_ids_count: Array.isArray(user?.member_ids) ? user.member_ids.length : 0,
+  memberships_count: getUserHospitalMemberships(user).length,
+});
+
+const getWishlistMutationDiagnostics = ({ trustId, product, context = {}, existingItem = null, request = null } = {}) => ({
+  trustId: redactId(trustId),
+  productId: redactId(product?.id || product?.product_id || product?.productId),
+  productName: normalizeText(product?.product_name || product?.alias_name || product?.name),
+  productStatus: normalizeText(product?.status),
+  categoryId: redactId(context?.categoryId || product?.category_id || product?.categoryId),
+  priceId: redactId(resolveWishlistProductPriceId(product, context)),
+  priceStatus: normalizeText(context?.price?.status || product?.price?.status),
+  priceProductId: redactId(context?.price?.product_id || product?.price?.product_id),
+  unitPrice: resolveWishlistUnitPrice(product, context),
+  existingPurchaseId: redactId(existingItem?.purchase_id || existingItem?.purchaseId),
+  existingStatus: normalizeText(existingItem?.status),
+  requestAction: request?.p_action,
+  requestTrustId: redactId(request?.p_trust_id),
+  requestMemberId: redactId(request?.p_member_id),
+  requestPayload: {
+    ...request?.p_payload,
+    id: redactId(request?.p_payload?.id),
+    product_price_id: redactId(request?.p_payload?.product_price_id),
+  },
+});
+
+const logWishlistDiagnosticSnapshot = (label, value) => {
+  try {
+    console.error(`${label} snapshot`, JSON.stringify(value, null, 2));
+  } catch {
+    console.error(`${label} snapshot`, value);
+  }
 };
 
 const normalizeAttributeRows = (value) => {
@@ -206,13 +254,28 @@ const resolveWishlistMutationMemberId = async () => {
 const getRequiredWishlistMutationIdentity = async (trustId) => {
   const normalizedTrustId = resolveTrustId(trustId);
   if (!normalizedTrustId || normalizedTrustId === TRUST_STORAGE_FALLBACK) {
+    console.warn('[Wishlist] mutation identity missing trust', {
+      requestedTrustId: redactId(trustId),
+      resolvedTrustId: normalizedTrustId,
+      selectedTrustId: redactId(hasStorage() ? window.localStorage.getItem('selected_trust_id') : ''),
+      lastSelectedTrustId: redactId(hasStorage() ? window.localStorage.getItem('last_selected_trust_id') : ''),
+    });
     throw new Error('Selected trust is missing. Please select a trust and try again.');
   }
 
   const memberId = await resolveWishlistMutationMemberId();
   if (!memberId) {
+    console.warn('[Wishlist] mutation identity missing member', {
+      trustId: redactId(normalizedTrustId),
+      user: getStoredUserDiagnostics(readStoredUser()),
+    });
     throw new Error('Could not find your member profile ID. Please sign in again and retry.');
   }
+
+  console.info('[Wishlist] mutation identity resolved', {
+    trustId: redactId(normalizedTrustId),
+    memberId: redactId(memberId),
+  });
 
   return { memberId, trustId: normalizedTrustId };
 };
@@ -491,6 +554,24 @@ const normalizeWishlistIdentifierType = (type) => {
   if (normalizedType === 'key') return 'key';
   if (normalizedType === 'any') return 'any';
   return '';
+};
+
+const isDuplicateWishlistMutationError = (error = {}) => {
+  const text = [
+    error?.message,
+    error?.details,
+    error?.hint,
+    error?.code,
+    error?.data?.error,
+    error?.data?.message,
+  ]
+    .map((value) => normalizeText(value).toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+
+  return text.includes('idx_unique_wishlist_item')
+    || text.includes('duplicate key value')
+    || text.includes('unique constraint');
 };
 
 const toWishlistIdentifier = (type, value) => {
@@ -1194,16 +1275,78 @@ const persistWishlistMutation = async ({
   }
 
   try {
+    console.info('[Wishlist] purchase mutation request', {
+      trustId: redactId(trustId),
+      action: request?.p_action,
+      memberId: redactId(request?.p_member_id),
+      payload: {
+        ...request?.p_payload,
+        id: redactId(request?.p_payload?.id),
+        product_price_id: redactId(request?.p_payload?.product_price_id),
+      },
+    });
     const response = await callWishlistPurchaseRpc(request);
     if (!response) {
       throw new Error('Wishlist sync is unavailable. Please refresh and try again.');
     }
 
     const { data, error } = response;
-    if (error) throw error;
+    if (error) {
+      console.error('[Wishlist] purchase RPC returned Supabase error', {
+        trustId: redactId(trustId),
+        action: request?.p_action,
+        code: error?.code,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+      }, error);
+      throw error;
+    }
 
     if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
-      throw new Error(normalizeText(data.message) || 'Unable to save wishlist right now.');
+      const mutationError = new Error(normalizeText(data.message) || 'Unable to save wishlist right now.');
+      mutationError.data = data;
+      mutationError.details = data.details || data.error || '';
+      mutationError.code = data.code;
+
+      if (
+        isDuplicateWishlistMutationError(mutationError)
+        && normalizeText(request?.p_payload?.status).toLowerCase() === WISHLIST_STATUS
+      ) {
+        const duplicateItems = writeScopedWishlistItems(
+          trustId,
+          Array.isArray(localItems) ? localItems : previousItems
+        );
+        notifyWishlistChange(duplicateItems);
+        console.info('[Wishlist] duplicate wishlist row treated as already saved', {
+          trustId: redactId(trustId),
+          action: request?.p_action,
+          productPriceId: redactId(request?.p_payload?.product_price_id),
+        });
+        return {
+          ok: true,
+          items: duplicateItems,
+          responseItems: [],
+          duplicateResolved: true,
+        };
+      }
+
+      const diagnostic = {
+        trustId: redactId(trustId),
+        action: request?.p_action,
+        message: normalizeText(data.message),
+        code: data.code,
+        details: data.details,
+        payload: {
+          ...request?.p_payload,
+          id: redactId(request?.p_payload?.id),
+          product_price_id: redactId(request?.p_payload?.product_price_id),
+        },
+        data,
+      };
+      console.error('[Wishlist] purchase RPC returned success=false', diagnostic);
+      logWishlistDiagnosticSnapshot('[Wishlist] purchase RPC returned success=false', diagnostic);
+      throw mutationError;
     }
 
     const responseRows = flattenPurchaseRows(extractPurchaseRows(data));
@@ -1251,12 +1394,22 @@ const persistWishlistMutation = async ({
       responseItems: normalizedResponseItems,
     };
   } catch (error) {
-    console.error('[Wishlist] purchase mutation failed', {
-      trustId,
+    const diagnostic = {
+      trustId: redactId(trustId),
       action: request?.p_action,
-      payload: request?.p_payload,
+      memberId: redactId(request?.p_member_id),
+      payload: {
+        ...request?.p_payload,
+        id: redactId(request?.p_payload?.id),
+        product_price_id: redactId(request?.p_payload?.product_price_id),
+      },
       message: error?.message || String(error),
-    }, error);
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+    };
+    console.error('[Wishlist] purchase mutation failed', diagnostic, error);
+    logWishlistDiagnosticSnapshot('[Wishlist] purchase mutation failed', diagnostic);
     const restored = writeScopedWishlistItems(trustId, previousItems);
     notifyWishlistChange(restored);
     if (throwOnError) throw error;
@@ -1512,21 +1665,43 @@ export const addWishlistProductAsync = async (product, context = {}) => {
     return { ok: false, items: previousItems, wished: false, error };
   }
 
-  let request = null;
-  if (hasWishlistPurchaseSource()) {
-    try {
-      request = await buildRequiredWishlistRpcRequest({
-        trustId,
-        product,
-        context,
-        existingItem: mutationExistingItem,
-        status: WISHLIST_STATUS,
-        quantity: optimisticItem.quantity,
-      });
-    } catch (error) {
-      return { ok: false, items: previousItems, wished: false, error };
-    }
-  }
+	  let request = null;
+	  if (hasWishlistPurchaseSource()) {
+	    try {
+	      console.info('[Wishlist] preparing add mutation', getWishlistMutationDiagnostics({
+	        trustId,
+	        product,
+	        context,
+	        existingItem: mutationExistingItem,
+	      }));
+	      request = await buildRequiredWishlistRpcRequest({
+	        trustId,
+	        product,
+	        context,
+	        existingItem: mutationExistingItem,
+	        status: WISHLIST_STATUS,
+	        quantity: optimisticItem.quantity,
+	      });
+	      console.info('[Wishlist] add mutation request prepared', getWishlistMutationDiagnostics({
+	        trustId,
+	        product,
+	        context,
+	        existingItem: mutationExistingItem,
+	        request,
+	      }));
+	    } catch (error) {
+	      console.error('[Wishlist] add mutation request failed before RPC', {
+	        ...getWishlistMutationDiagnostics({
+	          trustId,
+	          product,
+	          context,
+	          existingItem: mutationExistingItem,
+	        }),
+	        message: error?.message || String(error),
+	      }, error);
+	      return { ok: false, items: previousItems, wished: false, error };
+	    }
+	  }
 
   const nextItems = dedupeWishlistItems([
     optimisticItem,
@@ -1551,14 +1726,41 @@ export const addWishlistProductAsync = async (product, context = {}) => {
     });
 
     const hasSyncedResponse = Array.isArray(result?.responseItems) && result.responseItems.length > 0;
-    if (!hasSyncedResponse) {
+    if (!hasSyncedResponse && !result?.duplicateResolved) {
       await refreshWishlistCache(trustId);
     }
 
-    return { ok: true, items: readWishlistItems(trustId), wished: true };
-  } catch (error) {
-    return { ok: false, items: readWishlistItems(trustId), wished: false, error };
-  }
+	    return {
+	      ok: true,
+	      items: readWishlistItems(trustId),
+	      wished: true,
+	      duplicateResolved: Boolean(result?.duplicateResolved),
+	    };
+	  } catch (error) {
+	    if (isDuplicateWishlistMutationError(error)) {
+	      console.info('[Wishlist] duplicate wishlist row detected; refreshing cache', {
+	        trustId: redactId(trustId),
+	        productPriceId: redactId(productPriceId),
+	      });
+	      await refreshWishlistCache(trustId);
+	      const refreshedItems = readWishlistItems(trustId);
+	      const refreshedItem = findWishlistItemByIdentifiers(
+	        refreshedItems,
+	        trustId,
+	        getWishlistProductSearchIdentifiers(product, context)
+	      );
+	      if (isWishlistStatusItem(refreshedItem)) {
+	        console.info('[Wishlist] duplicate wishlist row resolved from backend cache', {
+	          trustId: redactId(trustId),
+	          productPriceId: redactId(productPriceId),
+	          purchaseId: redactId(refreshedItem?.purchase_id || refreshedItem?.purchaseId),
+	        });
+	        notifyWishlistChange(refreshedItems);
+	        return { ok: true, items: refreshedItems, wished: true, duplicateResolved: true };
+	      }
+	    }
+	    return { ok: false, items: readWishlistItems(trustId), wished: false, error };
+	  }
 };
 
 export const updateWishlistProduct = (productId, trustId = undefined, updates = {}) => {

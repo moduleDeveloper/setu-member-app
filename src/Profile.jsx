@@ -4,7 +4,7 @@ import {
   Shield, BadgeCheck, Phone, Droplet, UserCircle,
   Home as HomeIcon, Menu, X, Award, CheckCircle, AlertCircle,
 } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { getProfile, saveProfile } from './services/api';
 import { useAppTheme } from './context/ThemeContext';
 import { getNavbarThemeStyles } from './utils/themeUtils';

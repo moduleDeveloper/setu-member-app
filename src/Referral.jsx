@@ -4,7 +4,7 @@ import { createReferral, getUserReferrals, getReferralCounts, updateReferral, de
 import { supabase } from './services/supabaseClient';
 import { registerSidebarState, useAndroidBack } from './hooks';
 
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 
 const Referral = ({ onNavigate, referenceView, setReferenceView, newReference, setNewReference }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);

@@ -64,7 +64,6 @@ const JUMP_TOP_AFTER_CARD_COUNT = 2;
 const LOAD_MORE_DELAY_MS = 360;
 const LOAD_MORE_ROOT_MARGIN = '240px 0px';
 
-const HIDDEN_STATUSES = new Set(['inactive', 'disabled', 'archived', 'hidden', 'draft']);
 const VISIBLE_CATEGORY_STATUSES = new Set(['active']);
 const FALLBACK_ICONS = [
   'Shirt',
@@ -111,9 +110,8 @@ const collectProductIdsFromCategories = (categories) => {
   const ids = new Set();
 
   (Array.isArray(categories) ? categories : []).forEach((category) => {
-    (Array.isArray(category?.products) ? category.products : []).forEach((product) => { 
-      if(product.status === 'active')
-      {
+    (Array.isArray(category?.products) ? category.products : []).forEach((product) => {
+      if (pickText(product?.status).toLowerCase() === 'active') {
         const productId = pickText(product?.id);
         if (productId) ids.add(productId);
       }
@@ -248,8 +246,7 @@ const getScopedCategoryIds = (categoryId, childrenByParent, visited = new Set())
 
 const isVisibleProduct = (product) => {
   const status = pickText(product?.status).toLowerCase();
-  if (!status) return true;
-  return !HIDDEN_STATUSES.has(status);
+  return status === 'active';
 };
 
 const resolveProductImages = (product) =>
@@ -490,7 +487,6 @@ function Swatch({ paletteIdx = 0, iconName = 'Shirt', size = '100%', radius = 0 
 const getTrustCandidates = () => {
   const candidates = [
     localStorage.getItem('selected_trust_id'),
-    import.meta.env.VITE_DEFAULT_TRUST_ID,
   ]
     .map((value) => pickText(value))
     .filter(Boolean);
@@ -1374,7 +1370,7 @@ const ProductList = ({ categoryId, onBack, onOpenProduct }) => {
       ? 'No products match your search.'
       : activeFilterCount > 0
         ? 'No products match the selected filters.'
-        : 'No products found for this category.';
+        : 'No products available in this category.';
 
   return (
     <div className="ws-page">

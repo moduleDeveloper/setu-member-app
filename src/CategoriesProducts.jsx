@@ -39,9 +39,6 @@ const THEME = {
 const SKELETON_BG = 'color-mix(in srgb, var(--brand-navy) 8%, transparent)';
 const SKELETON_BORDER = 'color-mix(in srgb, var(--brand-navy) 12%, transparent)';
 const SHADOW = '0 18px 36px color-mix(in srgb, var(--brand-navy) 10%, transparent)';
-const SECTION_BATCH_SIZE = 2;
-const LOAD_MORE_DELAY_MS = 360;
-const LOAD_MORE_ROOT_MARGIN = '240px 0px';
 
 const ICONS = {
   Shirt,
@@ -71,9 +68,8 @@ const normalizeTrustId = (value) => normalizeText(value);
 
 const getTrustCandidates = () => {
   const selectedTrustId = normalizeTrustId(localStorage.getItem('selected_trust_id'));
-  const defaultTrustId = normalizeTrustId(import.meta.env.VITE_DEFAULT_TRUST_ID);
 
-  return [...new Set([selectedTrustId, defaultTrustId].filter(Boolean))];
+  return [...new Set([selectedTrustId].filter(Boolean))];
 };
 
 function CategoryArt({
@@ -306,12 +302,7 @@ function CategoriesProducts() {
   const [reloadToken, setReloadToken] = useState(0);
   const [wishlistItems, setWishlistItems] = useState(() => readWishlistItems());
   const [cartItems, setCartItems] = useState(() => readCartItems());
-  const [visibleSectionCount, setVisibleSectionCount] = useState(SECTION_BATCH_SIZE);
-  const [loadingMore, setLoadingMore] = useState(false);
   const scrollRef = useRef(null);
-  const sentinelRef = useRef(null);
-  const loadMoreFrameRef = useRef(null);
-  const loadMoreTimeoutRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -382,66 +373,9 @@ function CategoriesProducts() {
     () => buildCategoryView(categories),
     [categories]
   );
-  const visibleCardSections = useMemo(
-    () => cardSections.slice(0, visibleSectionCount),
-    [cardSections, visibleSectionCount]
-  );
-
   const hasVisibleContent = sliderEntries.length > 0 || cardSections.length > 0;
   const showLoading = loading && !hasVisibleContent;
   const showEmpty = !loading && !error && !hasVisibleContent;
-  const hasMoreSections = visibleSectionCount < cardSections.length;
-
-  useEffect(() => {
-    if (loadMoreTimeoutRef.current) {
-      window.clearTimeout(loadMoreTimeoutRef.current);
-      loadMoreTimeoutRef.current = null;
-    }
-    if (loadMoreFrameRef.current) {
-      window.cancelAnimationFrame(loadMoreFrameRef.current);
-      loadMoreFrameRef.current = null;
-    }
-    setLoadingMore(false);
-    setVisibleSectionCount(cardSections.length <= 6 ? cardSections.length : SECTION_BATCH_SIZE);
-  }, [cardSections]);
-
-  useEffect(() => () => {
-    if (loadMoreTimeoutRef.current) {
-      window.clearTimeout(loadMoreTimeoutRef.current);
-      loadMoreTimeoutRef.current = null;
-    }
-    if (loadMoreFrameRef.current) {
-      window.cancelAnimationFrame(loadMoreFrameRef.current);
-      loadMoreFrameRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    const container = scrollRef.current;
-    const sentinel = sentinelRef.current;
-    if (!container || !sentinel || loading || error) return undefined;
-    if (!hasMoreSections) return undefined;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && !loadMoreTimeoutRef.current && !loadMoreFrameRef.current) {
-          setLoadingMore(true);
-          loadMoreFrameRef.current = window.requestAnimationFrame(() => {
-            loadMoreFrameRef.current = null;
-            loadMoreTimeoutRef.current = window.setTimeout(() => {
-              loadMoreTimeoutRef.current = null;
-              setVisibleSectionCount((prev) => Math.min(prev + SECTION_BATCH_SIZE, cardSections.length));
-              setLoadingMore(false);
-            }, LOAD_MORE_DELAY_MS);
-          });
-        }
-      },
-      { root: container, rootMargin: LOAD_MORE_ROOT_MARGIN, threshold: 0.01 }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [loading, error, hasMoreSections, cardSections.length]);
 
   return (
     <main
@@ -546,8 +480,8 @@ function CategoriesProducts() {
           {showEmpty ? (
             <div className="px-4 pt-4">
               <EmptyState
-                title="No categories found"
-                description="The RPC returned no categories for the current trust."
+                title="No product categories available"
+                description="There are no active product categories for this trust yet."
                 onRetry={() => setReloadToken((value) => value + 1)}
               />
             </div>
@@ -562,30 +496,13 @@ function CategoriesProducts() {
                 />
               ) : null}
 
-              {visibleCardSections.map((section) => (
+              {cardSections.map((section) => (
                 <CardGrid
                   key={section.id}
                   section={section}
                   onOpen={(id) => navigate(`/categories-products/list/${id}`)}
                 />
               ))}
-
-              {!loading && !error && loadingMore ? (
-                <section className="ws-section" aria-hidden="true">
-                  <div className="ws-section-title">Loading more categories</div>
-                  <div className="ws-card-rows">
-                    <div className="ws-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-                      <LoadingCard />
-                      <LoadingCard />
-                      <LoadingCard />
-                    </div>
-                  </div>
-                </section>
-              ) : null}
-
-              {!loading && !error && hasMoreSections ? (
-                <div ref={sentinelRef} className="ws-category-sentinel" aria-hidden="true" />
-              ) : null}
             </>
           ) : null}
 

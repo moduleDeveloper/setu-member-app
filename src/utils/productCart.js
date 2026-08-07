@@ -1211,7 +1211,9 @@ const getRequiredCartMutationIdentity = (trustId) => {
 const ensureCartRpcSuccess = (data, error) => {
   if (error) throw error;
   if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
-    throw new Error(normalizeText(data.message) || 'Unable to update your cart right now.');
+    const rpcError = new Error(normalizeText(data.message) || 'Unable to update your cart right now.');
+    rpcError.rpcData = data;
+    throw rpcError;
   }
 };
 
@@ -1503,14 +1505,66 @@ export const moveCartProductToWishlist = async (productId, trustId = undefined, 
       wishlistItem,
     };
   } catch (error) {
-    console.error('[Cart] move to wishlist API failed', {
+    const debugInfo = {
       productId: target.id,
       productPriceId: existingRef.productPriceId || target.product_price_id,
       purchaseId,
       trustId: requestTrustId,
+      memberId,
+      requestPayload: request.p_payload,
       message: error?.message || String(error),
-    }, error);
-    throw error;
+      details: error?.details,
+      hint: error?.hint,
+      code: error?.code,
+      rpcData: error?.rpcData,
+    };
+    console.error('[Cart] move to wishlist API failed', JSON.stringify(debugInfo, null, 2));
+
+    const isDuplicateWishlistItem = normalizeText(error?.rpcData?.error || error?.message)
+      .toLowerCase()
+      .includes('idx_unique_wishlist_item');
+
+    if (!isDuplicateWishlistItem) {
+      throw error;
+    }
+
+    // Product is already saved in the wishlist under a different purchase row; the DB's
+    // unique wishlist constraint blocks converting this cart row, so just drop it from the cart.
+    const removalRequest = {
+      p_member_id: memberId,
+      p_trust_id: requestTrustId,
+      p_action: 'upsert_purchase',
+      p_payload: {
+        id: purchaseId,
+        status: REMOVE_FROM_CART_STATUS,
+        quantity,
+      },
+    };
+
+    const { data: removalData, error: removalError } = await callCartPurchaseRpc(removalRequest);
+    ensureCartRpcSuccess(removalData, removalError);
+
+    const now = new Date().toISOString();
+    const wishlistItem = {
+      ...target,
+      product_price_id: existingRef.productPriceId || target.product_price_id,
+      quantity,
+      type: WISHLIST_TYPE,
+      status: WISHLIST_STATUS,
+      sync_state: SYNCED_SYNC_STATE,
+      updated_at: now,
+      saved_at: now,
+    };
+
+    const nextItems = items.filter((item) => item.key !== key);
+    const persisted = writeScopedCartItems(normalizedTrustId, nextItems);
+    notifyCartChange(persisted);
+
+    return {
+      cartItems: persisted,
+      wishlistItem,
+      alreadyInWishlist: true,
+    };
   }
 };
 
