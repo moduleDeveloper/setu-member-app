@@ -2,7 +2,7 @@ import { supabase } from '../config/supabase.js';
 import { createCompatibleNotification } from '../services/notificationCompatibilityService.js';
 import { buildNotificationViewModel, mergeNotifications } from '../services/notificationSchemaMapper.js';
 import { isNotificationRelevantForUser } from '../services/notificationAudienceMatcher.js';
-import { resolveMemberIdForUser, resolveMemberIdsForUser } from '../services/memberIdentityResolver.js';
+import { resolveMemberIdForUser, resolveMemberIdsForUser, resolveMemberRolesForUser } from '../services/memberIdentityResolver.js';
 
 // ─── Helper: today's date in IST ───────────────────────────────────────────
 const getTodayIST = () => {
@@ -23,13 +23,18 @@ const buildNotificationAccessContext = async (userId, trustId = null, membersId 
   const normalizedTrustId = normalizeText(trustId);
   const normalizedMembersId = normalizeText(membersId);
   const memberIds = await resolveMemberIdsForUser(normalizedUserId, normalizedMembersId);
-  const memberType = await resolveMemberTypeForUser(normalizedUserId);
+  const userRoles = await resolveMemberRolesForUser(normalizedUserId, normalizedTrustId, normalizedMembersId);
+  // 'Trustee'/'Patron' membership type lives on reg_members.role (per-trust), not on
+  // Members — there's no separate "type" column there, so derive it from the roles
+  // we already resolved instead of a second, differently-sourced lookup.
+  const memberType = userRoles[0] || null;
 
   return {
     userId: normalizedUserId,
     membersId: normalizedMembersId || null,
     memberIds,
     memberType,
+    userRoles,
     trustId: normalizedTrustId || null,
   };
 };
@@ -71,26 +76,6 @@ const canAccessNotification = async (notification, context) => {
   if (!matchesTrustScope(notification, context.trustId)) return false;
   if (isNotificationRelevantForUser(notification, context)) return true;
   return await hasRecipientAccess(notification.id, context);
-};
-
-const resolveMemberTypeForUser = async (userId) => {
-  if (!userId) return null;
-
-  const normalizedUserId = String(userId).trim();
-  if (!normalizedUserId) return null;
-
-  const digits = normalizedUserId.replace(/\D/g, '').slice(-10);
-  const candidateQueries = [
-    supabase.from('Members Table').select('type').eq('Mobile', normalizedUserId).limit(1).maybeSingle(),
-    ...(digits ? [supabase.from('Members Table').select('type').ilike('Mobile', `%${digits}%`).limit(1).maybeSingle()] : []),
-  ];
-
-  for (const queryPromise of candidateQueries) {
-    const { data, error } = await queryPromise;
-    if (!error && data?.type) return data.type;
-  }
-
-  return null;
 };
 
 const syncRecipientStatus = async ({ userId, membersId = null, trustId = null, notificationIds, status }) => {

@@ -2,6 +2,65 @@ import { supabase } from '../config/supabase.js';
 import { resolveMemberIdForUser } from './memberIdentityResolver.js';
 
 const normalizeText = (value) => String(value ?? '').trim();
+const normalizeRole = (value) => normalizeText(value).toLowerCase();
+
+// audience_type: 'role' / 'mixed' notifications are meant to reach every matching
+// member of a trust, not just whoever's user_id happened to be on the create request.
+// Resolve the full recipient list here instead of assuming a single target member.
+const resolveRecipientMemberIds = async (trustId, { audienceType, audiencePayload, userId, explicitMemberId }) => {
+  if (!trustId) return explicitMemberId ? [explicitMemberId] : [];
+
+  const type = normalizeRole(audienceType);
+
+  const fetchActiveMembersByRoles = async (roles) => {
+    let query = supabase
+      .from('reg_members')
+      .select('id, role')
+      .eq('trust_id', trustId)
+      .eq('is_active', true);
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+
+    if (!roles || roles.length === 0) return data.map((row) => row.id).filter(Boolean);
+
+    const normalizedRoles = roles.map(normalizeRole).filter(Boolean);
+    return data
+      .filter((row) => normalizedRoles.includes(normalizeRole(row.role)))
+      .map((row) => row.id)
+      .filter(Boolean);
+  };
+
+  if (type === 'all') {
+    return fetchActiveMembersByRoles(null);
+  }
+
+  if (type === 'role') {
+    const roles = [
+      ...(Array.isArray(audiencePayload?.roles) ? audiencePayload.roles : []),
+      ...(audiencePayload?.role ? [audiencePayload.role] : []),
+    ];
+    return fetchActiveMembersByRoles(roles);
+  }
+
+  if (type === 'mixed') {
+    const targetAudience = normalizeText(audiencePayload?.target_audience);
+    if (targetAudience.toLowerCase() === 'both') {
+      return fetchActiveMembersByRoles(null);
+    }
+    if (targetAudience) {
+      return fetchActiveMembersByRoles([targetAudience]);
+    }
+  }
+
+  // Default: explicit single-user notification (no role/broadcast audience).
+  if (explicitMemberId) return [explicitMemberId];
+  if (userId) {
+    const memberId = await resolveMemberIdForUser(userId, trustId, null);
+    return memberId ? [memberId] : [];
+  }
+  return [];
+};
 
 const getDefaultTrustId = async () => {
   const envTrustId = normalizeText(process.env.VITE_DEFAULT_TRUST_ID || process.env.DEFAULT_TRUST_ID);
@@ -76,26 +135,36 @@ export const createCompatibleNotification = async (input = {}) => {
     newError = 'No trust context available for notification insert';
   }
 
-  if (newNotification?.id && userId) {
+  if (newNotification?.id) {
     try {
-      const memberId = await resolveMemberIdForUser(
-        userId,
-        trustId,
-        input.members_id || input.member_id || null
-      );
+      let explicitMemberId = null;
+      if (userId) {
+        explicitMemberId = await resolveMemberIdForUser(
+          userId,
+          trustId,
+          input.members_id || input.member_id || null
+        );
+      }
 
-      if (memberId) {
+      const recipientMemberIds = [...new Set(
+        (await resolveRecipientMemberIds(trustId, {
+          audienceType: newNotification.audience_type,
+          audiencePayload: newNotification.audience_payload,
+          userId,
+          explicitMemberId,
+        })).filter(Boolean)
+      )];
+
+      if (recipientMemberIds.length > 0) {
         await supabase
           .from('notification_recipients')
-          .insert([
-            {
-              notification_id: newNotification.id,
-              member_id: memberId,
-              status: 'unread',
-              created_at: createdAt,
-              updated_at: createdAt,
-            },
-          ]);
+          .insert(recipientMemberIds.map((memberId) => ({
+            notification_id: newNotification.id,
+            member_id: memberId,
+            status: 'unread',
+            created_at: createdAt,
+            updated_at: createdAt,
+          })));
       }
     } catch (recipientError) {
       console.warn('New-schema notification recipient insert skipped:', recipientError?.message || recipientError);

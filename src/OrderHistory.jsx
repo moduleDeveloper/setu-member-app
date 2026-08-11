@@ -2,20 +2,25 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  CalendarDays,
   CircleDollarSign,
   Clock3,
   ChevronDown,
   ChevronUp,
   Package2,
   PackageCheck,
-  ShoppingBag,
 } from 'lucide-react';
 import {
   clearOrderHistoryCache,
   loadOrderHistorySnapshot,
   resolveOrderHistoryTrustScope,
 } from './services/orderHistoryService';
+import {
+  ORDER_HISTORY_UNKNOWN_TRUST_KEY,
+  ORDER_HISTORY_UNKNOWN_TRUST_LABEL,
+  normalizeText,
+  formatCurrency,
+  normalizeOrderRecord,
+} from './utils/orderHistoryDisplay';
 import { useAppTheme } from './context/ThemeContext';
 import { getNavbarThemeStyles } from './utils/themeUtils';
 
@@ -32,193 +37,6 @@ const ORDER_HISTORY_PAGE_SIZE = 6;
 const ORDER_HISTORY_SKELETON_COUNT = 4;
 const ORDER_HISTORY_LOAD_MORE_DELAY_MS = 180;
 const ORDER_HISTORY_LOAD_MORE_ROOT_MARGIN = '240px';
-const ORDER_HISTORY_UNKNOWN_TRUST_KEY = '__unknown_trust__';
-const ORDER_HISTORY_UNKNOWN_TRUST_LABEL = 'Unknown trust';
-
-const normalizeText = (value) => {
-  if (value === null || value === undefined) return '';
-  const text = String(value).trim();
-  if (!text) return '';
-  const lowered = text.toLowerCase();
-  return ['null', 'undefined', 'nan'].includes(lowered) ? '' : text;
-};
-
-const toTitleCase = (value = '') =>
-  String(value || '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
-
-const normalizeStatusKey = (value = '') =>
-  normalizeText(value)
-    .toLowerCase()
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const parseAmount = (value) => {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : 0;
-  }
-
-  const text = normalizeText(value);
-  if (!text) return 0;
-
-  const parsed = Number(text.replace(/[^0-9.-]/g, ''));
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const formatCurrency = (value) => `Rs. ${Math.round(Number(value) || 0).toLocaleString('en-IN')}`;
-
-const formatOrderDate = (value) => {
-  const ts = Date.parse(value);
-  if (Number.isNaN(ts)) return 'Date unavailable';
-
-  const date = new Date(ts);
-  const datePart = new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-  const timePart = new Intl.DateTimeFormat('en-IN', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
-
-  return `${datePart} at ${timePart}`;
-};
-
-const getStatusMeta = (rawStatus) => {
-  const status = normalizeStatusKey(rawStatus);
-
-  if (status === 'order payment pending') {
-    return { group: 'pending', label: 'Payment pending', tone: 'var(--brand-red-dark)' };
-  }
-
-  if (status === 'order payment done') {
-    return { group: 'active', label: 'Payment done', tone: 'var(--app-button-bg)' };
-  }
-
-  if (status === 'cancelled') {
-    return { group: 'cancelled', label: 'Cancelled', tone: 'var(--brand-red-dark)' };
-  }
-
-  return {
-    group: status ? 'other' : 'pending',
-    label: status ? toTitleCase(status) : 'Payment pending',
-    tone: 'var(--subheading-color)',
-  };
-};
-
-const normalizeOrderLine = (item, index) => {
-  if (typeof item === 'string') {
-    const name = normalizeText(item);
-    return name ? { key: `${index}`, name, quantity: 1 } : null;
-  }
-
-  if (!item || typeof item !== 'object') return null;
-
-  const name = normalizeText(
-    item.product_name
-    || item.name
-    || item.title
-    || item.product
-    || item.item_name
-    || item.label
-  );
-  if (!name) return null;
-
-  const quantityValue = Number(item.quantity ?? item.qty ?? item.count ?? 1);
-  const quantity = Number.isFinite(quantityValue) && quantityValue > 0 ? Math.floor(quantityValue) : 1;
-
-  return {
-    key: normalizeText(item.id || item.product_id || item.sku || `${index}`) || `${index}`,
-    name,
-    quantity,
-  };
-};
-
-const normalizeOrderRecord = (order, index) => {
-  if (!order || typeof order !== 'object') {
-    return null;
-  }
-
-  const id = normalizeText(
-    order.order_id
-    || order.orderId
-    || order.invoice_no
-    || order.invoice_number
-    || order.reference
-    || order.id
-  ) || `ORD-${String(index + 1).padStart(3, '0')}`;
-
-  const createdAtRaw = normalizeText(
-    order.created_at
-    || order.createdAt
-    || order.placed_at
-    || order.placedAt
-    || order.ordered_at
-    || order.date
-    || order.timestamp
-  );
-  const createdAtTs = Date.parse(createdAtRaw);
-  const statusMeta = getStatusMeta(order.status || order.order_status || order.state || order.payment_status);
-
-  const rawItems = Array.isArray(order.items)
-    ? order.items
-    : Array.isArray(order.order_items)
-      ? order.order_items
-      : Array.isArray(order.products)
-        ? order.products
-        : Array.isArray(order.line_items)
-          ? order.line_items
-          : [];
-
-  const items = rawItems
-    .map((item, itemIndex) => normalizeOrderLine(item, itemIndex))
-    .filter(Boolean);
-
-  const itemCountFromLines = items.reduce((total, item) => total + (Number(item.quantity) || 0), 0);
-  const fallbackItemCount = Number(order.item_count ?? order.items_count ?? order.quantity);
-  const itemCount = itemCountFromLines > 0
-    ? itemCountFromLines
-    : (Number.isFinite(fallbackItemCount) && fallbackItemCount > 0 ? Math.floor(fallbackItemCount) : items.length);
-
-  const totalAmount = parseAmount(
-    order.total_amount
-    || order.grand_total
-    || order.amount
-    || order.net_amount
-    || order.payable_amount
-    || order.total
-  );
-  const trustId = normalizeText(order.trust_id || order.trustId || order.source_trust_id || order.sourceTrustId);
-  const trustName = normalizeText(order.trust_name || order.trustName || order.source_trust_name || order.sourceTrustName);
-  const trustKey = trustId || trustName || ORDER_HISTORY_UNKNOWN_TRUST_KEY;
-  const trustLabel = trustName || trustId || ORDER_HISTORY_UNKNOWN_TRUST_LABEL;
-  const source = normalizeText(order.source || order.sourceType || order.source_type) || 'local';
-
-  return {
-    id,
-    createdAt: createdAtRaw,
-    createdAtTs: Number.isNaN(createdAtTs) ? 0 : createdAtTs,
-    createdAtLabel: formatOrderDate(createdAtRaw),
-    status: statusMeta.label,
-    statusGroup: statusMeta.group,
-    statusTone: statusMeta.tone,
-    paymentMethod: normalizeText(order.payment_method || order.paymentMethod || order.method || order.payment_type),
-    deliveryEta: normalizeText(order.estimated_delivery || order.delivery_eta || order.eta || order.expected_delivery),
-    trackingStage: normalizeText(order.current_stage || order.tracking_stage || order.fulfillment_stage),
-    trustId,
-    trustName,
-    trustKey,
-    trustLabel,
-    source,
-    itemCount,
-    totalAmount,
-    items,
-  };
-};
 
 const getStatusChipStyles = (order) => ({
   color: order.statusTone,
@@ -354,15 +172,15 @@ function OrderHistory() {
 
   const summary = useMemo(() => {
     const totalOrders = orders.length;
-    const deliveredOrders = orders.filter((order) => order.statusGroup === 'delivered').length;
-    const activeOrders = orders.filter((order) => order.statusGroup === 'active' || order.statusGroup === 'pending').length;
+    const pendingOrders = orders.filter((order) => order.statusGroup === 'pending').length;
+    const doneOrders = orders.filter((order) => order.statusGroup === 'active').length;
     const totalSpent = orders.reduce((sum, order) => sum + (Number(order.totalAmount) || 0), 0);
     const latestOrder = orders[0] || null;
 
     return {
       totalOrders,
-      deliveredOrders,
-      activeOrders,
+      pendingOrders,
+      doneOrders,
       totalSpent,
       latestOrder,
     };
@@ -408,7 +226,10 @@ function OrderHistory() {
   const hasMoreOrders = visibleCount < visibleOrdersSource.length;
   const orderHistoryTrustScope = resolveOrderHistoryTrustScope();
   const isAllTrustsMode = orderHistoryTrustScope.isDefaultTrustSelected;
-  const historySourceLabel = 'Live backend sync';
+
+  const headerSubtitle = trustTabs.length === 1
+    ? `Orders from ${trustTabs[0].label}`
+    : 'All trusts linked to your account';
 
   const trustOverviewLabel = isLoading && orders.length === 0
     ? (isAllTrustsMode ? 'Loading orders from all linked trusts...' : 'Loading orders from the selected trust...')
@@ -420,24 +241,15 @@ function OrderHistory() {
     ? (isAllTrustsMode
       ? 'Fetching the latest purchases from every linked trust.'
       : 'Fetching the latest purchases from the selected trust.')
-    : trustTabs.length > 0
-      ? 'Use the trust tabs below to switch between the trusts where you placed orders.'
-      : 'Latest orders appear first and stay within the current theme tokens.';
+    : trustTabs.length > 1
+      ? 'Switch between trusts using the tabs below.'
+      : 'Latest orders appear first.';
 
   const trustWarning = trustErrors.length > 0
     ? (trustErrors.length === 1
       ? `${trustErrors[0]?.trustName || trustErrors[0]?.trustId || 'One trust'} could not be loaded. Showing the rest from the backend.`
       : `${trustErrors.length} trusts could not be loaded. Showing the rest from the backend.`)
     : '';
-
-  const latestOrderMetaLabel = summary.latestOrder
-    ? summary.latestOrder.createdAtLabel
-    : isInitialLoading
-      ? 'Loading latest order...'
-      : 'No recent order yet';
-  const totalOrdersMetaLabel = isInitialLoading
-    ? 'Loading orders...'
-    : `${summary.totalOrders} order${summary.totalOrders === 1 ? '' : 's'}`;
 
   const summaryCards = useMemo(() => ([
     {
@@ -450,16 +262,16 @@ function OrderHistory() {
       icon: Package2,
     },
     {
-      label: 'Active',
-      value: summary.activeOrders,
-      helper: summary.activeOrders > 0 ? 'Payment pending or completed' : 'Nothing active right now',
+      label: 'Payment Pending',
+      value: summary.pendingOrders,
+      helper: summary.pendingOrders > 0 ? 'Waiting on payment' : 'Nothing pending right now',
       tone: 'var(--app-button-bg)',
       icon: Clock3,
     },
     {
-      label: 'Delivered',
-      value: summary.deliveredOrders,
-      helper: summary.totalOrders > 0 ? `${Math.round((summary.deliveredOrders / summary.totalOrders) * 100) || 0}% complete` : 'Awaiting first delivery',
+      label: 'Payment Done',
+      value: summary.doneOrders,
+      helper: summary.totalOrders > 0 ? `${Math.round((summary.doneOrders / summary.totalOrders) * 100) || 0}% of orders` : 'No paid orders yet',
       tone: 'var(--brand-red)',
       icon: PackageCheck,
     },
@@ -573,7 +385,7 @@ function OrderHistory() {
                 Order History
               </h1>
               <p className="mt-0.5 text-[11px] font-medium" style={{ color: 'color-mix(in srgb, var(--body-text-color) 66%, var(--surface-color))' }}>
-                All trusts linked to your account
+                {headerSubtitle}
               </p>
             </div>
             <div className="w-10" aria-hidden="true" />
@@ -597,36 +409,6 @@ function OrderHistory() {
 
         {isSummaryOpen ? (
           <div id="order-history-summary-panel" className="order-history-summary-panel">
-            <div className="order-history-hero">
-              <div className="order-history-hero-copy">
-                <span className="order-history-pill">{historySourceLabel}</span>
-                <h2 className="order-history-hero-title">
-                  {isAllTrustsMode ? 'Your orders across every linked trust' : 'Your orders for the selected trust'}
-                </h2>
-                <p className="order-history-hero-text">
-                  {isAllTrustsMode
-                    ? 'Review the purchase trail across every trust tied to this member, powered by the backend purchase API.'
-                    : 'Review the purchase trail for the selected trust only, powered by the backend purchase API.'}
-                </p>
-                <div className="order-history-hero-meta">
-                  <span className="order-history-hero-meta-item">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    <span>{latestOrderMetaLabel}</span>
-                  </span>
-                  <span className="order-history-hero-meta-item">
-                    <ShoppingBag className="h-3.5 w-3.5" />
-                    <span>{totalOrdersMetaLabel}</span>
-                  </span>
-                </div>
-                <p className="order-history-hero-trust-note">{trustOverviewLabel}</p>
-              </div>
-
-              <div className="order-history-hero-badge">
-                <Package2 className="h-5 w-5" />
-                <span>{isInitialLoading ? '...' : summary.totalOrders || 0}</span>
-              </div>
-            </div>
-
             {trustWarning ? (
               <div className="order-history-alert" role="status">
                 <strong>Partial history loaded</strong>
@@ -646,16 +428,16 @@ function OrderHistory() {
                       key={card.label}
                       className="order-history-summary-card"
                       style={{
-                        borderColor: `color-mix(in srgb, ${card.tone} 18%, transparent)`,
-                        background: `linear-gradient(180deg, color-mix(in srgb, ${card.tone} 9%, var(--surface-color)) 0%, color-mix(in srgb, var(--surface-color) 94%, var(--app-accent-bg)) 100%)`,
-                        boxShadow: `0 12px 28px color-mix(in srgb, ${card.tone} 8%, transparent)`,
+                        borderColor: `color-mix(in srgb, ${card.tone} 20%, color-mix(in srgb, var(--surface-color) 14%, transparent))`,
+                        background: `color-mix(in srgb, ${card.tone} 6%, color-mix(in srgb, var(--surface-color) 10%, var(--app-accent-bg)))`,
+                        boxShadow: `0 12px 28px color-mix(in srgb, var(--brand-navy) 10%, transparent)`,
                       }}
                     >
-                      <div className="order-history-summary-icon" style={{ background: `color-mix(in srgb, ${card.tone} 12%, var(--surface-color))` }}>
+                      <div className="order-history-summary-icon" style={{ background: `color-mix(in srgb, ${card.tone} 14%, var(--surface-color))` }}>
                         <Icon className="h-4 w-4" style={{ color: card.tone }} />
                       </div>
                       <p className="order-history-summary-label">{card.label}</p>
-                      <strong className="order-history-summary-value" style={{ color: T.heading }}>{card.value}</strong>
+                      <strong className="order-history-summary-value" style={{ color: 'var(--surface-color)' }}>{card.value}</strong>
                       <p className="order-history-summary-helper">{card.helper}</p>
                     </article>
                   );
@@ -676,7 +458,7 @@ function OrderHistory() {
             </div>
           </div>
 
-          {trustTabs.length > 0 ? (
+          {trustTabs.length > 1 ? (
             <>
               <div className="order-history-trust-tabs" role="tablist" aria-label="Filter recent orders by trust">
                 {trustTabs.map((tab) => {
@@ -748,13 +530,28 @@ function OrderHistory() {
               {visibleOrders.map((order) => {
                 const previewChips = order.items.slice(0, 3);
                 const remainingCount = Math.max(0, order.items.length - previewChips.length);
-                
+                const productSummary = previewChips
+                  .map((item) => `${item.name}${item.quantity > 1 ? ` x${item.quantity}` : ''}`)
+                  .join(', ');
+                const hasProductSummary = Boolean(productSummary);
+
                 return (
                   <article key={order.id} className="order-history-card">
-                    
+
                     <div className="order-history-card-top">
                       <div className="min-w-0">
-                        <p className="order-history-card-id" style={{ color: navbarTextColor }}>{order.id}</p>
+                        {hasProductSummary ? (
+                          <p className="order-history-card-product" style={{ color: navbarTextColor }}>
+                            {productSummary}
+                            {remainingCount > 0 ? ` +${remainingCount} more` : ''}
+                          </p>
+                        ) : null}
+                        <p
+                          className={hasProductSummary ? 'order-history-card-id order-history-card-id--secondary' : 'order-history-card-id'}
+                          style={hasProductSummary ? undefined : { color: navbarTextColor }}
+                        >
+                          {hasProductSummary ? `Order #${order.id}` : order.id}
+                        </p>
                         <p className="order-history-card-date">{order.createdAtLabel}</p>
                         {order.trustLabel ? (
                           <p className="order-history-trust-row">
@@ -777,30 +574,14 @@ function OrderHistory() {
                         <strong className="order-history-meta-value">{formatCurrency(order.totalAmount)}</strong>
                       </div>
                       <div className="order-history-meta-item">
-                        <span className="order-history-meta-label">Payment</span>
-                        <strong className="order-history-meta-value">{order.paymentMethod || 'Not set'}</strong>
+                        <span className="order-history-meta-label">Attributes</span>
+                        <strong className="order-history-meta-value">{order.attributesLabel || 'No variant'}</strong>
                       </div>
                       <div className="order-history-meta-item">
                         <span className="order-history-meta-label">Delivery</span>
                         <strong className="order-history-meta-value">{order.deliveryEta || order.trackingStage || 'In progress'}</strong>
                       </div>
                     </div>
-
-                    {previewChips.length > 0 ? (
-                      <div className="order-history-item-chips">
-                        {previewChips.map((item) => (
-                          <span key={item.key} className="order-history-item-chip">
-                            {item.name}
-                            {item.quantity > 1 ? ` x${item.quantity}` : ''}
-                          </span>
-                        ))}
-                        {remainingCount > 0 ? (
-                          <span className="order-history-item-chip">
-                            +{remainingCount} more
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </article>
                 );
               })}
@@ -864,89 +645,6 @@ function OrderHistory() {
           flex-direction: column;
           gap: 16px;
         }
-        .order-history-hero {
-          border-radius: 24px;
-          padding: 18px;
-          background: linear-gradient(180deg, color-mix(in srgb, var(--brand-navy) 8%, var(--surface-color)) 0%, color-mix(in srgb, var(--surface-color) 96%, var(--app-accent-bg)) 100%);
-          border: 1px solid color-mix(in srgb, var(--brand-navy) 12%, transparent);
-          box-shadow: 0 16px 34px color-mix(in srgb, var(--brand-navy) 8%, transparent);
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) auto;
-          gap: 14px;
-          align-items: start;
-        }
-        .order-history-hero-copy {
-          min-width: 0;
-        }
-        .order-history-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          border-radius: 999px;
-          padding: 6px 10px;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: var(--brand-navy);
-          background: color-mix(in srgb, var(--brand-navy) 10%, var(--surface-color));
-          border: 1px solid color-mix(in srgb, var(--brand-navy) 20%, transparent);
-        }
-        .order-history-hero-title {
-          margin: 12px 0 0;
-          font-size: 22px;
-          line-height: 1.15;
-          font-weight: 900;
-          color: ${T.heading};
-          letter-spacing: -0.03em;
-        }
-        .order-history-hero-text {
-          margin: 10px 0 0;
-          font-size: 13px;
-          line-height: 1.6;
-          color: ${T.muted};
-        }
-        .order-history-hero-trust-note {
-          margin: 10px 0 0;
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: color-mix(in srgb, var(--brand-navy) 82%, var(--surface-color));
-        }
-        .order-history-hero-meta {
-          margin-top: 14px;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        .order-history-hero-meta-item {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 10px;
-          border-radius: 999px;
-          font-size: 11px;
-          font-weight: 700;
-          color: ${T.heading};
-          background: color-mix(in srgb, var(--surface-color) 82%, var(--app-accent-bg));
-          border: 1px solid ${T.line};
-        }
-        .order-history-hero-badge {
-          min-width: 60px;
-          height: 60px;
-          border-radius: 18px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
-          gap: 4px;
-          background: color-mix(in srgb, var(--brand-navy) 10%, var(--surface-color));
-          color: var(--brand-navy);
-          border: 1px solid color-mix(in srgb, var(--brand-navy) 18%, transparent);
-          font-weight: 900;
-          box-shadow: 0 10px 20px color-mix(in srgb, var(--brand-navy) 6%, transparent);
-        }
         .order-history-alert {
           border-radius: 20px;
           padding: 14px 16px;
@@ -984,7 +682,7 @@ function OrderHistory() {
           min-height: 134px;
         }
         .order-history-summary-card--skeleton {
-          background: linear-gradient(180deg, color-mix(in srgb, var(--surface-color) 92%, var(--app-accent-bg)) 0%, color-mix(in srgb, var(--surface-color) 97%, var(--page-bg)) 100%);
+          background: color-mix(in srgb, var(--surface-color) 10%, var(--app-accent-bg));
         }
         .order-history-summary-icon {
           width: 34px;
@@ -1000,7 +698,7 @@ function OrderHistory() {
           font-weight: 800;
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: ${T.muted};
+          color: color-mix(in srgb, var(--surface-color) 52%, ${navbarTextColor} 100%);
         }
         .order-history-summary-value {
           font-size: 18px;
@@ -1011,7 +709,7 @@ function OrderHistory() {
           margin: 0;
           font-size: 12px;
           line-height: 1.5;
-          color: ${T.muted};
+          color: color-mix(in srgb, var(--surface-color) 70%, transparent);
         }
         .order-history-skeleton {
           position: relative;
@@ -1229,11 +927,26 @@ function OrderHistory() {
           justify-content: space-between;
           gap: 12px;
         }
+        .order-history-card-product {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 900;
+          line-height: 1.3;
+          color: inherit;
+          overflow-wrap: break-word;
+        }
         .order-history-card-id {
           margin: 0;
           font-size: 15px;
           font-weight: 900;
           color: inherit;
+        }
+        .order-history-card-id--secondary {
+          margin-top: 3px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          color: color-mix(in srgb, currentColor 62%, transparent);
         }
         .order-history-card-date {
           margin: 4px 0 0;
@@ -1324,13 +1037,6 @@ function OrderHistory() {
           color: ${T.muted};
         }
         @media (max-width: 380px) {
-          .order-history-hero {
-            grid-template-columns: 1fr;
-          }
-          .order-history-hero-badge {
-            width: 56px;
-            height: 56px;
-          }
           .order-history-summary-grid,
           .order-history-meta-grid {
             grid-template-columns: 1fr;

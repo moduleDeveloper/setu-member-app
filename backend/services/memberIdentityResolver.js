@@ -1,6 +1,6 @@
 import { supabase } from '../config/supabase.js';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const normalizeText = (value) => String(value || '').trim();
 const toDigits = (value) => String(value || '').replace(/\D/g, '');
@@ -56,6 +56,15 @@ const resolveMasterMembersIdFromUuid = async (value) => {
 };
 
 const resolveMasterMembersId = async (userId, fallbackMembersId = null) => {
+  // Prefer the explicit members_id from the caller's own logged-in session — it's
+  // unambiguous. Mobile-based lookup is a last resort: two different Members rows can
+  // share the same Mobile (confirmed in prod), so `.limit(1)` on a Mobile match can
+  // silently resolve to the wrong person when a reliable id was available all along.
+  const fallbackResolved = await resolveMasterMembersIdFromUuid(fallbackMembersId);
+  if (fallbackResolved) {
+    return fallbackResolved;
+  }
+
   const mobileCandidates = buildMobileCandidates(userId);
 
   if (mobileCandidates.length) {
@@ -69,11 +78,6 @@ const resolveMasterMembersId = async (userId, fallbackMembersId = null) => {
     if (!error && data?.members_id) {
       return data.members_id;
     }
-  }
-
-  const fallbackResolved = await resolveMasterMembersIdFromUuid(fallbackMembersId);
-  if (fallbackResolved) {
-    return fallbackResolved;
   }
 
   return await resolveMasterMembersIdFromUuid(userId);
@@ -100,6 +104,22 @@ export const resolveMemberIdsForUser = async (userId, fallbackMembersId = null) 
   }
 
   return [...new Set(data.map((row) => row.id).filter(Boolean))];
+};
+
+// Returns the distinct role(s) (e.g. "Trustee") this user holds, scoped to trustId when
+// provided. Needed for audience_type: 'role'/'mixed' notification matching — without this,
+// isNotificationRelevantForUser has no roles to compare against.
+export const resolveMemberRolesForUser = async (userId, trustId = null, fallbackMembersId = null) => {
+  const masterMembersId = await resolveMasterMembersId(userId, fallbackMembersId);
+  if (!masterMembersId) return [];
+
+  let query = supabase.from('reg_members').select('role').eq('members_id', masterMembersId);
+  if (trustId) query = query.eq('trust_id', trustId);
+
+  const { data, error } = await query;
+  if (error || !data) return [];
+
+  return [...new Set(data.map((row) => normalizeText(row.role)).filter(Boolean))];
 };
 
 // Returns a single reg_members.id, scoped to trustId when provided

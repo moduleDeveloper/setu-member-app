@@ -1,4 +1,3 @@
-import { supabase } from './supabaseClient.js';
 import { getUserHospitalMemberships } from '../utils/storageUtils.js';
 
 const ORDER_HISTORY_STORAGE_KEYS = ['order_history_v1', 'order_history', 'orders_v1'];
@@ -13,6 +12,19 @@ const ALLOWED_PURCHASE_STATUSES = new Set([
 ]);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+let orderHistoryPurchaseRpcOverride = null;
+
+const getRuntimeEnv = () => (typeof import.meta !== 'undefined' ? import.meta.env : undefined);
+
+const hasPurchaseApiConfig = () => {
+  const env = getRuntimeEnv();
+  return Boolean(env?.VITE_SUPABASE_URL && env?.VITE_SUPABASE_ANON_KEY);
+};
+
+export const setOrderHistoryPurchaseRpcOverrideForTests = (handler = null) => {
+  orderHistoryPurchaseRpcOverride = handler;
+};
 
 const normalizeText = (value) => {
   if (value === null || value === undefined) return '';
@@ -72,8 +84,8 @@ const readDefaultTrustContext = () => {
   }
 
   return {
-    id: normalizeText(import.meta.env.VITE_DEFAULT_TRUST_ID || ''),
-    name: normalizeText(import.meta.env.VITE_DEFAULT_TRUST_NAME || '') || null,
+    id: normalizeText(getRuntimeEnv()?.VITE_DEFAULT_TRUST_ID || ''),
+    name: normalizeText(getRuntimeEnv()?.VITE_DEFAULT_TRUST_NAME || '') || null,
   };
 };
 
@@ -86,16 +98,16 @@ export const resolveOrderHistoryTrustScope = () => {
     selectedTrust.id
     || persistedSelected.id
     || defaultTrust.id
-    || normalizeText(import.meta.env.VITE_DEFAULT_TRUST_ID || '');
+    || normalizeText(getRuntimeEnv()?.VITE_DEFAULT_TRUST_ID || '');
 
-  const defaultTrustId = defaultTrust.id || normalizeText(import.meta.env.VITE_DEFAULT_TRUST_ID || '');
+  const defaultTrustId = defaultTrust.id || normalizeText(getRuntimeEnv()?.VITE_DEFAULT_TRUST_ID || '');
   const isDefaultTrustSelected = Boolean(
     selectedTrustId
     && defaultTrustId
     && selectedTrustId.toLowerCase() === defaultTrustId.toLowerCase()
   );
   const selectedTrustName = selectedTrust.name || (isDefaultTrustSelected
-    ? (defaultTrust.name || normalizeText(import.meta.env.VITE_DEFAULT_TRUST_NAME || '') || null)
+    ? (defaultTrust.name || normalizeText(getRuntimeEnv()?.VITE_DEFAULT_TRUST_NAME || '') || null)
     : null);
 
   return {
@@ -272,6 +284,54 @@ const extractRpcPayloadRows = (data) => {
   return extractOrderRows(data);
 };
 
+const callOrderHistoryPurchaseRpc = async (request) => {
+  if (orderHistoryPurchaseRpcOverride) {
+    return orderHistoryPurchaseRpcOverride(request);
+  }
+
+  if (!hasPurchaseApiConfig()) {
+    throw new Error('Order history sync is unavailable. Please check Supabase configuration and try again.');
+  }
+
+  const module = await import('./supabaseClient.js');
+  const supabase = module?.supabase;
+  if (!supabase?.rpc) {
+    throw new Error('Order history sync is unavailable. Please try again.');
+  }
+
+  return supabase.rpc('manage_purchase_by_member', request);
+};
+
+// The 'get' RPC action only returns `product_price_id` on each purchase row — never the
+// product's name — so it has to be looked up from the trust's product catalog, same as
+// productCart.js/productWishlist.js already do for cart and wishlist rows. Dynamic import
+// avoids a static circular dependency (productCart.js dynamically imports this module too,
+// to resolve the member id).
+const enrichOrderRowsWithCatalog = async (rows, trustId) => {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+
+  try {
+    const { fetchTrustProductsCategories, buildProductCatalogLookups } = await import('../utils/productCart.js');
+    const categories = await fetchTrustProductsCategories(trustId);
+    const { byPriceId } = buildProductCatalogLookups(categories);
+
+    return rows.map((row) => {
+      const productPriceId = normalizeText(row?.product_price_id || row?.productPriceId);
+      const catalogMatch = productPriceId ? byPriceId.get(productPriceId) : null;
+      if (!catalogMatch?.product) return row;
+
+      return {
+        ...row,
+        product_name: normalizeText(catalogMatch.product?.product_name || catalogMatch.product?.alias_name) || row.product_name,
+        product_image: catalogMatch.product?.selected_image || catalogMatch.product?.image_url || row.product_image,
+      };
+    });
+  } catch {
+    // Catalog lookup is a display enhancement, not critical — fall back to unenriched rows.
+    return rows;
+  }
+};
+
 export const fetchOrdersForTrust = async ({ memberId, trustId, trustName = null }) => {
   const normalizedMemberId = normalizeText(memberId);
   const normalizedTrustId = normalizeText(trustId);
@@ -284,7 +344,7 @@ export const fetchOrdersForTrust = async ({ memberId, trustId, trustName = null 
     p_payload: {},
   };
 
-  const { data, error } = await supabase.rpc('manage_purchase_by_member', request);
+  const { data, error } = await callOrderHistoryPurchaseRpc(request);
   if (error) {
     throw error;
   }
@@ -294,7 +354,7 @@ export const fetchOrdersForTrust = async ({ memberId, trustId, trustName = null 
   }
 
   const rows = extractRpcPayloadRows(data);
-  return rows
+  const mappedRows = rows
     .filter(shouldIncludePurchaseRow)
     .map((row) => {
       const resolvedTrustId = normalizeText(row?.trust_id || row?.trustId) || normalizedTrustId;
@@ -309,6 +369,8 @@ export const fetchOrdersForTrust = async ({ memberId, trustId, trustName = null 
         source_trust_name: resolvedTrustName,
       };
     });
+
+  return enrichOrderRowsWithCatalog(mappedRows, normalizedTrustId);
 };
 
 export const subscribeOrderHistory = (onEvent = () => {}) => {
@@ -317,9 +379,12 @@ export const subscribeOrderHistory = (onEvent = () => {}) => {
   const storedUser = readStoredUser();
   const memberId = resolveOrderHistoryMemberId(storedUser);
   const normalizedMemberId = normalizeText(memberId);
-  if (!normalizedMemberId || !supabase?.channel) return () => {};
+  if (!normalizedMemberId || !hasPurchaseApiConfig()) return () => {};
+  let active = true;
+  let resolvedSupabase = null;
+  const channels = [];
 
-  const createChannelForTable = (tableName) => supabase
+  const createChannelForTable = (supabase, tableName) => supabase
     .channel(`order-history-${normalizedMemberId}-${tableName}`)
     .on(
       'postgres_changes',
@@ -338,12 +403,19 @@ export const subscribeOrderHistory = (onEvent = () => {}) => {
     )
     .subscribe();
 
-  const channels = ['purchase', 'purchases'].map(createChannelForTable);
+  import('./supabaseClient.js')
+    .then((module) => {
+      if (!active || !module?.supabase?.channel) return;
+      resolvedSupabase = module.supabase;
+      channels.push(...['purchase', 'purchases'].map((tableName) => createChannelForTable(resolvedSupabase, tableName)));
+    })
+    .catch(() => {});
 
   return () => {
+    active = false;
     channels.forEach((channel) => {
-      if (channel) {
-        supabase.removeChannel(channel);
+      if (channel && resolvedSupabase?.removeChannel) {
+        resolvedSupabase.removeChannel(channel);
       }
     });
   };

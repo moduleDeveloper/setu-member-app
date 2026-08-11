@@ -1518,18 +1518,62 @@ export const moveCartProductToWishlist = async (productId, trustId = undefined, 
       code: error?.code,
       rpcData: error?.rpcData,
     };
-    console.error('[Cart] move to wishlist API failed', JSON.stringify(debugInfo, null, 2));
 
     const isDuplicateWishlistItem = normalizeText(error?.rpcData?.error || error?.message)
       .toLowerCase()
       .includes('idx_unique_wishlist_item');
 
     if (!isDuplicateWishlistItem) {
+      console.error('[Cart] move to wishlist API failed', JSON.stringify(debugInfo, null, 2));
       throw error;
     }
 
-    // Product is already saved in the wishlist under a different purchase row; the DB's
-    // unique wishlist constraint blocks converting this cart row, so just drop it from the cart.
+    // Expected, recoverable case — a row for this product already exists under the wishlist
+    // unique constraint. Log at info level; this only escalates to an error below if the
+    // recovery itself can't find/reactivate the conflicting row.
+    console.info('[Cart] move to wishlist hit an existing wishlist row; resolving', JSON.stringify(debugInfo, null, 2));
+
+    // A row for this product already exists under the wishlist unique constraint — but that
+    // constraint ignores status, so the existing row could be an active wishlist item OR a
+    // previously-removed tombstone. Find out which before touching the cart: if it's a
+    // tombstone, reactivate it first, otherwise we'd drop the cart item while the product is
+    // not actually wishlisted anywhere, silently losing it from both places.
+    const conflictProductPriceId = normalizeText(existingRef.productPriceId || target.product_price_id);
+    const { data: lookupData, error: lookupError } = await callCartPurchaseRpc({
+      p_member_id: memberId,
+      p_trust_id: requestTrustId,
+      p_action: 'get',
+      p_payload: {},
+    });
+    ensureCartRpcSuccess(lookupData, lookupError);
+
+    const existingWishlistRow = flattenPurchaseRows(extractPurchaseRows(lookupData)).find((row) => (
+      normalizeText(row?.trust_id || row?.trustId) === requestTrustId
+      && normalizeText(row?.type || row?.purchase_type).toLowerCase() === WISHLIST_TYPE
+      && normalizeText(row?.product_price_id || row?.productPriceId) === conflictProductPriceId
+    ));
+    const existingWishlistRowId = normalizeText(existingWishlistRow?.id || existingWishlistRow?.purchase_id);
+    const existingWishlistRowIsActive = normalizeText(existingWishlistRow?.status).toLowerCase() === WISHLIST_STATUS;
+
+    if (!existingWishlistRowId) {
+      console.error('[Cart] move to wishlist could not resolve the conflicting wishlist row', JSON.stringify(debugInfo, null, 2));
+      throw error;
+    }
+
+    if (!existingWishlistRowIsActive) {
+      const { data: reactivateData, error: reactivateError } = await callCartPurchaseRpc({
+        p_member_id: memberId,
+        p_trust_id: requestTrustId,
+        p_action: 'upsert_purchase',
+        p_payload: {
+          id: existingWishlistRowId,
+          status: WISHLIST_STATUS,
+          quantity,
+        },
+      });
+      ensureCartRpcSuccess(reactivateData, reactivateError);
+    }
+
     const removalRequest = {
       p_member_id: memberId,
       p_trust_id: requestTrustId,
@@ -1547,6 +1591,7 @@ export const moveCartProductToWishlist = async (productId, trustId = undefined, 
     const now = new Date().toISOString();
     const wishlistItem = {
       ...target,
+      purchase_id: existingWishlistRowId,
       product_price_id: existingRef.productPriceId || target.product_price_id,
       quantity,
       type: WISHLIST_TYPE,

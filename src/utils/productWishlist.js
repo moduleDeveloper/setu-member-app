@@ -1043,6 +1043,55 @@ const loadRemoteWishlistItems = async (trustId = undefined) => {
   );
 };
 
+// loadRemoteWishlistItems (and therefore refreshWishlistCache) filters out any row whose
+// status isn't 'wishlist', so it can never see a 'remove_from_wishlist' tombstone row. That
+// tombstone is exactly what idx_unique_wishlist_item collides against, so recovering from a
+// duplicate-key error needs the *unfiltered* row — this fetches it directly.
+const fetchAuthoritativeWishlistPurchase = async (trustId, productPriceId) => {
+  const normalizedProductPriceId = normalizeText(productPriceId);
+  if (!hasWishlistPurchaseSource() || !normalizedProductPriceId) return null;
+
+  const activeTrustId = resolveTrustId(trustId);
+  const memberId = await resolveWishlistMutationMemberId();
+  if (!memberId) return null;
+
+  try {
+    const response = await callWishlistPurchaseRpc({
+      p_member_id: memberId,
+      p_trust_id: activeTrustId,
+      p_action: 'get',
+      p_payload: {},
+    });
+    if (!response) return null;
+
+    const { data, error } = response;
+    if (error || (data && typeof data === 'object' && !Array.isArray(data) && data.success === false)) {
+      return null;
+    }
+
+    const rows = flattenPurchaseRows(extractPurchaseRows(data));
+    const match = rows.find((row) => {
+      const rowTrustId = normalizeText(row?.trust_id || row?.trustId || activeTrustId);
+      const rowType = normalizeText(row?.type || row?.purchase_type).toLowerCase();
+      const rowProductPriceId = normalizeText(row?.product_price_id || row?.productPriceId);
+      return rowTrustId === activeTrustId && rowType === 'wishlist' && rowProductPriceId === normalizedProductPriceId;
+    });
+
+    if (!match) return null;
+
+    const id = normalizeText(match?.id || match?.purchase_id || match?.purchaseId);
+    if (!id) return null;
+
+    return {
+      id,
+      status: normalizeText(match?.status || match?.purchase_status).toLowerCase(),
+      quantity: Number(match?.quantity) || 1,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const refreshWishlistCache = async (trustId = undefined) => {
   const normalizedTrustId = resolveTrustId(trustId);
 
@@ -1304,7 +1353,7 @@ const persistWishlistMutation = async ({
     }
 
     if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
-      const mutationError = new Error(normalizeText(data.message) || 'Unable to save wishlist right now.');
+      const mutationError = new Error(normalizeText(data.message || data.error) || 'Unable to save wishlist right now.');
       mutationError.data = data;
       mutationError.details = data.details || data.error || '';
       mutationError.code = data.code;
@@ -1313,22 +1362,51 @@ const persistWishlistMutation = async ({
         isDuplicateWishlistMutationError(mutationError)
         && normalizeText(request?.p_payload?.status).toLowerCase() === WISHLIST_STATUS
       ) {
-        const duplicateItems = writeScopedWishlistItems(
-          trustId,
-          Array.isArray(localItems) ? localItems : previousItems
-        );
-        notifyWishlistChange(duplicateItems);
-        console.info('[Wishlist] duplicate wishlist row treated as already saved', {
+        // The insert collided with idx_unique_wishlist_item, which means a row for this
+        // product already exists — almost always a previously removed (tombstone) row,
+        // since that index ignores status. refreshWishlistCache can't see it (it filters
+        // to active rows only), so fetch it directly and re-activate that same row instead
+        // of leaving a phantom "added" state that has no real purchase_id behind it.
+        const productPriceId = normalizeText(request?.p_payload?.product_price_id);
+        const authoritative = await fetchAuthoritativeWishlistPurchase(trustId, productPriceId);
+
+        if (authoritative?.id) {
+          const reactivateResponse = await callWishlistPurchaseRpc({
+            p_member_id: request.p_member_id,
+            p_trust_id: trustId,
+            p_action: 'upsert_purchase',
+            p_payload: {
+              id: authoritative.id,
+              status: WISHLIST_STATUS,
+              quantity: request?.p_payload?.quantity || 1,
+            },
+          });
+          const reactivated = reactivateResponse
+            && !reactivateResponse.error
+            && !(reactivateResponse.data && typeof reactivateResponse.data === 'object' && reactivateResponse.data.success === false);
+
+          if (reactivated) {
+            const refreshedItems = await refreshWishlistCache(trustId);
+            console.info('[Wishlist] duplicate wishlist row reactivated', {
+              trustId: redactId(trustId),
+              productPriceId: redactId(productPriceId),
+              purchaseId: redactId(authoritative.id),
+            });
+            return {
+              ok: true,
+              items: Array.isArray(refreshedItems) ? refreshedItems : (Array.isArray(localItems) ? localItems : previousItems),
+              responseItems: [],
+              duplicateResolved: true,
+            };
+          }
+        }
+
+        console.error('[Wishlist] duplicate wishlist row could not be reactivated', {
           trustId: redactId(trustId),
-          action: request?.p_action,
-          productPriceId: redactId(request?.p_payload?.product_price_id),
+          productPriceId: redactId(productPriceId),
+          authoritative,
         });
-        return {
-          ok: true,
-          items: duplicateItems,
-          responseItems: [],
-          duplicateResolved: true,
-        };
+        throw mutationError;
       }
 
       const diagnostic = {
@@ -1845,35 +1923,85 @@ export const removeWishlistProduct = (productId, trustId = undefined) => {
   );
   notifyWishlistChange(persisted);
 
-  if (hasWishlistPurchaseSource() && target.purchase_id) {
+  if (hasWishlistPurchaseSource()) {
     void (async () => {
-      const service = await loadOrderHistoryService();
-      const memberId = service?.resolveOrderHistoryMemberId
-        ? service.resolveOrderHistoryMemberId(readStoredUser())
-        : resolveMemberIdFromUser(readStoredUser());
-
-      const request = {
-        p_member_id: memberId,
-        p_trust_id: normalizedTrustId,
-        p_action: 'upsert_purchase',
-        p_payload: {
-          id: target.purchase_id,
+      let request;
+      try {
+        request = await buildRequiredWishlistRpcRequest({
+          trustId: normalizedTrustId,
+          product: target,
+          context: { ...target, trustId: normalizedTrustId, price: target.price },
+          existingItem: target,
           status: REMOVE_FROM_WISHLIST_STATUS,
           quantity: target.quantity || 1,
-        },
-      };
+        });
+      } catch (error) {
+        console.warn('[Wishlist] wishlist remove could not build request:', error?.message || error);
+        const restored = writeScopedWishlistItems(normalizedTrustId, previousItems);
+        notifyWishlistChange(restored);
+        return;
+      }
 
       try {
         const response = await callWishlistPurchaseRpc(request);
-        if (!response) return;
+        if (!response) {
+          throw new Error('Wishlist sync is unavailable. Please refresh and try again.');
+        }
 
         const { data, error } = response;
         if (error) throw error;
         if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
-          throw new Error(normalizeText(data.message) || 'Unable to remove wishlist item.');
+          const rpcError = new Error(normalizeText(data.error || data.message) || 'Unable to remove wishlist item.');
+          rpcError.rpcData = data;
+          throw rpcError;
         }
       } catch (error) {
-        console.warn('[Wishlist] wishlist remove failed:', error?.message || error);
+        console.warn('[Wishlist] wishlist remove failed:', JSON.stringify({
+          message: error?.message || String(error),
+          details: error?.details,
+          hint: error?.hint,
+          code: error?.code,
+          rpcData: error?.rpcData,
+          requestPayload: request?.p_payload,
+        }, null, 2));
+
+        if (isDuplicateWishlistMutationError(error)) {
+          try {
+            const productPriceId = resolveWishlistProductPriceId(target, {});
+            const authoritative = await fetchAuthoritativeWishlistPurchase(normalizedTrustId, productPriceId);
+
+            if (authoritative?.id && authoritative.status === REMOVE_FROM_WISHLIST_STATUS) {
+              const finalItems = readScopedWishlistItems(normalizedTrustId).map((item) => (
+                item.key === target.key
+                  ? { ...hiddenRemovalItem, purchase_id: authoritative.id, sync_state: SYNCED_SYNC_STATE }
+                  : item
+              ));
+              notifyWishlistChange(writeScopedWishlistItems(normalizedTrustId, finalItems));
+              return;
+            }
+
+            if (authoritative?.id) {
+              const retryResponse = await callWishlistPurchaseRpc({
+                p_member_id: (await getRequiredWishlistMutationIdentity(normalizedTrustId)).memberId,
+                p_trust_id: normalizedTrustId,
+                p_action: 'upsert_purchase',
+                p_payload: {
+                  id: authoritative.id,
+                  status: REMOVE_FROM_WISHLIST_STATUS,
+                  quantity: authoritative.quantity || 1,
+                },
+              });
+              const retrySucceeded = retryResponse
+                && !retryResponse.error
+                && !(retryResponse.data && typeof retryResponse.data === 'object' && retryResponse.data.success === false);
+
+              if (retrySucceeded) return;
+            }
+          } catch (retryError) {
+            console.warn('[Wishlist] wishlist remove retry after refresh failed:', retryError?.message || retryError);
+          }
+        }
+
         const restored = writeScopedWishlistItems(normalizedTrustId, previousItems);
         notifyWishlistChange(restored);
       }
@@ -1938,12 +2066,81 @@ export const removeWishlistProductAsync = async (productId, trustId = undefined)
     const { data, error } = response;
     if (error) throw error;
     if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
-      throw new Error(normalizeText(data.message) || 'Unable to remove wishlist item.');
+      const rpcError = new Error(normalizeText(data.error || data.message) || 'Unable to remove wishlist item.');
+      rpcError.rpcData = data;
+      throw rpcError;
     }
 
     return { ok: true, items: readWishlistItems(normalizedTrustId), wished: false };
   } catch (error) {
-    console.warn('[Wishlist] wishlist remove failed:', error?.message || error);
+    console.warn('[Wishlist] wishlist remove failed:', JSON.stringify({
+      productId,
+      trustId: normalizedTrustId,
+      purchaseId: target.purchase_id,
+      requestPayload: request?.p_payload,
+      message: error?.message || String(error),
+      details: error?.details,
+      hint: error?.hint,
+      code: error?.code,
+      rpcData: error?.rpcData,
+    }, null, 2));
+
+    if (isDuplicateWishlistMutationError(error)) {
+      // The local item had no known purchase_id, so the removal fell back to an insert
+      // that collided with idx_unique_wishlist_item. That almost always means the server
+      // already has this exact row in 'remove_from_wishlist' status (refreshWishlistCache
+      // can't see it — it filters to active rows only), so local state was simply stale.
+      // Fetch the real row directly: if it's already removed, just sync local state to
+      // match; if it's genuinely still active, retry the removal against its real id.
+      try {
+        const productPriceId = resolveWishlistProductPriceId(target, {});
+        const authoritative = await fetchAuthoritativeWishlistPurchase(normalizedTrustId, productPriceId);
+
+        if (authoritative?.id && authoritative.status === REMOVE_FROM_WISHLIST_STATUS) {
+          const finalItems = readScopedWishlistItems(normalizedTrustId).map((item) => (
+            item.key === target.key
+              ? { ...hiddenRemovalItem, purchase_id: authoritative.id, sync_state: SYNCED_SYNC_STATE }
+              : item
+          ));
+          const finalPersisted = writeScopedWishlistItems(normalizedTrustId, finalItems);
+          notifyWishlistChange(finalPersisted);
+          console.info('[Wishlist] remove target was already removed server-side; local state synced', {
+            trustId: normalizedTrustId,
+            productPriceId,
+            purchaseId: authoritative.id,
+          });
+          return { ok: true, items: readWishlistItems(normalizedTrustId), wished: false };
+        }
+
+        if (authoritative?.id) {
+          const retryResponse = await callWishlistPurchaseRpc({
+            p_member_id: (await getRequiredWishlistMutationIdentity(normalizedTrustId)).memberId,
+            p_trust_id: normalizedTrustId,
+            p_action: 'upsert_purchase',
+            p_payload: {
+              id: authoritative.id,
+              status: REMOVE_FROM_WISHLIST_STATUS,
+              quantity: authoritative.quantity || 1,
+            },
+          });
+          const retrySucceeded = retryResponse
+            && !retryResponse.error
+            && !(retryResponse.data && typeof retryResponse.data === 'object' && retryResponse.data.success === false);
+
+          if (retrySucceeded) {
+            const finalItems = readScopedWishlistItems(normalizedTrustId).map((item) =>
+              (item.key === target.key ? hiddenRemovalItem : item)
+            );
+            const finalPersisted = writeScopedWishlistItems(normalizedTrustId, finalItems);
+            notifyWishlistChange(finalPersisted);
+            return { ok: true, items: readWishlistItems(normalizedTrustId), wished: false };
+          }
+        }
+      } catch (retryError) {
+        console.warn('[Wishlist] wishlist remove retry after refresh failed:', retryError?.message || retryError);
+      }
+    }
+
     const restored = writeScopedWishlistItems(normalizedTrustId, previousItems);
     notifyWishlistChange(restored);
     return { ok: false, items: readWishlistItems(normalizedTrustId), wished: true, error };
