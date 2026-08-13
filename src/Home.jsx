@@ -1522,9 +1522,6 @@ const Home = ({ onNavigate, onLogout }) => {
   const hasRenderableSponsors = sponsors.length > 0;
   const isSponsorSectionLoading = !hasRenderableSponsors && (!hasSettledSponsorsForCurrentTrust || isSponsorsLoading);
   const sponsorDebugInfo = currentSponsorTrustId ? getSponsorDebugInfo(currentSponsorTrustId) : null;
-  const sponsorEmptyDebugReason = !isSponsorSectionLoading && sponsors.length === 0
-    ? sponsorDebugInfo?.reason || ''
-    : '';
   const sponsorChunkStart = sponsors.length > 0
     ? Math.floor(sponsorIndex / SPONSOR_CHUNK_SIZE) * SPONSOR_CHUNK_SIZE
     : 0;
@@ -3086,20 +3083,19 @@ const Home = ({ onNavigate, onLogout }) => {
                             background: `repeating-linear-gradient(135deg, transparent 0 13px, ${sponsorTheme.patternColor}44 13px 14px)`,
                           }}
                         />
-                        <div className="relative z-10 h-full flex items-center gap-4">
-                          <div className="w-20 h-20 rounded-[1.2rem] flex items-center justify-center flex-shrink-0" style={{ background: sponsorTheme.skeletonColor }}>
+                        <div className="relative z-10 h-full flex flex-col items-center justify-center text-center gap-1.5 px-4">
+                          <div
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-1"
+                            style={{ background: applyOpacity(sponsorTheme.badgeTextColor, 0.14) }}
+                          >
                             <Star className="h-6 w-6" style={{ color: sponsorTheme.badgeTextColor }} />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold" style={{ color: sponsorTheme.emptyTextColor }}>
-                              No active sponsors available right now.
-                            </p>
-                            {!sponsors.length && import.meta.env.DEV && sponsorEmptyDebugReason && (
-                              <p className="text-[11px] mt-1 font-medium break-words" style={{ color: getThemeToken(theme, 'typography.component_overrides.error_text', theme.primary) }}>
-                                Debug: {sponsorEmptyDebugReason}
-                              </p>
-                            )}
-                          </div>
+                          <p className="text-[13px] font-semibold" style={{ color: sponsorTheme.emptyTextColor }}>
+                            No sponsors to show right now
+                          </p>
+                          <p className="text-[11px] font-medium" style={{ color: applyOpacity(sponsorTheme.emptyTextColor, 0.7) }}>
+                            Please add sponsors to get started
+                          </p>
                         </div>
                       </div>
                     </div>

@@ -667,11 +667,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
         || normalizedKey === 'addcommunity'
         || normalizedKey === 'add-community'
         || normalizedKey === 'feature-add-community';
-      const isOrderHistory = resolvedRoute === 'order-history'
-        || normalizedKey === 'orderhistory'
-        || normalizedKey === 'order-history'
-        || normalizedKey === 'feature-order-history';
-      return Boolean(key) && meta?.is_enabled && (isContactUs || isMyFamily || isNominationDetails || isAddCommunity || isOrderHistory);
+      return Boolean(key) && meta?.is_enabled && (isContactUs || isMyFamily || isNominationDetails || isAddCommunity);
     })
     .map(([key, meta]) => ({
       id: normalizeSidebarRoute(meta?.route, key),
