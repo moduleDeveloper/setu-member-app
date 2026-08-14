@@ -72,15 +72,10 @@ const normalizeId = (value) => {
 
 const normalizeDigits = (value) => String(value || '').replace(/\D/g, '');
 
-const isSponsorActive = (sponsor) => {
-  const value = sponsor?.is_active;
-  if (value === undefined || value === null) return true;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value === 1;
-  const normalized = String(value).trim().toLowerCase();
-  if (!normalized) return true;
-  return !['false', '0', 'no', 'inactive'].includes(normalized);
-};
+// get_active_sponsors(p_trust_id) is the single source of truth for which
+// sponsors are active and date-valid. The store must not re-derive that
+// status from a sponsor.is_active field on the frontend.
+const isSponsorActive = () => true;
 
 const readLoggedInUserSponsorContext = (trustId = null) => {
   try {
@@ -689,14 +684,7 @@ export async function ensureAllSponsorsLoaded(trustId, options = {}) {
   if (existing) return existing;
 
   const request = (async () => {
-    const res = await getSponsors(normalizedTrustId, null, {
-      view: 'list',
-      page: 1,
-      limit: 500,
-      offset: 0,
-      all: true,
-      force: forceRefresh
-    });
+    const res = await getSponsors(normalizedTrustId, { force: forceRefresh });
     sponsorDebugByTrust[normalizedTrustId] = res?.debug || null;
     const sponsors = Array.isArray(res?.data) ? res.data : [];
     const replaced = replaceSponsorSnapshot(normalizedTrustId, sponsors);
@@ -905,4 +893,3 @@ export async function getSponsorDetail({ sponsorId, trustId = null }) {
 
   return detail;
 }
-

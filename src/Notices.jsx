@@ -870,7 +870,7 @@ const Notices = ({ onNavigate }) => {
       )}
 
       {!loading && !error && (
-        <div className="px-6 py-4 space-y-4">
+        <div className="notices-list px-6 py-4 space-y-4">
           {sortedNotices.map((notice) => {
             const dateLabel = formatDateRange(notice.start_date, notice.end_date);
             const rawAttachments = Array.isArray(notice.attachments) ? notice.attachments : [];
@@ -903,7 +903,7 @@ const Notices = ({ onNavigate }) => {
                   openNoticeDetail(notice.id);
                 }
               }}
-              className="w-full text-left rounded-2xl p-4 sm:p-5 border transition-all hover:shadow-md active:scale-[0.995] border-l-4 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent"
+              className="notice-card w-full text-left rounded-2xl p-4 sm:p-5 border transition-all hover:shadow-md active:scale-[0.995] border-l-4 shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent"
               style={{
                 borderLeftColor: theme.primary,
                 borderColor: 'var(--advertisement-card-border)',
@@ -940,7 +940,7 @@ const Notices = ({ onNavigate }) => {
 
               {firstAttachment && (
                 <div
-                  className="mb-3 rounded-xl border px-3 py-3"
+                  className="notice-card-media mb-3 rounded-xl border px-3 py-3"
                   style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 12%, transparent)' }}
                 >
                   {firstAttachment.type === 'image' ? (
@@ -1098,6 +1098,66 @@ const Notices = ({ onNavigate }) => {
           onDownload={downloadAttachment}
         />
       )}
+      <style>{`
+        @media (min-width: 1024px) {
+          .notices-list {
+            padding-left: 2rem;
+            padding-right: 2rem;
+          }
+
+          .notice-card {
+            display: grid;
+            grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
+            grid-template-areas:
+              "media meta"
+              "media title"
+              "media description"
+              "media footer";
+            column-gap: 1.25rem;
+            align-items: start;
+            min-height: 180px;
+          }
+
+          .notice-card > .flex:first-child {
+            grid-area: meta;
+            margin-bottom: 0.45rem;
+          }
+
+          .notice-card > h3 {
+            grid-area: title;
+            margin-bottom: 0.4rem;
+          }
+
+          .notice-card > div:has(> p.line-clamp-3) {
+            grid-area: description;
+            margin-bottom: 0.75rem;
+          }
+
+          .notice-card-media {
+            grid-area: media;
+            margin-bottom: 0 !important;
+            height: 160px;
+            align-self: stretch;
+            padding: 0.5rem !important;
+          }
+
+          .notice-card-media .aspect-\\[4\\/3\\] {
+            height: 100%;
+            aspect-ratio: auto !important;
+          }
+
+          .notice-card-media img,
+          .notice-card-media > div {
+            max-height: 100%;
+          }
+
+          .notice-card > .pt-3 {
+            grid-area: footer;
+            align-self: end;
+            margin-top: auto;
+          }
+        }
+      `}</style>
     </div>
   );
 };

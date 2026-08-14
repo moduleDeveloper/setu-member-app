@@ -1943,7 +1943,7 @@ const ProductDetail = ({ categoryId, productId, onBack }) => {
         ) : null}
 
         {!loading && !error && product ? (
-          <>
+          <div className="ws-pdp-layout">
         <div className="ws-pdp-hero">
           <button
             type="button"
@@ -2172,7 +2172,7 @@ const ProductDetail = ({ categoryId, productId, onBack }) => {
 
          
         </div>
-          </>
+          </div>
         ) : null}
       </div>
 
@@ -2760,6 +2760,66 @@ const ProductDetail = ({ categoryId, productId, onBack }) => {
 
         .ws-pdp-skeleton-line--short {
           width: 68%;
+        }
+
+        @media (min-width: 1024px) {
+          .ws-breadcrumb {
+            padding: 16px 28px 0;
+          }
+
+          .ws-pdp-layout {
+            display: grid;
+            grid-template-columns: minmax(360px, 42%) minmax(0, 1fr);
+            gap: 28px;
+            padding: 18px 28px 40px;
+            align-items: start;
+          }
+
+          .ws-pdp-hero {
+            aspect-ratio: auto;
+            height: min(82vh, 560px);
+            min-height: 420px;
+            border-radius: 20px;
+            position: sticky;
+            top: 96px;
+            box-shadow: 0 18px 40px color-mix(in srgb, var(--brand-navy) 16%, transparent);
+          }
+
+          .ws-pdp-body {
+            padding: 0 0 32px;
+            min-width: 0;
+          }
+
+          .ws-pdp-name {
+            font-size: 28px;
+            line-height: 1.15;
+          }
+
+          .ws-pdp-price-block {
+            margin-top: 14px;
+            padding-bottom: 14px;
+          }
+
+          .ws-pdp-actions {
+            max-width: 520px;
+          }
+
+          .ws-attr-group--selection,
+          .ws-description-group {
+            max-width: 720px;
+          }
+
+          .ws-chip--selection {
+            min-height: 40px;
+          }
+
+          .ws-description-text {
+            font-size: 14px;
+          }
+
+          .ws-pdp-toast {
+            left: calc(260px + ((100vw - 260px) / 2));
+          }
         }
       `}</style>
     </div>

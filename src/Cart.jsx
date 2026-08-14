@@ -1970,6 +1970,94 @@ function Cart() {
             grid-column: 1 / -1;
           }
         }
+
+        @media (min-width: 1024px) {
+          .cart-content {
+            padding: 24px;
+          }
+
+          .cart-content > .cart-grid:not(.cart-grid--skeleton) {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            align-items: start;
+            gap: 20px;
+          }
+
+          .cart-content > .cart-grid:not(.cart-grid--skeleton) > .cart-card {
+            grid-column: 1 / -1;
+          }
+
+          .cart-content > .cart-grid:not(.cart-grid--skeleton) > .cart-summary {
+            grid-column: 1 / -1;
+            position: static;
+          }
+
+          .cart-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 18px;
+            padding: 14px;
+            border: 1px solid color-mix(in srgb, var(--brand-navy) 10%, transparent);
+            border-radius: 18px;
+            background: color-mix(in srgb, var(--surface-color) 82%, var(--page-bg, var(--app-page-bg)));
+          }
+
+          .cart-open {
+            padding-right: 0;
+            grid-template-columns: 92px minmax(0, 1fr);
+            align-items: center;
+          }
+
+          .cart-image {
+            width: 92px;
+            height: 116px;
+            aspect-ratio: auto;
+            border-radius: 12px;
+          }
+
+          .cart-info {
+            padding-top: 0;
+          }
+
+          .cart-name {
+            font-size: 15px;
+          }
+
+          .cart-price {
+            margin-top: 7px;
+          }
+
+          .cart-actions {
+            padding-left: 0;
+            justify-content: flex-end;
+            min-width: 210px;
+          }
+
+          .cart-qty-control {
+            flex: 0 0 150px;
+          }
+
+          .cart-remove {
+            position: static;
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+          }
+
+          .cart-summary {
+            padding: 18px;
+            border-radius: 18px;
+          }
+
+          .cart-summary-actions {
+            gap: 12px;
+          }
+
+          .cart-toast {
+            left: calc(260px + ((100vw - 260px) / 2));
+          }
+        }
         @keyframes cartModalIn {
           from {
             opacity: 0;

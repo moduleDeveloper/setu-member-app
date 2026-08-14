@@ -743,9 +743,9 @@ const OtherMemberships = ({ onNavigate }) => {
   // ── render ──
   return (
     <div
+      className="om-shell"
       style={{
         width: '100%',
-        maxWidth: '430px',
         margin: '0 auto',
         minHeight: '100dvh',
         overflow: 'visible',
@@ -756,7 +756,7 @@ const OtherMemberships = ({ onNavigate }) => {
     >
       {/* ── Header ── */}
       <div
-        className="px-4 py-4 flex items-center justify-between sticky top-0 z-50 shadow-md"
+        className="px-4 py-4 md:px-8 md:py-5 lg:px-12 flex items-center justify-between sticky top-0 z-50 shadow-md"
         style={{
           background: navbarTheme?.backgroundStyle || 'var(--navbar-bg, var(--app-navbar-bg))',
           backdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
@@ -773,7 +773,7 @@ const OtherMemberships = ({ onNavigate }) => {
         >
           {showForm ? <ArrowLeft className="h-6 w-6" /> : (isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />)}
         </button>
-        <h1 className="text-base font-bold tracking-wide" style={{ color: navbarTheme?.textColor || 'var(--navbar-text)' }}>
+        <h1 className="text-base md:text-lg font-bold tracking-wide" style={{ color: navbarTheme?.textColor || 'var(--navbar-text)' }}>
           Other Memberships
         </h1>
         <button
@@ -788,7 +788,7 @@ const OtherMemberships = ({ onNavigate }) => {
       <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="other-memberships" />
 
       {/* ── Content ── */}
-      <div style={{ width: '100%', margin: '0 auto', padding: '20px 16px 40px', boxSizing: 'border-box' }}>
+      <div className="om-content" style={{ width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
 
         {/* Success banner */}
         {submitSuccess && (
@@ -820,6 +820,7 @@ const OtherMemberships = ({ onNavigate }) => {
             {/* ── ADD MEMBERSHIP BUTTON ── */}
             {!showForm && (
               <button
+                className="om-primary-btn"
                 onClick={() => { setShowForm(true); setSubmitError(''); setSubmitSuccess(''); }}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px 20px', background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`, color: '#fff', border: 'none', borderRadius: '16px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', marginBottom: '20px', boxShadow: `0 8px 18px ${applyOpacity(colors.primary, 0.26)}`, letterSpacing: '-0.2px', animation: 'fadeUp 0.3s ease-out' }}
               >
@@ -830,7 +831,7 @@ const OtherMemberships = ({ onNavigate }) => {
 
             {/* ── ADD MEMBERSHIP FORM ── */}
             {showForm && (
-              <div style={{ background: 'var(--advertisement-card-bg)', borderRadius: '20px', border: '2px solid var(--advertisement-card-border)', boxShadow: '0 12px 32px color-mix(in srgb, var(--advertisement-card-shadow) 26%, transparent)', marginBottom: '24px', overflow: 'hidden', animation: 'fadeUp 0.35s ease-out' }}>
+              <div className="om-form-card" style={{ background: 'var(--advertisement-card-bg)', borderRadius: '20px', border: '2px solid var(--advertisement-card-border)', boxShadow: '0 12px 32px color-mix(in srgb, var(--advertisement-card-shadow) 26%, transparent)', marginBottom: '24px', overflow: 'hidden', animation: 'fadeUp 0.35s ease-out' }}>
                 <div style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -935,7 +936,7 @@ const OtherMemberships = ({ onNavigate }) => {
                     {otherMems.length} Added Membership{otherMems.length !== 1 ? 's' : ''}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="om-card-grid">
                   {otherMems.map((m, idx) => (
                     <MembershipCard key={m.id} m={m} index={idx} showGoldenMembershipBadge={false} />
                   ))}
@@ -954,7 +955,7 @@ const OtherMemberships = ({ onNavigate }) => {
                     {trustLinks.length} Trust{trustLinks.length !== 1 ? 's' : ''} Linked
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="om-card-grid">
                   {trustLinks.map((link, index) => (
                     <MembershipCard
                       key={link.id || index}
@@ -972,6 +973,7 @@ const OtherMemberships = ({ onNavigate }) => {
             {/* Empty state */}
             {otherMems.length === 0 && trustLinks.length === 0 && (
               <div
+                className="om-empty-state"
                 style={{
                   textAlign: 'center',
                   padding: '60px 24px',
@@ -1091,6 +1093,50 @@ const OtherMemberships = ({ onNavigate }) => {
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .om-shell { max-width: 430px; }
+        .om-content { padding: 20px 16px 40px; }
+        .om-card-grid { display: flex; flex-direction: column; gap: 12px; }
+
+        @media (min-width: 768px) {
+          .om-shell { max-width: 100%; }
+          .om-content { max-width: 1148px; margin-left: auto; margin-right: auto; padding: 28px 32px 48px; }
+          .om-card-grid { display: flex; flex-direction: row; flex-wrap: wrap;  gap: 16px; }
+          .om-card-grid > div { flex: 0 1 340px; }
+          .om-primary-btn { max-width: 480px; margin-left: auto; margin-right: auto; }
+          .om-form-card { max-width: 560px; margin-left: auto; margin-right: auto; }
+          .om-empty-state { max-width: 560px; margin-left: auto; margin-right: auto; }
+        }
+
+        @media (min-width: 1024px) {
+          .om-content {
+            max-width: none;
+            padding: 24px 28px 44px;
+          }
+
+          .om-primary-btn {
+            width: fit-content !important;
+            max-width: none;
+            display: inline-flex !important;
+            margin-left: auto !important;
+            margin-right: 0 !important;
+            padding-left: 22px !important;
+            padding-right: 22px !important;
+            float:right;
+          }
+
+          .om-card-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+          }
+
+          .om-card-grid > div {
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+          }
         }
       `}</style>
     </div>

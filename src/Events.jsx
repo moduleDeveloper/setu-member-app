@@ -803,7 +803,7 @@ const Events = ({ onNavigate }) => {
       )}
 
       {!loading && !error && (
-        <div className="px-6 py-4 space-y-4">
+        <div className="events-list px-6 py-4 space-y-4">
           {events.map((event) => {
             const dateLabel = formatEventDate(event.startEventDate, event.endEventDate);
             const timeLabel = formatTimeRange(event.startTime, event.endTime);
@@ -842,7 +842,7 @@ const Events = ({ onNavigate }) => {
                     openEventDetail(event.id);
                   }
                 }}
-                className="w-full text-left rounded-2xl overflow-hidden transition-all active:scale-[0.995] shadow-sm cursor-pointer"
+                className="event-card w-full text-left rounded-2xl overflow-hidden transition-all active:scale-[0.995] shadow-sm cursor-pointer"
                 style={{
                   background: 'var(--advertisement-card-bg)',
                   border: '1px solid var(--advertisement-card-border)',
@@ -851,7 +851,7 @@ const Events = ({ onNavigate }) => {
               >
                 {/* ── Image / Attachment Hero ── */}
                 {firstAttachment && firstAttachment.type === 'image' ? (
-                  <div className="relative w-full overflow-hidden aspect-[16/9]" style={{ background: 'color-mix(in srgb, var(--brand-navy) 10%, var(--surface-color))' }}>
+                  <div className="event-card-media relative w-full overflow-hidden aspect-[16/9]" style={{ background: 'color-mix(in srgb, var(--brand-navy) 10%, var(--surface-color))' }}>
                     <img
                       src={firstAttachment.url}
                       alt={firstAttachment.label}
@@ -883,7 +883,7 @@ const Events = ({ onNavigate }) => {
 
                 {/* ── Card Content ── */}
                 <div
-                  className="p-4"
+                  className="event-card-content p-4"
                   style={{
                     borderTop: firstAttachment?.type === 'image'
                       ? `2px solid ${isPast ? applyOpacity(theme.secondary, 0.4) : theme.primary}`
@@ -1075,6 +1075,50 @@ const Events = ({ onNavigate }) => {
           onDownload={downloadAttachment}
         />
       )}
+
+      <style>{`
+        @media (min-width: 1024px) {
+          .events-list {
+            padding-left: 2rem;
+            padding-right: 2rem;
+          }
+
+          .event-card {
+            display: flex;
+            min-height: 190px;
+          }
+
+          .event-card-media {
+            width: min(34%, 420px);
+            min-width: 300px;
+            flex: 0 0 min(34%, 420px);
+            aspect-ratio: auto !important;
+          }
+
+          .event-card-media img {
+            height: 100%;
+          }
+
+          .event-card-content {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 1.25rem 1.35rem !important;
+            border-top: none !important;
+            border-left: 2px solid var(--advertisement-card-border);
+          }
+
+          .event-card-content h3 {
+            font-size: 1.05rem;
+            margin-bottom: 0.35rem;
+          }
+
+          .event-card-content > div:last-child {
+            margin-top: auto;
+          }
+        }
+      `}</style>
     </div>
   );
 };

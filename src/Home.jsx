@@ -1522,9 +1522,6 @@ const Home = ({ onNavigate, onLogout }) => {
   const hasRenderableSponsors = sponsors.length > 0;
   const isSponsorSectionLoading = !hasRenderableSponsors && (!hasSettledSponsorsForCurrentTrust || isSponsorsLoading);
   const sponsorDebugInfo = currentSponsorTrustId ? getSponsorDebugInfo(currentSponsorTrustId) : null;
-  const sponsorEmptyDebugReason = !isSponsorSectionLoading && sponsors.length === 0
-    ? sponsorDebugInfo?.reason || ''
-    : '';
   const sponsorChunkStart = sponsors.length > 0
     ? Math.floor(sponsorIndex / SPONSOR_CHUNK_SIZE) * SPONSOR_CHUNK_SIZE
     : 0;
@@ -2344,13 +2341,14 @@ const Home = ({ onNavigate, onLogout }) => {
   return (
     <div
       ref={mainContainerRef}
-      className={`flex flex-col relative ${isMenuOpen ? 'overflow-hidden max-h-screen' : 'overflow-hidden'}`}
+      className={`home-desktop-shell flex flex-col relative ${isMenuOpen ? 'overflow-hidden max-h-screen' : 'overflow-hidden'}`}
       style={{ background: 'var(--page-bg, var(--app-page-bg))', minHeight: '100%' }}
     >
+      <div className="home-main-content flex min-w-0 flex-1 flex-col">
       {/* Decorative blobs (theme-aware) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute"
+        className="home-decor-blob pointer-events-none absolute"
         style={{
           top: '-110px',
           left: '-120px',
@@ -2363,7 +2361,7 @@ const Home = ({ onNavigate, onLogout }) => {
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute"
+        className="home-decor-blob pointer-events-none absolute"
         style={{
           bottom: '-140px',
           right: '-110px',
@@ -2376,7 +2374,7 @@ const Home = ({ onNavigate, onLogout }) => {
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute"
+        className="home-decor-blob pointer-events-none absolute"
         style={{
           top: '35%',
           left: '55%',
@@ -2391,7 +2389,7 @@ const Home = ({ onNavigate, onLogout }) => {
       {/* ══ Light Navbar (theme-aware) ══ */}
       <div
         role="navigation"
-        className="theme-navbar sticky top-0 z-50 w-full"
+        className="theme-navbar home-navbar sticky top-0 z-50 w-full"
         style={{
           background: 'var(--navbar-bg, var(--app-navbar-bg))',
           backdropFilter: 'blur(var(--navbar-blur, 12px))',
@@ -2405,7 +2403,7 @@ const Home = ({ onNavigate, onLogout }) => {
 
         {/* Top row: hamburger | logo+name | bell */}
         <div
-          className="flex items-center justify-between"
+          className="home-navbar-row flex items-center justify-between"
           style={{
             paddingTop: 'max(24px, calc(env(safe-area-inset-top, 0px) + 24px))',
             paddingBottom: '10px',
@@ -2417,7 +2415,7 @@ const Home = ({ onNavigate, onLogout }) => {
           {/* Hamburger */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all flex-shrink-0 active:scale-95"
+            className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all flex-shrink-0 active:scale-95 lg:hidden"
             style={{
               background: isMenuOpen
                 ? appButtonBg
@@ -2431,15 +2429,15 @@ const Home = ({ onNavigate, onLogout }) => {
           </button>
 
           {/* Trust logo + name */}
-          <div className="flex items-center gap-2.5 flex-1 justify-center">
+          <div className="home-navbar-title-wrap flex items-center gap-2.5 flex-1 justify-center">
             {(() => {
               const trustName = activeTrust?.name || trustInfo?.name || defaultTrust?.name || '';
               const isLongName = trustName.length > 20;
-              
+
               return isLongName ? (
                 <div className="overflow-hidden w-full flex items-center">
                   <h1
-                    className="font-extrabold text-[15px] whitespace-nowrap"
+                    className="home-navbar-title font-extrabold text-[15px] whitespace-nowrap"
                     style={{ color: navbarTextColor, animation: 'marquee 15s linear infinite', maxWidth: '9rem' }}
                   >
                     {trustName}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2447,7 +2445,7 @@ const Home = ({ onNavigate, onLogout }) => {
                 </div>
               ) : (
                 <h1
-                  className="font-extrabold text-[15px]"
+                  className="home-navbar-title font-extrabold text-[15px]"
                   style={{ color: navbarTextColor }}
                 >
                   {trustName}
@@ -2595,7 +2593,7 @@ const Home = ({ onNavigate, onLogout }) => {
 
         {/* Welcome strip / member banner */}
         {(userProfile?.name || showSelectedTrustMemberBanner) && (
-          <div className="px-4 pb-3">
+          <div className="px-4 pb-3 home-navbar-member-banner">
             <div
               className="rounded-[22px] px-3 py-2"
               style={{
@@ -2681,7 +2679,9 @@ const Home = ({ onNavigate, onLogout }) => {
       </div>
 
 
-      <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="home" onLogout={onLogout} />
+      <div className="lg:hidden">
+        <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="home" onLogout={onLogout} />
+      </div>
 
       {/* ── Dynamic Section Renderer (order from theme.homeLayout) ── */}
       <div
@@ -2695,7 +2695,7 @@ const Home = ({ onNavigate, onLogout }) => {
         {(() => {
           const SECTIONS = {
             trustList: showTrustSelector && (selectedTrust || otherTrusts.length > 0) ? (
-              <div key="trustList">
+              <div className="home-section home-section-full" key="trustList">
                 <p className="text-sm font-semibold text-muted-foreground ml-4 mt-1" style={{color: ` ${theme.primary}`}}>Our trusts</p>
                 <div
                   className="flex items-center gap-2 px-4 py-2"
@@ -2727,7 +2727,7 @@ const Home = ({ onNavigate, onLogout }) => {
             ) : null,
             marquee: ff('feature_marquee') && marqueeUpdates.length > 0 ? (
               <div
-                className="mt-0 mb-2 w-full overflow-hidden"
+                className="home-section home-section-full mt-0 mb-2 w-full overflow-hidden"
                 style={{
                   background: 'var(--marquee-bg)',
                   boxShadow: `0 2px 12px ${applyOpacity(theme.primary, 0.3)}`,
@@ -2757,7 +2757,7 @@ const Home = ({ onNavigate, onLogout }) => {
               </div>
             ) : null,
             gallery: ff('feature_gallery') ? (
-              <div className="relative px-4 mt-5 mb-3" style={{ animation: resolveAnimation('gallery', 'zoomIn') }} key="gallery">
+              <div className="home-section home-section-row home-section-gallery relative px-4 mt-5 mb-3" style={{ animation: resolveAnimation('gallery', 'zoomIn') }} key="gallery">
                 <div className="pointer-events-none absolute -top-1.5 left-7 z-20 ">
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.18em] relative top-[12px]  flex-shrink-0"
@@ -2776,7 +2776,7 @@ const Home = ({ onNavigate, onLogout }) => {
                 </div>
 
                 <div
-                  className="rounded-3xl overflow-hidden"
+                  className="home-gallery-card rounded-3xl overflow-hidden"
                   style={{
                     boxShadow: `0 10px 32px ${applyOpacity(theme.secondary, 0.16)}, 0 2px 8px ${applyOpacity(theme.primary, 0.08)}`,
                     border: `1px solid ${applyOpacity(theme.primary, 0.1)}`,
@@ -2784,7 +2784,7 @@ const Home = ({ onNavigate, onLogout }) => {
                 >
                   <div className="h-[3px]" style={{ background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})` }} />
                   {showGalleryLoader ? (
-                    <div className="w-full h-[200px] flex items-center justify-center" style={{ background: theme.accentBg }}>
+                    <div className="home-gallery-fill w-full h-[200px] flex items-center justify-center" style={{ background: theme.accentBg }}>
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: theme.primary, borderTopColor: 'transparent' }} />
                         <p className="text-xs font-medium" style={{ color: theme.secondary }}>Loading gallery...</p>
@@ -2795,7 +2795,7 @@ const Home = ({ onNavigate, onLogout }) => {
                   ) : (
                     <button
                       onClick={() => onNavigate('gallery')}
-                      className="w-full h-[200px] flex flex-col items-center justify-center gap-3"
+                      className="home-gallery-fill w-full h-[200px] flex flex-col items-center justify-center gap-3"
                       style={{
                         background: 'color-mix(in srgb, var(--app-page-bg) 80%, var(--surface-color))'
                       }}
@@ -2824,7 +2824,7 @@ const Home = ({ onNavigate, onLogout }) => {
             ) : null,
 
             quickActions: enabledQuickActions.length > 0 ? (
-              <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('quickActions', 'cards') }} key="quickActions">
+              <div className="home-section home-section-full home-section-quick-actions px-4 mt-5 mb-4" style={{ animation: resolveAnimation('quickActions', 'cards') }} key="quickActions">
                 <div className="grid grid-cols-2 gap-3">
                   {enabledQuickActions.map((action) => {
                     return (
@@ -2877,11 +2877,11 @@ const Home = ({ onNavigate, onLogout }) => {
             ) : null,
 
             sponsors: ff('feature_sponsors') ? (
-              <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('sponsors', 'cards') }} key="sponsors">
+              <div className="home-section home-section-row home-section-sponsors px-4 mt-5 mb-4" style={{ animation: resolveAnimation('sponsors', 'cards') }} key="sponsors">
                 {sponsors.length > 0 ? (
                   <div className="relative">
                     <div
-                      className="relative overflow-hidden rounded-3xl"
+                      className="home-sponsor-card relative overflow-hidden rounded-3xl"
                       onTouchStart={handleSponsorTouchStart}
                       onTouchMove={handleSponsorTouchMove}
                       onTouchEnd={handleSponsorTouchEnd}
@@ -2892,7 +2892,7 @@ const Home = ({ onNavigate, onLogout }) => {
                           background: sponsorOverlayBackground,
                         }}
                       />
-                      <div className="relative min-h-[196px]">
+                      <div className="home-sponsor-fill relative min-h-[196px]">
                         {visibleSponsors.map((sponsor, idx) => {
                           if (!sponsor?.id) return null;
                           const isActive = idx === activeVisibleSponsorIndex;
@@ -3009,7 +3009,7 @@ const Home = ({ onNavigate, onLogout }) => {
                   </div>
                 ) : isSponsorSectionLoading ? (
                   <div
-                    className="relative overflow-hidden rounded-3xl"
+                    className="home-sponsor-card relative overflow-hidden rounded-3xl"
                     style={{
                       boxShadow: `0 8px 24px ${applyOpacity(theme.secondary, 0.07)}`
                     }}
@@ -3027,7 +3027,7 @@ const Home = ({ onNavigate, onLogout }) => {
                       }}
                     >
                       <div
-                        className="relative rounded-3xl p-4 min-h-[168px] overflow-hidden"
+                        className="home-sponsor-fill relative rounded-3xl p-4 min-h-[168px] overflow-hidden"
                         style={{
                           background: applyOpacity(sponsorTheme.cardBgColor, sponsorTheme.cardBgOpacity),
                           backdropFilter: 'blur(8px)',
@@ -3056,7 +3056,7 @@ const Home = ({ onNavigate, onLogout }) => {
                   </div>
                 ) : (
                   <div
-                    className="relative overflow-hidden rounded-3xl"
+                    className="home-sponsor-card relative overflow-hidden rounded-3xl"
                     style={{
                       boxShadow: `0 8px 24px ${applyOpacity(theme.secondary, 0.07)}`
                     }}
@@ -3074,7 +3074,7 @@ const Home = ({ onNavigate, onLogout }) => {
                       }}
                     >
                       <div
-                        className="relative rounded-3xl p-4 min-h-[168px] overflow-hidden"
+                        className="home-sponsor-fill relative rounded-3xl p-4 min-h-[168px] overflow-hidden"
                         style={{
                           background: applyOpacity(sponsorTheme.cardBgColor, sponsorTheme.cardBgOpacity),
                           backdropFilter: 'blur(8px)',
@@ -3086,20 +3086,19 @@ const Home = ({ onNavigate, onLogout }) => {
                             background: `repeating-linear-gradient(135deg, transparent 0 13px, ${sponsorTheme.patternColor}44 13px 14px)`,
                           }}
                         />
-                        <div className="relative z-10 h-full flex items-center gap-4">
-                          <div className="w-20 h-20 rounded-[1.2rem] flex items-center justify-center flex-shrink-0" style={{ background: sponsorTheme.skeletonColor }}>
+                        <div className="relative z-10 h-full flex flex-col items-center justify-center text-center gap-1.5 px-4">
+                          <div
+                            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-1"
+                            style={{ background: applyOpacity(sponsorTheme.badgeTextColor, 0.14) }}
+                          >
                             <Star className="h-6 w-6" style={{ color: sponsorTheme.badgeTextColor }} />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold" style={{ color: sponsorTheme.emptyTextColor }}>
-                              No active sponsors available right now.
-                            </p>
-                            {!sponsors.length && import.meta.env.DEV && sponsorEmptyDebugReason && (
-                              <p className="text-[11px] mt-1 font-medium break-words" style={{ color: getThemeToken(theme, 'typography.component_overrides.error_text', theme.primary) }}>
-                                Debug: {sponsorEmptyDebugReason}
-                              </p>
-                            )}
-                          </div>
+                          <p className="text-[13px] font-semibold" style={{ color: sponsorTheme.emptyTextColor }}>
+                            No sponsors to show right now
+                          </p>
+                          <p className="text-[11px] font-medium" style={{ color: applyOpacity(sponsorTheme.emptyTextColor, 0.7) }}>
+                            Please add sponsors to get started
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -3110,10 +3109,14 @@ const Home = ({ onNavigate, onLogout }) => {
             ) : null,
           };
 
-          return resolvedHomeLayout.map((key) => {
-            if (key === 'trustList' && !showTrustSelector) return null;
-            return SECTIONS[key] || null;
-          });
+          return (
+            <div className="home-section-layout">
+              {resolvedHomeLayout.map((key) => {
+                if (key === 'trustList' && !showTrustSelector) return null;
+                return SECTIONS[key] || null;
+              })}
+            </div>
+          );
         })()}
       </div>
 
@@ -3145,6 +3148,144 @@ const Home = ({ onNavigate, onLogout }) => {
         @keyframes themeZoomIn {
           from { opacity: 0; transform: scale(0.98); }
           to { opacity: 1; transform: scale(1); }
+        }
+
+        .home-section-layout {
+          width: 100%;
+        }
+
+        @media (min-width: 1024px) {
+          .home-desktop-shell {
+            overflow: visible !important;
+            min-height: 100% !important;
+          }
+
+          .home-main-content {
+            flex: 1 0 auto;
+            overflow: visible !important;
+          }
+
+          .home-decor-blob {
+            display: none !important;
+          }
+
+          .home-footer {
+            margin-top: auto !important;
+            position: static;
+            flex-shrink: 0;
+            box-shadow: none;
+          }
+
+          .home-navbar {
+            position: sticky;
+            top: 0;
+            z-index: 55;
+            box-shadow: 0 10px 26px color-mix(in srgb, var(--brand-navy-dark) 16%, transparent) !important;
+          }
+
+          .home-navbar-row {
+            padding: 14px 16px !important;
+            justify-content: flex-start !important;
+            gap: 24px;
+          }
+          .home-navbar-member-banner{
+            display:none !important;
+          }
+
+          .home-navbar-title-wrap {
+            justify-content: flex-start !important;
+            min-width: 0;
+          }
+
+          .home-navbar-title-wrap > .overflow-hidden {
+            width: auto !important;
+            max-width: min(52vw, 760px);
+          }
+
+          .home-navbar-title {
+            font-size: 1.3em !important;
+            line-height: 1.1;
+            max-width: min(52vw, 760px) !important;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            animation: none !important;
+            letter-spacing: 0;
+          }
+
+          .home-navbar-row > .flex-shrink-0:last-child {
+            margin-left: auto;
+          }
+
+          .home-navbar .notification-button {
+            
+            border-radius: 16px !important;
+            background: transparent !important;
+          }
+
+          .home-navbar .notification-dropdown {
+            top: 82px !important;
+            right: 32px !important;
+          }
+
+          .home-section-layout {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+            padding: 0;
+            align-items: stretch;
+          }
+
+          .home-section-full {
+            grid-column: 1 / -1;
+          }
+
+          .home-section-row {
+            min-width: 0;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+          }
+
+          .home-section-gallery {
+            order: 20;
+          }
+
+          .home-section-sponsors {
+            order: 21;
+          }
+
+          .home-section-quick-actions {
+            order: 30;
+          }
+
+          .home-gallery-card,
+          .home-sponsor-card {
+            height: 260px;
+          }
+
+          .home-gallery-card {
+            display: flex;
+            flex-direction: column;
+          }
+
+          .home-gallery-card > div:first-child {
+            flex: 0 0 3px;
+          }
+
+          .home-gallery-card > div:not(:first-child),
+          .home-gallery-card > button,
+          .home-gallery-card .relative.w-full.overflow-hidden,
+          .home-gallery-card .flex.transition-transform,
+          .home-gallery-card .w-full.flex-shrink-0,
+          .home-gallery-card img,
+          .home-gallery-fill,
+          .home-sponsor-card > .relative:not(.absolute),
+          .home-sponsor-fill {
+            height: 100% !important;
+            min-height: 0 !important;
+          }
         }
 
         /* Decorative home blobs animations */
@@ -3203,7 +3344,7 @@ const Home = ({ onNavigate, onLogout }) => {
 
       {/* ── Footer ── */}
       <footer
-        className="mt-auto py-3 px-6"
+        className="home-footer mt-auto py-3 px-6"
         style={{
           borderTop: '1px solid var(--footer-border)',
           background: 'var(--footer-bg)',
@@ -3231,6 +3372,7 @@ const Home = ({ onNavigate, onLogout }) => {
         loading={termsModalLoading}
         error={termsModalError}
       />
+      </div>
     </div>
   );
 };

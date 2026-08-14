@@ -403,8 +403,8 @@ export function Gallery({ onNavigate }) {
   const actionBg = 'var(--app-button-bg, var(--brand-red))';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--page-bg, var(--app-page-bg))', fontFamily: "var(--font-family, 'Inter', sans-serif)" }}>
-      <div style={{ background: navbarBackground, padding: '16px', paddingTop: 'max(env(safe-area-inset-top,0px),16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy-dark) 18%, transparent)', backdropFilter: 'blur(var(--navbar-blur, 12px))', WebkitBackdropFilter: 'blur(var(--navbar-blur, 12px))', borderBottom: '1px solid var(--navbar-border)' }}>
+    <div className="gallery-page" style={{ minHeight: '100vh', background: 'var(--page-bg, var(--app-page-bg))', fontFamily: "var(--font-family, 'Inter', sans-serif)" }}>
+      <div className="gallery-navbar" style={{ background: navbarBackground, padding: '16px', paddingTop: 'max(env(safe-area-inset-top,0px),16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy-dark) 18%, transparent)', backdropFilter: 'blur(var(--navbar-blur, 12px))', WebkitBackdropFilter: 'blur(var(--navbar-blur, 12px))', borderBottom: '1px solid var(--navbar-border)' }}>
         <button onClick={() => setIsMenuOpen(!isMenuOpen)} style={nb.iconBtn}>
           {isMenuOpen ? <X style={{ width: 24, height: 24, color: 'var(--app-button-text, var(--surface-color))' }} /> : <Menu style={{ width: 24, height: 24, color: 'var(--app-button-text, var(--surface-color))' }} />}
         </button>
@@ -433,9 +433,9 @@ export function Gallery({ onNavigate }) {
         </button>
       </div>
 
-      <div style={{ padding: '16px 14px 40px', maxWidth: 520, margin: '0 auto' }}>
+      <div className="gallery-content" style={{ padding: '16px 14px 40px', maxWidth: 520, margin: '0 auto' }}>
         {isLoading && !showLoadingFallback && !hasSettledInitialAlbums && (
-          <div style={gl.folderGrid}>
+          <div className="gallery-album-grid" style={gl.folderGrid}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} style={{ ...gl.folderCard, background: 'color-mix(in srgb, var(--app-accent-bg) 85%, var(--surface-muted))', animation: 'pulse 1.4s ease-in-out infinite' }}>
                 <div style={{ height: 160, background: 'color-mix(in srgb, var(--app-accent-bg) 78%, var(--surface-muted))', borderRadius: '16px 16px 0 0' }} />
@@ -468,7 +468,7 @@ export function Gallery({ onNavigate }) {
                   <p style={{ fontSize: 12, color: 'var(--body-text-color)', margin: '4px 0 0', fontWeight: 500 }}>{albums.length} album{albums.length !== 1 ? 's' : ''}</p>
                 </div>
 
-                <div style={gl.folderGrid}>
+                <div className="gallery-album-grid" style={gl.folderGrid}>
                   {albums.map((album) => {
                     const photos = (album.previewImages || []).slice(0, 2);
                     const count = Math.max(0, Number.isFinite(Number(album.imageCount)) ? Number(album.imageCount) : 0);
@@ -515,7 +515,7 @@ export function Gallery({ onNavigate }) {
             </div>
 
             {isAlbumLoading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+              <div className="gallery-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                 {Array.from({ length: 10 }).map((_, i) => (
                   <div key={i} style={{ ...gl.photoCard, background: 'color-mix(in srgb, var(--app-accent-bg) 84%, var(--surface-muted))', animation: 'pulse 1.4s ease-in-out infinite' }} />
                 ))}
@@ -527,7 +527,7 @@ export function Gallery({ onNavigate }) {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                <div className="gallery-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                   {filteredImages.map((image, idx) => (
                     <div
                       key={image.id}
@@ -663,6 +663,62 @@ export function Gallery({ onNavigate }) {
         }
         .gallery-photo-card:active {
           transform: scale(0.97);
+        }
+
+        @media (min-width: 1024px) {
+          .gallery-page {
+            min-height: 100% !important;
+          }
+
+          .gallery-navbar {
+            min-height: 96px;
+            padding: 24px 28px !important;
+          }
+
+          .gallery-content {
+            max-width: none !important;
+            width: 100%;
+            margin: 0 !important;
+            padding: 28px clamp(24px, 3vw, 48px) 48px !important;
+          }
+
+          .gallery-content > div:first-child h2 {
+            font-size: 28px !important;
+          }
+
+          .gallery-album-grid {
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+            gap: 20px !important;
+          }
+
+          .gallery-folder-card {
+            border-radius: 16px !important;
+            background: color-mix(in srgb, var(--surface-color) 82%, var(--page-bg, var(--app-page-bg))) !important;
+            border: 1px solid color-mix(in srgb, var(--navbar-accent) 22%, transparent) !important;
+            box-shadow: 0 12px 28px color-mix(in srgb, var(--brand-navy-dark) 16%, transparent) !important;
+          }
+
+          .gallery-folder-card > div:first-child {
+            height: 190px !important;
+          }
+
+          .gallery-folder-card > div:last-child {
+            padding: 14px 16px !important;
+          }
+
+          .gallery-folder-card > div:last-child > div {
+            color: var(--heading-color, var(--body-text-color)) !important;
+            font-size: 15px !important;
+          }
+
+          .gallery-photo-grid {
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important;
+            gap: 14px !important;
+          }
+
+          .gallery-photo-card {
+            aspect-ratio: 1 / 1;
+          }
         }
       `}</style>
     </div>

@@ -1726,6 +1726,11 @@ function Wishlist() {
             transform: translateX(-50%) translateY(0) scale(1);
           }
         }
+          @media (min-width: 1024px) {
+            .wishlist-content {
+              max-width: none !important;
+            }
+          }
       `}</style>
     </main>
   );
