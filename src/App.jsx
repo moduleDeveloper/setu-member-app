@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { ThemeContext } from './context/ThemeContext';
 import { GalleryProvider } from './context/GalleryContext';
@@ -20,8 +20,16 @@ import FacilityDetail from './FacilityDetail';
 import Events from './Events';
 import EventDetail from './EventDetail';
 import Achievements from './Achievements';
+import AchievementDetail from './AchievementDetail';
 import Donation from './Donation';
 import DonationForm from './DonationForm';
+import CategoriesProducts from './CategoriesProducts';
+import ProductList from './ProductList';
+import ProductDetail from './ProductDetail';
+import Wishlist from './Wishlist';
+import Cart from './Cart';
+import CreateOrder from './CreateOrder';
+import OrderHistory from './OrderHistory';
 import ExecutiveBody from './ExecutiveBody';
 import Notifications from './Notifications';
 import HealthcareTrusteeDirectory from './HealthcareTrusteeDirectory';
@@ -32,6 +40,7 @@ import SponsorDetails from './SponsorDetails';
 import SponsorsList from './SponsorsList';
 import DeveloperDetails from './DeveloperDetails';
 import FeatureGuard from './components/FeatureGuard';
+import Sidebar from './features/sidebar/Sidebar';
 
 import TermsAndConditions from './TermsAndConditions';
 import PrivacyPolicy from './PrivacyPolicy';
@@ -41,10 +50,16 @@ import AdminUserProfiles from './admin/AdminUserProfiles';
 import ContactUs from './ContactUs';
 import MyFamily from './MyFamily';
 import NominationDetails from './NominationDetails';
+import AddCommunity from './AddCommunity';
+import TrustIdCard from './TrustIdCard';
+import AppVersionUpdatePrompt from './components/AppVersionUpdatePrompt';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
+import { initPushNotifications } from './services/pushNotificationService';
+import { createUserNotification } from './services/api';
 import { syncTrustVersion } from './services/trustVersionService';
 import { logUserSessionEvent } from './services/sessionAuditService';
 import { applyThemeCssVariables, scopeCustomCss } from './utils/themeUtils';
+import { clearLoginTermsPromptPending } from './utils/legalContent';
 import { colorToHex } from './utils/colorUtils';
 import {
   THEME_REFRESH_EVENT
@@ -61,12 +76,22 @@ import {
   useInAppUpdate
 } from './hooks';
 
-const LAST_THEME_CACHE_KEY = 'last_theme_cache_v2';
-const LEGACY_LAST_THEME_CACHE_KEY = 'last_theme_cache_v1';
+const LAST_THEME_CACHE_KEY = 'last_theme_cache_v3';
+const LEGACY_LAST_THEME_CACHE_KEYS = ['last_theme_cache_v2', 'last_theme_cache_v1'];
+const THEME_CACHE_VERSION = 'v3';
+const LEGACY_THEME_CACHE_VERSIONS = ['v2'];
 const LAST_SELECTED_TRUST_ID_KEY = 'last_selected_trust_id';
+const TRUST_ID_CARD_CACHE_KEY = 'trust_id_card_payload_v1';
 const AUTO_LOGOUT_MINUTES = Number(import.meta.env.VITE_AUTO_LOGOUT_MINUTES || 30);
 const AUTO_LOGOUT_MS = Math.max(1, AUTO_LOGOUT_MINUTES) * 60 * 1000;
-const getPersistTrustCacheIndexKey = (trustId) => `theme_cache_persist_trust_v2_${trustId}`;
+const getPersistTrustCacheIndexKey = (trustId) => `theme_cache_persist_trust_${THEME_CACHE_VERSION}_${trustId}`;
+const SHOP_ROOT_PATH = '/categories-products';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const isUuid = (value) => UUID_RE.test(String(value || '').trim());
+const resolvePositiveId = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
 
 const safeParse = (value) => {
   try {
@@ -77,9 +102,11 @@ const safeParse = (value) => {
 };
 
 const readLastKnownThemeTrust = () => {
-  const parsedV2 = safeParse(localStorage.getItem('last_theme_cache_v2') || '');
-  const parsedLegacy = safeParse(localStorage.getItem('last_theme_cache_v1') || '');
-  const parsed = parsedV2 || parsedLegacy;
+  const parsedCurrent = safeParse(localStorage.getItem(LAST_THEME_CACHE_KEY) || '');
+  const parsedLegacy = LEGACY_LAST_THEME_CACHE_KEYS
+    .map((key) => safeParse(localStorage.getItem(key) || ''))
+    .find(Boolean);
+  const parsed = parsedCurrent || parsedLegacy;
   if (!parsed || typeof parsed !== 'object') return { id: '', name: '' };
   const id = String(parsed.selectedTrustId || parsed.trustId || '').trim();
   const name = String(parsed.selectedTrustName || parsed.trustName || '').trim();
@@ -90,7 +117,7 @@ const readBootThemeCache = (trustId) => {
   const normalizedTrustId = String(trustId || '').trim();
   if (!normalizedTrustId) return null;
 
-  const trustIndexKey = `theme_cache_trust_v2_${normalizedTrustId}`;
+  const trustIndexKey = `theme_cache_trust_${THEME_CACHE_VERSION}_${normalizedTrustId}`;
   const activeEntryKey = sessionStorage.getItem(trustIndexKey);
   if (activeEntryKey) {
     const parsedEntry = safeParse(sessionStorage.getItem(activeEntryKey) || '');
@@ -117,17 +144,23 @@ const readBootThemeCache = (trustId) => {
   }
 
   const lastTheme = safeParse(localStorage.getItem(LAST_THEME_CACHE_KEY) || '')
-    || safeParse(localStorage.getItem(LEGACY_LAST_THEME_CACHE_KEY) || '');
+    || LEGACY_LAST_THEME_CACHE_KEYS.map((key) => safeParse(localStorage.getItem(key) || '')).find(Boolean);
   if (!lastTheme || typeof lastTheme !== 'object') {
     // Recovery path when index keys are missing but trust cache entries exist.
-    const sessionPrefix = `theme_cache_v2_${normalizedTrustId}_`;
-    const persistPrefix = `theme_cache_persist_v2_${normalizedTrustId}_`;
+    const sessionPrefixes = [
+      `theme_cache_${THEME_CACHE_VERSION}_${normalizedTrustId}_`,
+      ...LEGACY_THEME_CACHE_VERSIONS.map((version) => `theme_cache_${version}_${normalizedTrustId}_`)
+    ];
+    const persistPrefixes = [
+      `theme_cache_persist_${THEME_CACHE_VERSION}_${normalizedTrustId}_`,
+      ...LEGACY_THEME_CACHE_VERSIONS.map((version) => `theme_cache_persist_${version}_${normalizedTrustId}_`)
+    ];
     let recoveredTheme = null;
     let recoveredTs = 0;
 
     for (let i = 0; i < sessionStorage.length; i += 1) {
       const key = sessionStorage.key(i);
-      if (!key || !key.startsWith(sessionPrefix)) continue;
+      if (!key || !sessionPrefixes.some((prefix) => key.startsWith(prefix))) continue;
       const parsed = safeParse(sessionStorage.getItem(key) || '');
       const candidateTheme = parsed?.theme;
       const candidateTs = Number(parsed?.ts) || 0;
@@ -139,7 +172,7 @@ const readBootThemeCache = (trustId) => {
 
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
-      if (!key || !key.startsWith(persistPrefix)) continue;
+      if (!key || !persistPrefixes.some((prefix) => key.startsWith(prefix))) continue;
       const parsed = safeParse(localStorage.getItem(key) || '');
       const candidateTheme = parsed?.theme;
       const candidateTs = Number(parsed?.ts) || 0;
@@ -174,6 +207,47 @@ const applyThemeToDocument = (theme) => {
   document.head.appendChild(style);
 };
 
+const CategoriesProductListRoute = () => {
+  const navigate = useNavigate();
+  const { categoryId } = useParams();
+  const resolvedCategoryId = resolvePositiveId(categoryId);
+
+  if (!resolvedCategoryId) {
+    return <Navigate to={SHOP_ROOT_PATH} replace />;
+  }
+
+  return (
+    <ProductList
+      categoryId={resolvedCategoryId}
+      onBack={() => navigate(-1)}
+      onOpenProduct={(productId) => {
+        const resolvedProductId = resolvePositiveId(productId);
+        if (!resolvedProductId) return;
+        navigate(`${SHOP_ROOT_PATH}/list/${resolvedCategoryId}/detail/${resolvedProductId}`);
+      }}
+    />
+  );
+};
+
+const CategoriesProductDetailRoute = () => {
+  const navigate = useNavigate();
+  const { categoryId, productId } = useParams();
+  const resolvedCategoryId = resolvePositiveId(categoryId);
+  const resolvedProductId = resolvePositiveId(productId);
+
+  if (!resolvedCategoryId || !resolvedProductId) {
+    return <Navigate to={SHOP_ROOT_PATH} replace />;
+  }
+
+  return (
+    <ProductDetail
+      categoryId={resolvedCategoryId}
+      productId={resolvedProductId}
+      onBack={() => navigate(-1)}
+    />
+  );
+};
+
 const HospitalTrusteeApp = () => {
   const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
   const BASE_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
@@ -182,9 +256,34 @@ const HospitalTrusteeApp = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMember] = useState(true);
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [previousScreen, setPreviousScreen] = useState(null);
-  const [previousScreenName, setPreviousScreenName] = useState(null);
+  const shouldRestoreMemberState =
+    location.pathname === '/member-details'
+    || location.pathname === '/executive_members_details'
+    || location.pathname === '/committee-members';
+  const routeStateMember = location.state?.memberData || null;
+  const [selectedMember, setSelectedMember] = useState(() => {
+    if (!shouldRestoreMemberState) return null;
+    const storedMember = safeParse(sessionStorage.getItem('selectedMember') || '');
+    return storedMember && typeof storedMember === 'object' ? storedMember : null;
+  });
+  const [selectedDetailMember, setSelectedDetailMember] = useState(() => {
+    if (!shouldRestoreMemberState) return null;
+    const storedDetailMember = safeParse(sessionStorage.getItem('selectedDetailMember') || '');
+    return storedDetailMember && typeof storedDetailMember === 'object' ? storedDetailMember : null;
+  });
+  const [previousScreen, setPreviousScreen] = useState(() => {
+    if (!shouldRestoreMemberState) return null;
+    return String(sessionStorage.getItem('previousScreen') || '').trim() || null;
+  });
+  const [previousScreenName, setPreviousScreenName] = useState(() => {
+    if (!shouldRestoreMemberState) return null;
+    return String(sessionStorage.getItem('previousScreenName') || '').trim() || null;
+  });
+  const committeeDetailMember =
+    (routeStateMember?.source === 'committee-members' ? routeStateMember : null)
+    || (selectedDetailMember?.source === 'committee-members' ? selectedDetailMember : null);
+  const resolvedCommitteePreviousScreen = selectedMember?.previousScreen || previousScreen;
+  const resolvedCommitteePreviousScreenName = selectedMember?.previousScreenName || previousScreenName;
   const [activeTrustId, setActiveTrustId] = useState(() => {
     const selected = localStorage.getItem('selected_trust_id') || '';
     if (selected) return selected;
@@ -248,6 +347,9 @@ const HospitalTrusteeApp = () => {
     : (activeTrustId || defaultThemeTrust.id);
   const { theme: appTheme, refreshTheme } = useTheme(resolvedThemeTrustId);
   const notificationLightColorRef = useRef('');
+  const pushInitCleanupRef = useRef(null);
+  const pushInitAttemptedRef = useRef(false);
+  const lastLoggedInStateRef = useRef(false);
 
   useLayoutEffect(() => {
     if (!resolvedThemeTrustId) return;
@@ -257,7 +359,6 @@ const HospitalTrusteeApp = () => {
     applyThemeToDocument(cachedTheme);
   }, [resolvedThemeTrustId]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const rootBrand = typeof window !== 'undefined'
       ? window.getComputedStyle(document.documentElement).getPropertyValue('--brand-red').trim()
@@ -274,6 +375,44 @@ const HospitalTrusteeApp = () => {
   useAndroidScreenOrientation('PORTRAIT');
   useAndroidKeyboard();
   useInAppUpdate();
+
+  useEffect(() => {
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const wasLoggedIn = lastLoggedInStateRef.current;
+    lastLoggedInStateRef.current = isLoggedIn;
+
+    if (!isLoggedIn) {
+      if (wasLoggedIn && typeof pushInitCleanupRef.current === 'function') {
+        pushInitCleanupRef.current();
+        pushInitCleanupRef.current = null;
+      }
+      pushInitAttemptedRef.current = false;
+      return undefined;
+    }
+
+    if (pushInitAttemptedRef.current) return undefined;
+
+    pushInitAttemptedRef.current = true;
+    const setupPushNotifications = async () => {
+      try {
+        const cleanup = await initPushNotifications();
+        if (typeof cleanup === 'function') {
+          pushInitCleanupRef.current = cleanup;
+        }
+      } catch (error) {
+        console.warn('Push notification init skipped:', error?.message || error);
+      }
+    };
+
+    setupPushNotifications();
+  }, [location.pathname]);
+
+  useEffect(() => () => {
+    if (typeof pushInitCleanupRef.current === 'function') {
+      pushInitCleanupRef.current();
+      pushInitCleanupRef.current = null;
+    }
+  }, []);
 
   const clearAuthAndRedirectToLogin = async (reason = 'logout', explicitUser = null) => {
     let currentUser = explicitUser;
@@ -294,6 +433,7 @@ const HospitalTrusteeApp = () => {
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('user');
     localStorage.removeItem(LAST_VISITED_ROUTE_KEY);
+    clearLoginTermsPromptPending();
     if (resetTrust.id) {
       localStorage.setItem('selected_trust_id', resetTrust.id);
       localStorage.setItem('selected_trust_name', resetTrust.name || BASE_TRUST_NAME);
@@ -304,6 +444,7 @@ const HospitalTrusteeApp = () => {
       localStorage.removeItem(LAST_SELECTED_TRUST_ID_KEY);
     }
     sessionStorage.removeItem('selectedMember');
+    sessionStorage.removeItem('selectedDetailMember');
     sessionStorage.removeItem('previousScreen');
     sessionStorage.removeItem('previousScreenName');
     sessionStorage.removeItem('trust_selected_in_session');
@@ -472,23 +613,18 @@ const HospitalTrusteeApp = () => {
       try {
         const userStr = localStorage.getItem('user');
         if (!userStr) {
-          console.log('ðŸŽ‚ [Birthday] No user in localStorage, skipping');
           return;
         }
 
         const parsedUser = JSON.parse(userStr);
-        console.log('ðŸŽ‚ [Birthday] parsedUser keys:', Object.keys(parsedUser));
-        console.log('ðŸŽ‚ [Birthday] Mobile:', parsedUser.Mobile || parsedUser.mobile);
-        console.log('ðŸŽ‚ [Birthday] Membership number:', parsedUser['Membership number']);
 
         const mobileForSearch = parsedUser.Mobile || parsedUser.mobile || parsedUser.phone || '';
         const membershipId = parsedUser['Membership number'] || parsedUser.membershipNumber || parsedUser['membership_number'] || '';
-        const membersId = parsedUser.members_id || parsedUser.member_id || parsedUser.id || '';
+        const membersId = [parsedUser.members_id, parsedUser.member_id, parsedUser.id].find(isUuid) || '';
         // Primary userId for notifications table
         const userId = mobileForSearch || membershipId || String(membersId || '');
 
         if (!userId) {
-          console.log('ðŸŽ‚ [Birthday] No userId found in user object, skipping');
           return;
         }
 
@@ -497,7 +633,6 @@ const HospitalTrusteeApp = () => {
         const today = todayIST.toISOString().slice(0, 10); // YYYY-MM-DD
         const localKey = `birthdayNotif_${userId}_${today}`;
         if (localStorage.getItem(localKey)) {
-          console.log('ðŸŽ‚ [Birthday] Already shown today, skipping');
           return;
         }
 
@@ -505,17 +640,14 @@ const HospitalTrusteeApp = () => {
         const { supabase } = await import('./services/supabaseClient');
 
         if (!membersId) {
-          console.log('ðŸŽ‚ [Birthday] No members_id found, skipping');
           return;
         }
 
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('member_profiles')
           .select('date_of_birth')
           .eq('members_id', membersId)
           .maybeSingle();
-
-        console.log('ðŸŽ‚ [Birthday] member_profiles row:', JSON.stringify(profile), 'error:', profileError?.message);
 
         if (!profile || !profile.date_of_birth) return;
 
@@ -529,36 +661,11 @@ const HospitalTrusteeApp = () => {
         if (dobMonth !== todayMonth || dobDay !== todayDay) return;
 
         const userName = parsedUser.name || parsedUser.Name || 'Member';
-        console.log(`ðŸŽ‰ [Birthday] BIRTHDAY DETECTED for: ${userName}`);
-
-        const isMissingUserIdColumnError = (error) =>
-          /column\s+notifications\.user_id\s+does not exist/i.test(String(error?.message || ''));
-
-        let existing = [];
-        let canUseUserIdColumn = true;
-        const { data: existingData, error: existingError } = await supabase
-          .from('notifications')
-          .select('id')
-          .eq('user_id', String(userId))
-          .eq('type', 'birthday')
-          .gte('created_at', `${today}T00:00:00.000Z`)
-          .limit(1);
-
-        if (existingError) {
-          if (isMissingUserIdColumnError(existingError)) {
-            canUseUserIdColumn = false;
-            console.warn('[Birthday] notifications.user_id column missing; skipping birthday DB sync.');
-          } else {
-            throw existingError;
-          }
-        } else {
-          existing = existingData || [];
-        }
 
         const birthdayMessage = `ðŸŽ‚ Maharaja Agrasen Samiti ki taraf se aapko janamdin ki hardik shubhkamnayein, ${userName} ji! Aapka yeh din bahut khaas ho! ðŸŽ‰ðŸŽŠ`;
 
-        if (canUseUserIdColumn && (!existing || existing.length === 0)) {
-          const { error: insertErr } = await supabase.from('notifications').insert({
+        try {
+          await createUserNotification({
             user_id: String(userId),
             title: 'ðŸŽ‚ Happy Birthday!',
             message: birthdayMessage,
@@ -566,11 +673,8 @@ const HospitalTrusteeApp = () => {
             is_read: false,
             created_at: new Date().toISOString(),
           });
-          if (insertErr) {
+        } catch (insertErr) {
             console.error('ðŸŽ‚ [Birthday] DB insert error:', insertErr.message);
-          } else {
-            console.log('âœ… [Birthday] Notification inserted in DB successfully');
-          }
         }
 
         localStorage.setItem(localKey, '1');
@@ -633,66 +737,21 @@ const HospitalTrusteeApp = () => {
       try {
         const userStr = localStorage.getItem('user');
         if (!userStr) {
-          console.log('[NotifListener] No user in localStorage, skipping setup');
           return;
         }
 
         const notificationContext = getCurrentNotificationContext();
-        const { userId, userIdVariants, audienceVariants } = notificationContext;
+        const { userId } = notificationContext;
 
         if (!userId) {
-          console.log('[NotifListener] No userId found, skipping setup');
           return;
         }
-
-        console.log('[NotifListener] Setting up for user:', userId, 'variants:', userIdVariants);
 
         const { supabase } = await import('./services/supabaseClient');
         supabaseRef = supabase;
 
         const notificationTracker = new Set();
         const trackerKey = `shownNotifications_${userId}`;
-        const normalizeId = (value) => String(value || '').trim().toLowerCase();
-        const fallbackUserIdSet = new Set();
-        const fallbackUserIdRawSet = new Set();
-        let canQueryNotificationUserId = true;
-        const isMissingUserIdColumnError = (error) =>
-          /column\s+notifications\.user_id\s+does not exist/i.test(String(error?.message || ''));
-
-        const refreshFallbackUserIds = async () => {
-          try {
-            const { data: linkedAppointments } = await supabase
-              .from('appointments')
-              .select('patient_name, membership_number, user_id')
-              .in('patient_phone', userIdVariants)
-              .limit(500);
-
-            fallbackUserIdSet.clear();
-            fallbackUserIdRawSet.clear();
-            (linkedAppointments || []).forEach((row) => {
-              const patientName = String(row?.patient_name || '').trim();
-              const membershipNumber = String(row?.membership_number || '').trim();
-              const appointmentUserId = String(row?.user_id || '').trim();
-
-              if (patientName) {
-                fallbackUserIdRawSet.add(patientName);
-                fallbackUserIdSet.add(normalizeId(patientName));
-              }
-              if (membershipNumber) {
-                fallbackUserIdRawSet.add(membershipNumber);
-                fallbackUserIdSet.add(normalizeId(membershipNumber));
-              }
-              if (appointmentUserId) {
-                fallbackUserIdRawSet.add(appointmentUserId);
-                fallbackUserIdSet.add(normalizeId(appointmentUserId));
-              }
-            });
-          } catch (fallbackErr) {
-            console.warn('[NotifListener] Fallback user-id refresh failed:', fallbackErr?.message || fallbackErr);
-          }
-        };
-
-        await refreshFallbackUserIds();
         const existing = localStorage.getItem(trackerKey);
         if (existing) {
           try {
@@ -703,18 +762,21 @@ const HospitalTrusteeApp = () => {
           }
         }
 
+        const getNotificationType = (notification) => String(notification?.click_action || notification?.type || 'general').trim() || 'general';
+
         const showPushNotification = async (notification) => {
           if (isDisposed || notificationTracker.has(notification.id)) return;
 
           try {
             window.dispatchEvent(new CustomEvent('pushNotificationArrived', { detail: notification }));
 
+            const notificationType = getNotificationType(notification);
             await LocalNotifications.createChannel({
-              id: `notif_channel_${notification.type || 'general'}`,
-              name: notification.type === 'appointment_insert' ? 'Appointment Updates'
-                : notification.type === 'referral' ? 'Referral Updates'
-                  : notification.type === 'birthday' ? 'Birthday Wishes'
-                    : notification.type === 'test' ? 'Test Notifications'
+              id: `notif_channel_${notificationType}`,
+              name: notificationType === 'appointment_insert' ? 'Appointment Updates'
+                : notificationType === 'referral' ? 'Referral Updates'
+                  : notificationType === 'birthday' ? 'Birthday Wishes'
+                    : notificationType === 'test' ? 'Test Notifications'
                       : 'Hospital Notifications',
               description: 'Updates from Mah-Setu app',
               importance: 5,
@@ -738,7 +800,7 @@ const HospitalTrusteeApp = () => {
                   id: notifId,
                   title: notification.title || 'New Notification',
                   body: (notification.message || notification.body || 'You have a new notification').substring(0, 200),
-                  channelId: `notif_channel_${notification.type || 'general'}`,
+                  channelId: `notif_channel_${notificationType}`,
                   schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true },
                   sound: null,
                   attachments: null,
@@ -762,52 +824,32 @@ const HospitalTrusteeApp = () => {
 
             const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
 
-            const notificationUserIds = [
-              ...new Set([
-                ...userIdVariants,
-                ...Array.from(fallbackUserIdRawSet),
-              ]),
-            ];
+            let recentNotificationQuery = supabase
+              .from('notification')
+              .select('*')
+              .gte('created_at', fiveSecondsAgo)
+              .order('created_at', { ascending: false })
+              .limit(25);
 
-            let userNotifications = [];
-            if (canQueryNotificationUserId) {
-              const { data, error: userNotifError } = await supabase
-                .from('notifications')
-                .select('*')
-                .in('user_id', notificationUserIds)
-                .gte('created_at', fiveSecondsAgo)
-                .order('created_at', { ascending: false });
-
-              if (userNotifError) {
-                if (isMissingUserIdColumnError(userNotifError)) {
-                  canQueryNotificationUserId = false;
-                  console.warn('[NotifListener] notifications.user_id column missing; skipping direct user polling.');
-                } else {
-                  console.error('[NotifListener] User polling error:', userNotifError.message);
-                  return;
-                }
-              } else {
-                userNotifications = data || [];
-              }
+            if (notificationContext.trustId) {
+              recentNotificationQuery = recentNotificationQuery.eq('trust_id', notificationContext.trustId);
             }
 
-            const { data: audienceNotifications, error: audienceError } = await supabase
-              .from('notifications')
-              .select('*')
-              .in('target_audience', audienceVariants)
-              .gte('created_at', fiveSecondsAgo)
-              .order('created_at', { ascending: false });
+            const { data: recentNotifications, error: recentError } = await recentNotificationQuery;
 
-            if (audienceError) {
-              console.error('[NotifListener] Audience polling error:', audienceError.message);
+            if (recentError) {
+              console.error('[NotifListener] Notification polling error:', recentError.message);
               return;
             }
 
-            const merged = [...(userNotifications || []), ...(audienceNotifications || [])];
-            const uniqueRecent = [...new Map(merged.map((item) => [item.id, item])).values()];
+            const uniqueRecent = [...new Map(
+              (recentNotifications || [])
+                .filter((item) => matchesNotificationForContext(item, notificationContext))
+                .map((item) => [item.id, item])
+            ).values()];
 
             for (const notif of uniqueRecent) {
-              if (notif.type !== 'birthday' && !notificationTracker.has(notif.id)) {
+              if (getNotificationType(notif) !== 'birthday' && !notificationTracker.has(notif.id)) {
                 await showPushNotification(notif);
               }
             }
@@ -821,14 +863,12 @@ const HospitalTrusteeApp = () => {
             .channel(`notifications_channel_${userId}`)
             .on(
               'postgres_changes',
-              { event: 'INSERT', schema: 'public', table: 'notifications' },
+              { event: 'INSERT', schema: 'public', table: 'notification' },
               (payload) => {
                 const newNotification = payload.new;
-                const directMatch = matchesNotificationForContext(newNotification, notificationContext);
-                const fallbackMatch = fallbackUserIdSet.has(normalizeId(newNotification?.user_id));
-                const isForThisUser = directMatch || fallbackMatch;
+                const isForThisUser = matchesNotificationForContext(newNotification, notificationContext);
 
-                if (isForThisUser && newNotification.type !== 'birthday') {
+                if (isForThisUser && getNotificationType(newNotification) !== 'birthday') {
                   showPushNotification(newNotification);
                 }
               }
@@ -887,15 +927,45 @@ const HospitalTrusteeApp = () => {
 
   // Navigation handler - supports both route-based and state-based navigation
   const handleNavigate = (screen, data = null) => {
+    // Some callers (e.g. notification click-redirects) already resolve a real
+    // route path like "/events" instead of a screen key — pass those straight
+    // through to the router instead of looking them up in routeMap below.
+    if (typeof screen === 'string' && screen.startsWith('/')) {
+      navigate(screen);
+      return;
+    }
     if (screen === 'appointment' && !isMember) {
       alert('Only members can book appointments.');
+      return;
+    }
+    if (screen === 'achievement-details' && data?.achievementId) {
+      navigate(`/achievements/${encodeURIComponent(String(data.achievementId))}`);
       return;
     }
     if (screen === 'executive-body') {
       navigate('/executive-body');
       return;
     }
+    if (screen === 'trust-id-card') {
+      if (data && typeof data === 'object') {
+        try {
+          sessionStorage.setItem(TRUST_ID_CARD_CACHE_KEY, JSON.stringify(data));
+        } catch {
+          // Ignore storage failures and continue navigating.
+        }
+      }
+      navigate('/trust-id-card');
+      return;
+    }
     if ((screen === 'member-details' || screen === 'executive-member-details') && data) {
+      const isCommitteeDetail = data?.source === 'committee-members';
+      if (isCommitteeDetail) {
+        setSelectedDetailMember(data);
+        sessionStorage.setItem('selectedDetailMember', JSON.stringify(data));
+      } else {
+        setSelectedDetailMember(null);
+        sessionStorage.removeItem('selectedDetailMember');
+      }
       setPreviousScreen(location.pathname);
       setPreviousScreenName(data.previousScreenName || location.pathname);
       setSelectedMember(data);
@@ -904,12 +974,17 @@ const HospitalTrusteeApp = () => {
       sessionStorage.setItem('previousScreenName', data.previousScreenName || location.pathname);
       navigate('/executive_members_details');
     } else if (screen === 'committee-members' && data) {
+      const committeePayload = {
+        ...data,
+        previousScreen: location.pathname,
+        previousScreenName: data.previousScreenName || location.pathname,
+      };
       setPreviousScreen(location.pathname);
-      setPreviousScreenName(data.previousScreenName || location.pathname);
-      setSelectedMember(data);
-      sessionStorage.setItem('selectedMember', JSON.stringify(data));
+      setPreviousScreenName(committeePayload.previousScreenName);
+      setSelectedMember(committeePayload);
+      sessionStorage.setItem('selectedMember', JSON.stringify(committeePayload));
       sessionStorage.setItem('previousScreen', location.pathname);
-      sessionStorage.setItem('previousScreenName', data.previousScreenName || location.pathname);
+      sessionStorage.setItem('previousScreenName', committeePayload.previousScreenName);
       navigate('/committee-members');
     } else {
       const routeMap = {
@@ -929,6 +1004,10 @@ const HospitalTrusteeApp = () => {
         'donation': '/donation',
         'executive-body': '/executive-body',
         'donation-form': '/donation-form',
+        'products': '/categories-products',
+        'categories-products': '/categories-products',
+        'wishlist': '/wishlist',
+        'cart': '/cart',
         'notifications': '/notifications',
         'committee-members': '/committee-members',
         'sponsor-details': '/sponsor-details',
@@ -939,7 +1018,11 @@ const HospitalTrusteeApp = () => {
         'contact-us': '/contact-us',
         'my-family': '/my-family',
         'nomination-details': '/nomination-details',
+        'add-community': '/add-community',
+        'trust-id-card': '/trust-id-card',
         'other-memberships': '/other-memberships',
+        'order-history': '/order-history',
+        'orderhistory': '/order-history',
       };
       const route = routeMap[screen] || '/';
       console.log('Navigating to route:', screen, '->', route);
@@ -947,15 +1030,28 @@ const HospitalTrusteeApp = () => {
     }
   };
 
-  // Load member data from sessionStorage on mount if on member-details route
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Load member data from sessionStorage on mount if on member-details or committee-members route
   useEffect(() => {
-    if (location.pathname === '/member-details' || location.pathname === '/executive_members_details') {
+    if (
+      location.pathname === '/member-details'
+      || location.pathname === '/executive_members_details'
+      || location.pathname === '/committee-members'
+    ) {
       const storedMember = sessionStorage.getItem('selectedMember');
+      const storedDetailMember = sessionStorage.getItem('selectedDetailMember');
       const storedPreviousScreen = sessionStorage.getItem('previousScreen');
       const storedPreviousScreenName = sessionStorage.getItem('previousScreenName');
 
-      if (storedMember) {
+      if (location.pathname === '/executive_members_details' && storedDetailMember) {
+        try {
+          const parsedDetailMember = JSON.parse(storedDetailMember);
+          if (JSON.stringify(selectedDetailMember) !== JSON.stringify(parsedDetailMember)) {
+            setSelectedDetailMember(parsedDetailMember);
+          }
+        } catch (e) {
+          console.error('Error parsing stored detail member:', e);
+        }
+      } else if (storedMember) {
         try {
           const parsedMember = JSON.parse(storedMember);
           if (JSON.stringify(selectedMember) !== JSON.stringify(parsedMember)) {
@@ -976,22 +1072,26 @@ const HospitalTrusteeApp = () => {
         }
       }
     }
-  }, [location.pathname]);
+  }, [location.pathname, selectedDetailMember, selectedMember, previousScreen, previousScreenName]);
+
+  const normalizedPath = String(location.pathname || '/').replace(/^\/+/, '').replace(/\/.*$/, '');
+  const currentSidebarPage = normalizedPath || 'home';
+  const showDesktopSidebar = !PUBLIC_ROUTES.includes(location.pathname) && localStorage.getItem('isLoggedIn') === 'true';
 
   const appContent = (
     <div
       className={`min-h-screen relative shadow-2xl overflow-x-hidden app-route-shell ${(location.pathname === '/login' || location.pathname === '/otp-verification' || location.pathname === '/profile' || location.pathname === '/vip-login') ? 'overflow-hidden' : 'overflow-y-auto'
-        } w-full max-w-[430px] mx-auto`}
+        } w-full mx-auto`}
       style={{
         background: 'var(--page-bg, var(--app-page-bg))',
         color: 'var(--body-text-color)',
         fontFamily: "var(--font-family, 'Inter', sans-serif)",
         marginInline: 'auto',
-        width: 'min(100%, 430px)',
-        maxWidth: '430px',
+        width: '100%',
         flexShrink: 0,
       }}
     >
+      <AppVersionUpdatePrompt trustId={resolvedThemeTrustId} />
       <Routes>
         <Route
           path="/login"
@@ -1174,6 +1274,16 @@ const HospitalTrusteeApp = () => {
           }
         />
         <Route
+          path="/achievements/:achievementId"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_achievements">
+                <AchievementDetail onNavigate={handleNavigate} />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/donation"
           element={
             <ProtectedRoute>
@@ -1189,6 +1299,86 @@ const HospitalTrusteeApp = () => {
             <ProtectedRoute>
               <FeatureGuard featureKey="feature_donation">
                 <DonationForm />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categories-products"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <CategoriesProducts />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categoriesproducts"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <Navigate to="/categories-products" replace />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categories-products/list/:categoryId"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <CategoriesProductListRoute />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categories-products/list/:categoryId/detail/:productId"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <CategoriesProductDetailRoute />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/wishlist"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <Wishlist />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cart"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <Cart />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/create-order"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_product">
+                <CreateOrder />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/order-history"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_order_history">
+                <OrderHistory />
               </FeatureGuard>
             </ProtectedRoute>
           }
@@ -1217,23 +1407,26 @@ const HospitalTrusteeApp = () => {
           path="/executive_members_details"
           element={
             <ProtectedRoute>
-              {selectedMember ? (
+              {(committeeDetailMember || selectedMember) ? (
                 <MemberDetails
-                  member={selectedMember}
+                  member={committeeDetailMember || selectedMember}
                   onNavigate={handleNavigate}
                   onNavigateBack={() => {
-                    if (previousScreenName && (previousScreenName === 'healthcare' || previousScreenName === 'committee' || previousScreenName === 'trustee')) {
+                    const resolvedPreviousScreenName = committeeDetailMember?.previousScreenName || previousScreenName;
+                    const resolvedPreviousScreen = committeeDetailMember?.previousScreen || previousScreen;
+
+                    if (resolvedPreviousScreenName && (resolvedPreviousScreenName === 'healthcare' || resolvedPreviousScreenName === 'committee' || resolvedPreviousScreenName === 'trustee')) {
                       navigate('/healthcare-trustee-directory');
-                      sessionStorage.setItem('restoreDirectory', previousScreenName);
-                    } else if (previousScreenName && (previousScreenName === 'healthcare' || previousScreenName === 'trustees' || previousScreenName === 'patrons' || previousScreenName === 'committee' || previousScreenName === 'doctors' || previousScreenName === 'hospitals' || previousScreenName === 'elected')) {
+                      sessionStorage.setItem('restoreDirectory', resolvedPreviousScreenName);
+                    } else if (resolvedPreviousScreenName && (resolvedPreviousScreenName === 'healthcare' || resolvedPreviousScreenName === 'trustees' || resolvedPreviousScreenName === 'patrons' || resolvedPreviousScreenName === 'committee' || resolvedPreviousScreenName === 'doctors' || resolvedPreviousScreenName === 'hospitals' || resolvedPreviousScreenName === 'elected')) {
                       navigate('/directory');
-                      sessionStorage.setItem('restoreDirectoryTab', previousScreenName);
+                      sessionStorage.setItem('restoreDirectoryTab', resolvedPreviousScreenName);
                     } else {
-                      const prevScreen = previousScreen || '/directory';
+                      const prevScreen = resolvedPreviousScreen || '/directory';
                       navigate(prevScreen);
                     }
                   }}
-                  previousScreenName={previousScreenName}
+                  previousScreenName={committeeDetailMember?.previousScreenName || previousScreenName}
                 />
               ) : (
                 <Navigate to="/executive-body" replace />
@@ -1245,19 +1438,19 @@ const HospitalTrusteeApp = () => {
           path="/committee-members"
           element={
             <ProtectedRoute>
-              {selectedMember ? (
+              {selectedMember && (selectedMember.is_committee_group || Array.isArray(selectedMember.committee_members)) ? (
                 <CommitteeMembers
                   committeeData={selectedMember}
                   onNavigateBack={() => {
-                    if (previousScreenName && (previousScreenName === 'healthcare' || previousScreenName === 'committee' || previousScreenName === 'trustee')) {
+                    if (resolvedCommitteePreviousScreenName && (resolvedCommitteePreviousScreenName === 'healthcare' || resolvedCommitteePreviousScreenName === 'committee' || resolvedCommitteePreviousScreenName === 'trustee')) {
                       navigate('/healthcare-trustee-directory');
-                      sessionStorage.setItem('restoreDirectory', previousScreenName);
+                      sessionStorage.setItem('restoreDirectory', resolvedCommitteePreviousScreenName);
                     } else {
-                      const prevScreen = previousScreen || '/directory';
+                      const prevScreen = resolvedCommitteePreviousScreen || '/directory';
                       navigate(prevScreen);
                     }
                   }}
-                  previousScreenName={previousScreenName}
+                  previousScreenName={resolvedCommitteePreviousScreenName}
                   onNavigate={handleNavigate}
                 />
               ) : (
@@ -1334,9 +1527,27 @@ const HospitalTrusteeApp = () => {
             <ProtectedRoute>
               <FeatureGuard featureKey="feature_nomination_details">
                 <NominationDetails
-                  onNavigateBack={() => navigate('/')}
+                  onNavigate={handleNavigate}
                 />
               </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/add-community"
+          element={
+            <ProtectedRoute>
+              <FeatureGuard featureKey="feature_add_community">
+                <AddCommunity onNavigateBack={() => navigate('/')} />
+              </FeatureGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/trust-id-card"
+          element={
+            <ProtectedRoute>
+              <TrustIdCard onNavigate={handleNavigate} />
             </ProtectedRoute>
           }
         />
@@ -1382,15 +1593,29 @@ const HospitalTrusteeApp = () => {
     <ThemeContext.Provider value={appTheme}>
       <GalleryProvider>
         <div
-          className="min-h-screen w-full flex justify-center overflow-x-hidden app-root-shell"
+          className={`min-h-screen w-full flex overflow-x-hidden app-root-shell ${showDesktopSidebar ? 'has-desktop-sidebar' : ''}`}
           data-theme-scope="trust-app"
           style={{
             display: 'flex',
-            justifyContent: 'center',
             width: '100%',
           }}
         >
-          {appContent}
+          {showDesktopSidebar && (
+            <div className="app-desktop-sidebar hidden lg:block flex-shrink-0">
+              <Sidebar
+                isOpen={false}
+                onClose={() => {}}
+                onNavigate={handleNavigate}
+                currentPage={currentSidebarPage}
+                onLogout={() => clearAuthAndRedirectToLogin('logout')}
+                variant="persistent"
+                isCollapsed={false}
+              />
+            </div>
+          )}
+          <div className="app-main-column min-w-0 flex-1">
+            {appContent}
+          </div>
         </div>
       </GalleryProvider>
     </ThemeContext.Provider>

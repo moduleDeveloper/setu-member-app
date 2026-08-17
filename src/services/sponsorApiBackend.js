@@ -1,8 +1,6 @@
-import {
-  api,
-  getSponsors as getSponsorsDirect
-} from './api';
+import { api } from './api';
 import { supabase } from './supabaseClient.js';
+import { isDateValidForToday, isRowActive, toYmdOnly } from './sponsorRules.js';
 
 const inFlight = new Map();
 
@@ -30,38 +28,6 @@ const shouldFallbackToDirectFetch = (error) => {
   const status = Number(error?.response?.status || 0);
   if ([500, 502, 503, 504].includes(status)) return true;
   return !error?.response;
-};
-
-const toYmdOnly = (value) => {
-  if (value === null || value === undefined) return null;
-  const raw = String(value).trim();
-  if (!raw) return null;
-  const ymdMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (ymdMatch) return ymdMatch[1];
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return null;
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const isDateValidForToday = (row, todayYmd) => {
-  const startYmd = toYmdOnly(row?.start_date);
-  const endYmd = toYmdOnly(row?.end_date);
-  const startOk = Boolean(startYmd) && startYmd <= todayYmd;
-  const endOk = !endYmd || endYmd >= todayYmd;
-  return startOk && endOk;
-};
-
-const isRowActive = (row) => {
-  const value = row?.is_active;
-  if (value === undefined || value === null) return true;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value === 1;
-  const normalized = String(value).trim().toLowerCase();
-  if (!normalized) return true;
-  return !['false', '0', 'no', 'inactive'].includes(normalized);
 };
 
 const getSponsorByIdDirect = async (id, trustId = null) => {
@@ -111,56 +77,73 @@ const getSponsorByIdDirect = async (id, trustId = null) => {
   return { success: true, data: [sponsor] };
 };
 
-export const getSponsors = async (
-  trustId = null,
-  trustName = null,
-  { page = 1, limit = null, offset = null, view = 'carousel', all = false } = {}
-) => {
+// Single source of truth for the sponsor listing/carousel flow: the
+// get_active_sponsors(p_trust_id) RPC already applies trust_id, active
+// status, and start/end date validity — no backend API call and no
+// fallback query are made here.
+export const getSponsors = async (trustId = null, { force = false } = {}) => {
   const normalizedTrustId = normalizeTrustId(trustId);
-  const normalizedTrustName = String(trustName || '').trim() || null;
-  const pageNo = Number(page) > 0 ? Math.floor(Number(page)) : 1;
-  const limitNo = Number(limit) > 0 ? Math.floor(Number(limit)) : null;
-  const offsetNo = Number.isFinite(Number(offset)) ? Math.max(0, Math.floor(Number(offset))) : null;
-  const normalizedView = String(view || 'carousel').toLowerCase() === 'list' ? 'list' : 'carousel';
-  const normalizedAll = Boolean(all);
+  const normalizedForce = Boolean(force);
 
-  const requestKey = [
-    'sponsors',
-    normalizedTrustId || 'none',
-    normalizedTrustName || 'none',
-    normalizedView,
-    pageNo,
-    limitNo === null ? 'auto' : limitNo,
-    offsetNo === null ? 'auto' : offsetNo,
-    normalizedAll ? 'all' : 'paged'
-  ].join('|');
+  if (!normalizedTrustId) {
+    return {
+      success: true,
+      data: [],
+      hasMore: false,
+      debug: { trustId: null, reason: 'No trust_id resolved from app context.' }
+    };
+  }
+
+  const requestKey = `sponsors|${normalizedTrustId}|${normalizedForce ? 'force' : 'cache'}`;
 
   return runDedupe(requestKey, async () => {
-    const params = { view: normalizedView, page: pageNo };
-    if (normalizedTrustId) params.trust_id = normalizedTrustId;
-    if (normalizedTrustName) params.trust_name = normalizedTrustName;
-    if (limitNo !== null) params.limit = limitNo;
-    if (offsetNo !== null) params.offset = offsetNo;
-    if (normalizedAll) params.all = 'true';
+    const { data, error } = await supabase.rpc('get_active_sponsors', {
+      p_trust_id: normalizedTrustId
+    });
 
-    try {
-      const response = await api.get('/sponsors/active', { params });
-      return response?.data || { success: true, data: [], hasMore: false };
-    } catch (error) {
-      if (!shouldFallbackToDirectFetch(error)) throw error;
-      console.warn('[SponsorAPI] Backend sponsor feed failed, falling back to direct fetch.', {
-        status: error?.response?.status || null,
-        trustId: normalizedTrustId,
-        trustName: normalizedTrustName,
-        view: normalizedView
-      });
-      return getSponsorsDirect(normalizedTrustId, normalizedTrustName, {
-        page: pageNo,
-        limit: limitNo,
-        offset: offsetNo,
-        view: normalizedView
-      });
+    if (error) {
+      console.error('[Sponsor] get_active_sponsors RPC failed:', error);
+      throw error;
     }
+
+    const rows = Array.isArray(data) ? data : [];
+    const mapped = rows
+      .filter((row) => row?.sponsor_id)
+      .map((row) => ({
+        id: String(row.sponsor_id),
+        sponsor_id: String(row.sponsor_id),
+        flash_id: row.flash_id || null,
+        trust_id: normalizedTrustId,
+        priority: row.priority ?? null,
+        duration_seconds: Number(row.duration_seconds) > 0 ? Number(row.duration_seconds) : 5,
+        start_date: row.start_date || null,
+        end_date: row.end_date || null,
+        name: row.name || null,
+        position: row.position || null,
+        about: row.about || null,
+        photo_url: row.photo_url || null,
+        company_name: row.company_name || null,
+        badge_label: row.badge_label || null,
+        whatsapp_number: row.whatsapp_number || null,
+        website_url: row.website_url || null,
+        catalog_url: row.catalog_url || null,
+        coPartner: row.coPartner || null,
+        facebook: row.facebook || null,
+        instagram: row.instagram || null,
+        linkedin: row.linkedin || null,
+        X: row.X || null
+      }));
+
+    return {
+      success: true,
+      data: mapped,
+      hasMore: false,
+      debug: {
+        trustId: normalizedTrustId,
+        reason: mapped.length === 0 ? 'get_active_sponsors returned no rows for this trust_id.' : '',
+        counts: { finalRows: mapped.length }
+      }
+    };
   });
 };
 
@@ -168,13 +151,7 @@ export const getAllSponsorsForTrust = async (trustId) => {
   const normalizedTrustId = normalizeTrustId(trustId);
   if (!normalizedTrustId) return { success: true, data: [], total: 0 };
 
-  const response = await getSponsors(normalizedTrustId, null, {
-    view: 'list',
-    page: 1,
-    limit: 100,
-    offset: 0,
-    all: true
-  });
+  const response = await getSponsors(normalizedTrustId);
 
   const data = Array.isArray(response?.data) ? response.data : [];
   return {

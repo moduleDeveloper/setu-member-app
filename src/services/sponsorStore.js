@@ -1,4 +1,5 @@
 import { getSponsorById, getSponsors } from './sponsorApiBackend';
+import { isFresh, isRowActive } from './sponsorRules.js';
 
 /**
  * Centralized Sponsor Store (ID normalized)
@@ -28,7 +29,7 @@ export const sponsorConfig = {
   CAROUSEL_SLIDE_SECONDS: 5
 };
 
-const STORAGE_VERSION = 'v4';
+const STORAGE_VERSION = 'v5';
 const SPONSOR_TIMEZONE = 'Asia/Kolkata';
 const KEY_BY_ID_PREFIX = `sp_by_id_${STORAGE_VERSION}_`;
 const KEY_ORDER_PREFIX = `sp_order_${STORAGE_VERSION}_`;
@@ -63,8 +64,6 @@ const writeJson = (key, value) => {
 };
 
 const now = () => Date.now();
-const isFresh = (ts, ttl) => Number(ts) > 0 && now() - Number(ts) < ttl;
-
 const normalizeId = (value) => {
   if (value === null || value === undefined) return null;
   const id = String(value).trim();
@@ -73,15 +72,10 @@ const normalizeId = (value) => {
 
 const normalizeDigits = (value) => String(value || '').replace(/\D/g, '');
 
-const isSponsorActive = (sponsor) => {
-  const value = sponsor?.is_active;
-  if (value === undefined || value === null) return true;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value === 1;
-  const normalized = String(value).trim().toLowerCase();
-  if (!normalized) return true;
-  return !['false', '0', 'no', 'inactive'].includes(normalized);
-};
+// get_active_sponsors(p_trust_id) is the single source of truth for which
+// sponsors are active and date-valid. The store must not re-derive that
+// status from a sponsor.is_active field on the frontend.
+const isSponsorActive = () => true;
 
 const readLoggedInUserSponsorContext = (trustId = null) => {
   try {
@@ -440,10 +434,21 @@ export function readSponsorOrder(trustId) {
     const sponsor = byId[id];
     return Boolean(sponsor) && isSponsorActive(sponsor);
   });
+
   if (activeOrder.length !== order.length) {
     writeJson(KEY_ORDER(normalizedTrustId), activeOrder);
     memorySponsorOrder[normalizedTrustId] = activeOrder;
   }
+
+  if (activeOrder.length === 0 && Object.keys(byId).length > 0) {
+    const fallbackOrder = Object.keys(byId).filter((id) => isSponsorActive(byId[id]));
+    if (fallbackOrder.length > 0) {
+      writeJson(KEY_ORDER(normalizedTrustId), fallbackOrder);
+      memorySponsorOrder[normalizedTrustId] = fallbackOrder;
+      return fallbackOrder;
+    }
+  }
+
   return activeOrder;
 }
 
@@ -536,7 +541,14 @@ export function saveDetailCache(sponsorId, detail) {
 
 export function buildOrderedSponsors(trustId) {
   const order = reorderSponsorsForLoggedInUser(trustId);
-  return readSponsorObjectsForIds(trustId, order);
+  const ordered = readSponsorObjectsForIds(trustId, order);
+  if (ordered.length === 0) {
+    const byId = readSponsorsByIdMap(trustId);
+    return Object.keys(byId)
+      .map((id) => byId[id])
+      .filter((sponsor) => Boolean(sponsor) && isSponsorActive(sponsor));
+  }
+  return ordered;
 }
 
 export function clearSponsorCache(trustId) {
@@ -672,13 +684,7 @@ export async function ensureAllSponsorsLoaded(trustId, options = {}) {
   if (existing) return existing;
 
   const request = (async () => {
-    const res = await getSponsors(normalizedTrustId, null, {
-      view: 'list',
-      page: 1,
-      limit: 500,
-      offset: 0,
-      all: true
-    });
+    const res = await getSponsors(normalizedTrustId, { force: forceRefresh });
     sponsorDebugByTrust[normalizedTrustId] = res?.debug || null;
     const sponsors = Array.isArray(res?.data) ? res.data : [];
     const replaced = replaceSponsorSnapshot(normalizedTrustId, sponsors);
@@ -887,4 +893,3 @@ export async function getSponsorDetail({ sponsorId, trustId = null }) {
 
   return detail;
 }
-

@@ -5,7 +5,7 @@ import {
   Image as ImageIcon, X, ChevronLeft, ChevronRight,
   Menu, Home as HomeIcon, FolderOpen, Play, Pause, ArrowLeft
 } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 
 function FolderCover({ photos, folderName }) {
   const [p1Err, setP1Err] = useState(false);
@@ -95,6 +95,56 @@ const cs = {
   },
 };
 
+function buildPaginationItems(currentPage, totalPages) {
+  const safeTotalPages = Math.max(0, Number(totalPages) || 0);
+  const safeCurrentPage = Math.min(Math.max(1, Number(currentPage) || 1), safeTotalPages || 1);
+
+  if (safeTotalPages <= 0) return [];
+  if (safeTotalPages <= 7) {
+    return Array.from({ length: safeTotalPages }, (_, index) => ({
+      type: 'page',
+      page: index + 1,
+      key: `page-${index + 1}`,
+    }));
+  }
+
+  const pages = new Set([1, safeTotalPages]);
+  const addRange = (start, end) => {
+    for (let page = start; page <= end; page += 1) {
+      if (page >= 1 && page <= safeTotalPages) pages.add(page);
+    }
+  };
+
+  if (safeCurrentPage <= 4) {
+    addRange(1, 5);
+  } else if (safeCurrentPage >= safeTotalPages - 3) {
+    addRange(safeTotalPages - 4, safeTotalPages);
+  } else {
+    addRange(safeCurrentPage - 1, safeCurrentPage + 1);
+  }
+
+  const sortedPages = Array.from(pages).sort((a, b) => a - b);
+  const items = [];
+
+  sortedPages.forEach((page, index) => {
+    const previousPage = sortedPages[index - 1];
+    if (typeof previousPage === 'number' && page - previousPage > 1) {
+      items.push({
+        type: 'ellipsis',
+        key: `ellipsis-${previousPage}-${page}`,
+      });
+    }
+
+    items.push({
+      type: 'page',
+      page,
+      key: `page-${page}`,
+    });
+  });
+
+  return items;
+}
+
 export function Gallery({ onNavigate }) {
   const navigate = useNavigate();
   const {
@@ -124,6 +174,8 @@ export function Gallery({ onNavigate }) {
   const [hasSettledInitialAlbums, setHasSettledInitialAlbums] = useState(false);
   const listBottomRef = useRef(null);
   const fetchDebounceRef = useRef(null);
+  const activeAlbumRequestRef = useRef(0);
+  const suppressNextPageEffectRef = useRef(false);
   const touchStartXRef = useRef(null);
   const touchStartYRef = useRef(null);
   const IMAGES_PER_PAGE = 10;
@@ -221,6 +273,10 @@ export function Gallery({ onNavigate }) {
 
   const totalPages = Math.max(0, Number(albumTotalPages || 0));
   const filteredImages = albumPageImages;
+  const paginationItems = useMemo(
+    () => buildPaginationItems(currentPage, totalPages),
+    [currentPage, totalPages]
+  );
 
   useEffect(() => {
     setSelectedAlbumId(null);
@@ -242,9 +298,13 @@ export function Gallery({ onNavigate }) {
     const aid = String(albumId || '');
     if (!aid) return;
 
+    const requestId = ++activeAlbumRequestRef.current;
     const previewImages = (albumsById[aid]?.previewImages || []).slice(0, 2);
     const details = albumDetails?.[aid];
     const cachedPage = details?.pages?.[page] || null;
+    const hasImmediateContent = Boolean(
+      (cachedPage && cachedPage.length > 0) || (page === 1 && previewImages.length > 0)
+    );
 
     if (page === 1 && previewImages.length > 0 && (!cachedPage || cachedPage.length === 0)) {
       setAlbumPageImages(previewImages);
@@ -255,35 +315,54 @@ export function Gallery({ onNavigate }) {
     }
 
     const shouldShowSpinner = !isAlbumPageCached(aid, page) && !opts?.silent;
-    if (shouldShowSpinner) setIsAlbumLoading(true);
+    const shouldHoldLoadingState = !hasImmediateContent;
+    if (shouldHoldLoadingState) {
+      setAlbumPageImages([]);
+      if (page === 1) setAlbumTotalPages(0);
+    }
+    if (shouldShowSpinner || shouldHoldLoadingState) setIsAlbumLoading(true);
 
     try {
       const res = await getAlbumPage(aid, page);
+      if (activeAlbumRequestRef.current !== requestId) return;
       setAlbumPageImages(res.photos || []);
       setAlbumTotalPages(Number(res.totalPages || 0));
     } catch (err) {
+      if (activeAlbumRequestRef.current !== requestId) return;
       console.error('Error loading album page:', err);
       if (!cachedPage && previewImages.length === 0) {
         setAlbumPageImages([]);
         setAlbumTotalPages(0);
       }
     } finally {
-      if (shouldShowSpinner) setIsAlbumLoading(false);
+      if (activeAlbumRequestRef.current === requestId && (shouldShowSpinner || shouldHoldLoadingState)) {
+        setIsAlbumLoading(false);
+      }
     }
   }, [albumDetails, albumsById, getAlbumPage, isAlbumPageCached]);
+
+  const loadAlbumPageRef = useRef(loadAlbumPage);
+  useEffect(() => {
+    loadAlbumPageRef.current = loadAlbumPage;
+  }, [loadAlbumPage]);
 
   const handleAlbumClick = async (albumId) => {
     const aid = String(albumId);
     setSelectedAlbumId(aid);
     setCurrentPage(1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    await loadAlbumPage(aid, 1, { silent: true });
+    suppressNextPageEffectRef.current = true;
+    await loadAlbumPageRef.current(aid, 1, { silent: true });
   };
 
   useEffect(() => {
-    if (!selectedAlbumId || currentPage === 1) return;
-    void loadAlbumPage(selectedAlbumId, currentPage);
-  }, [currentPage, selectedAlbumId, loadAlbumPage]);
+    if (!selectedAlbumId) return;
+    if (suppressNextPageEffectRef.current) {
+      suppressNextPageEffectRef.current = false;
+      return;
+    }
+    void loadAlbumPageRef.current(selectedAlbumId, currentPage);
+  }, [currentPage, selectedAlbumId]);
 
   const openLightbox = (image) => { setSelectedImage(image); setIsPlaying(true); };
   const closeLightbox = () => { setSelectedImage(null); setIsPlaying(false); };
@@ -324,8 +403,8 @@ export function Gallery({ onNavigate }) {
   const actionBg = 'var(--app-button-bg, var(--brand-red))';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--page-bg, var(--app-page-bg))', fontFamily: "var(--font-family, 'Inter', sans-serif)" }}>
-      <div style={{ background: navbarBackground, padding: '16px', paddingTop: 'max(env(safe-area-inset-top,0px),16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy-dark) 18%, transparent)', backdropFilter: 'blur(var(--navbar-blur, 12px))', WebkitBackdropFilter: 'blur(var(--navbar-blur, 12px))', borderBottom: '1px solid var(--navbar-border)' }}>
+    <div className="gallery-page" style={{ minHeight: '100vh', background: 'var(--page-bg, var(--app-page-bg))', fontFamily: "var(--font-family, 'Inter', sans-serif)" }}>
+      <div className="gallery-navbar" style={{ background: navbarBackground, padding: '16px', paddingTop: 'max(env(safe-area-inset-top,0px),16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy-dark) 18%, transparent)', backdropFilter: 'blur(var(--navbar-blur, 12px))', WebkitBackdropFilter: 'blur(var(--navbar-blur, 12px))', borderBottom: '1px solid var(--navbar-border)' }}>
         <button onClick={() => setIsMenuOpen(!isMenuOpen)} style={nb.iconBtn}>
           {isMenuOpen ? <X style={{ width: 24, height: 24, color: 'var(--app-button-text, var(--surface-color))' }} /> : <Menu style={{ width: 24, height: 24, color: 'var(--app-button-text, var(--surface-color))' }} />}
         </button>
@@ -354,9 +433,9 @@ export function Gallery({ onNavigate }) {
         </button>
       </div>
 
-      <div style={{ padding: '16px 14px 40px', maxWidth: 520, margin: '0 auto' }}>
+      <div className="gallery-content" style={{ padding: '16px 14px 40px', maxWidth: 520, margin: '0 auto' }}>
         {isLoading && !showLoadingFallback && !hasSettledInitialAlbums && (
-          <div style={gl.folderGrid}>
+          <div className="gallery-album-grid" style={gl.folderGrid}>
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} style={{ ...gl.folderCard, background: 'color-mix(in srgb, var(--app-accent-bg) 85%, var(--surface-muted))', animation: 'pulse 1.4s ease-in-out infinite' }}>
                 <div style={{ height: 160, background: 'color-mix(in srgb, var(--app-accent-bg) 78%, var(--surface-muted))', borderRadius: '16px 16px 0 0' }} />
@@ -385,11 +464,11 @@ export function Gallery({ onNavigate }) {
             ) : (
               <>
                 <div style={{ marginBottom: 16, marginTop: 4 }}>
-                  <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--heading-color)', margin: 0 }}>Albums</h2>
+                  <h2 style={{ fontSize: 20, fontWeight: 800, color: actionBg, margin: 0 }}>Albums</h2>
                   <p style={{ fontSize: 12, color: 'var(--body-text-color)', margin: '4px 0 0', fontWeight: 500 }}>{albums.length} album{albums.length !== 1 ? 's' : ''}</p>
                 </div>
 
-                <div style={gl.folderGrid}>
+                <div className="gallery-album-grid" style={gl.folderGrid}>
                   {albums.map((album) => {
                     const photos = (album.previewImages || []).slice(0, 2);
                     const count = Math.max(0, Number.isFinite(Number(album.imageCount)) ? Number(album.imageCount) : 0);
@@ -436,7 +515,7 @@ export function Gallery({ onNavigate }) {
             </div>
 
             {isAlbumLoading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+              <div className="gallery-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                 {Array.from({ length: 10 }).map((_, i) => (
                   <div key={i} style={{ ...gl.photoCard, background: 'color-mix(in srgb, var(--app-accent-bg) 84%, var(--surface-muted))', animation: 'pulse 1.4s ease-in-out infinite' }} />
                 ))}
@@ -448,7 +527,7 @@ export function Gallery({ onNavigate }) {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                <div className="gallery-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                   {filteredImages.map((image, idx) => (
                     <div
                       key={image.id}
@@ -469,26 +548,45 @@ export function Gallery({ onNavigate }) {
                 </div>
 
                 {totalPages > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 28, flexWrap: 'wrap', rowGap: 8 }}>
                     <button
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
+                      aria-label="Previous page"
                       style={{ ...pg.btn, ...(currentPage === 1 ? pg.disabled : { background: actionBg, color: 'var(--app-button-text, var(--surface-color))' }) }}
                     >
                       <ChevronLeft style={{ width: 18, height: 18 }} />
                     </button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        style={{ ...pg.pageBtn, ...(currentPage === page ? { background: actionBg, color: 'var(--app-button-text, var(--surface-color))', boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-red) 25%, transparent)' } : {}) }}
-                      >
-                        {page}
-                      </button>
-                    ))}
+                    {paginationItems.map((item) =>
+                      item.type === 'ellipsis' ? (
+                        <span key={item.key} style={pg.ellipsis} aria-hidden="true">
+                          &hellip;
+                        </span>
+                      ) : (
+                        <button
+                          key={item.key}
+                          onClick={() => setCurrentPage(item.page)}
+                          aria-label={`Go to page ${item.page}`}
+                          aria-current={currentPage === item.page ? 'page' : undefined}
+                          style={{
+                            ...pg.pageBtn,
+                            ...(currentPage === item.page
+                              ? {
+                                  background: actionBg,
+                                  color: 'var(--app-button-text, var(--surface-color))',
+                                  boxShadow: '0 4px 12px color-mix(in srgb, var(--brand-red) 25%, transparent)',
+                                }
+                              : { color: 'color-mix(in srgb, var(--body-text-color) 62%, var(--surface-color))',}),
+                          }}
+                        >
+                          {item.page}
+                        </button>
+                      )
+                    )}
                     <button
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
+                      aria-label="Next page"
                       style={{ ...pg.btn, ...(currentPage === totalPages ? pg.disabled : { background: actionBg, color: 'var(--app-button-text, var(--surface-color))' }) }}
                     >
                       <ChevronRight style={{ width: 18, height: 18 }} />
@@ -565,6 +663,62 @@ export function Gallery({ onNavigate }) {
         }
         .gallery-photo-card:active {
           transform: scale(0.97);
+        }
+
+        @media (min-width: 1024px) {
+          .gallery-page {
+            min-height: 100% !important;
+          }
+
+          .gallery-navbar {
+            min-height: 96px;
+            padding: 24px 28px !important;
+          }
+
+          .gallery-content {
+            max-width: none !important;
+            width: 100%;
+            margin: 0 !important;
+            padding: 28px clamp(24px, 3vw, 48px) 48px !important;
+          }
+
+          .gallery-content > div:first-child h2 {
+            font-size: 28px !important;
+          }
+
+          .gallery-album-grid {
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+            gap: 20px !important;
+          }
+
+          .gallery-folder-card {
+            border-radius: 16px !important;
+            background: color-mix(in srgb, var(--surface-color) 82%, var(--page-bg, var(--app-page-bg))) !important;
+            border: 1px solid color-mix(in srgb, var(--navbar-accent) 22%, transparent) !important;
+            box-shadow: 0 12px 28px color-mix(in srgb, var(--brand-navy-dark) 16%, transparent) !important;
+          }
+
+          .gallery-folder-card > div:first-child {
+            height: 190px !important;
+          }
+
+          .gallery-folder-card > div:last-child {
+            padding: 14px 16px !important;
+          }
+
+          .gallery-folder-card > div:last-child > div {
+            color: var(--heading-color, var(--body-text-color)) !important;
+            font-size: 15px !important;
+          }
+
+          .gallery-photo-grid {
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important;
+            gap: 14px !important;
+          }
+
+          .gallery-photo-card {
+            aspect-ratio: 1 / 1;
+          }
         }
       `}</style>
     </div>
@@ -706,13 +860,26 @@ const pg = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontWeight: 700,
   },
-  disabled: { background: 'color-mix(in srgb, var(--app-accent-bg) 84%, var(--surface-muted))', color: 'color-mix(in srgb, var(--body-text-color) 55%, var(--surface-color))', cursor: 'not-allowed' },
+  disabled: { 
+    background: 'color-mix(in srgb, var(--app-accent-bg) 84%, var(--surface-muted))', 
+    color: 'color-mix(in srgb, var(--body-text-color) 55%, var(--surface-color))', 
+    cursor: 'not-allowed' 
+  },
   pageBtn: {
     width: 36, height: 36, borderRadius: 10,
     border: 'none', cursor: 'pointer',
     background: 'color-mix(in srgb, var(--app-accent-bg) 84%, var(--surface-muted))', color: 'var(--body-text-color)',
     fontSize: 13, fontWeight: 700,
     transition: 'all 0.18s',
+  },
+  ellipsis: {
+    minWidth: 20,
+    textAlign: 'center',
+    color: 'color-mix(in srgb, var(--body-text-color) 72%, var(--surface-color))',
+    fontSize: 18,
+    fontWeight: 700,
+    lineHeight: '36px',
+    userSelect: 'none',
   },
 };
 
