@@ -1,12 +1,14 @@
 import { useAppTheme } from './context/ThemeContext';
 import React, { useState, useEffect } from 'react';
-import { User, Users, Stethoscope, Building2, Star, Award, ChevronLeft, Phone, Mail, MapPin, FileText, Clock } from 'lucide-react';
+import { User, Users, Stethoscope, Building2, Star, Award, ChevronLeft, Phone, Mail, MapPin, FileText, Clock, HomeIcon } from 'lucide-react';
 import { getProfilePhotos } from './services/api';
 import { getNavbarThemeStyles } from './utils/themeUtils';
+import { useNavigate } from 'react-router-dom';
 
 const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
   const theme = useAppTheme();
   const navbarTheme = getNavbarThemeStyles(theme);
+  const navigate = useNavigate();
   const navbarTextColor = navbarTheme?.textColor || 'var(--navbar-text)';
   const [profilePhoto, setProfilePhoto] = useState(member?.profile_photo_url || null);
   const cleanValue = (value) => {
@@ -121,25 +123,35 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
       >
         <div className="h-[3px]" style={{ background: 'var(--navbar-accent)' }} />
         <div className="px-6 pt-4 pb-4">
-          <div className="flex items-center">
+          <div className="flex items-center justify-between">
             <button
               onClick={onNavigateBack}
               className="p-2 rounded-xl transition-colors flex items-center gap-1"
               style={{ color: navbarTextColor, background: 'transparent' }}
             >
               <ChevronLeft className="h-5 w-5" />
-              <span className="text-sm font-medium">Back</span>
+              
             </button>
-            <h1 className="text-2xl font-bold flex-1 text-center pr-16" style={{ color: navbarTextColor }}>Member Details</h1>
+            <h1 className="text-lg font-extrabold tracking-wide" style={{ color: navbarTextColor }}>Member Details</h1>
+            {/* <h1 className="text-2xl font-bold flex-1 text-center pr-16" style={{ color: navbarTextColor }}>Member Details</h1> */}
+            <button
+                          type="button"
+                          onClick={() => navigate('/')}
+                          className="p-2 rounded-xl transition-colors"
+                          style={{ color: navbarTextColor, background: 'transparent' }}
+                          aria-label="Home"
+                        >
+                          <HomeIcon className="h-5 w-5" />
+                        </button>
           </div>
         </div>
       </div>
 
       {/* Member Details Card */}
-      <div className="p-6">
-        <div className="rounded-2xl shadow-sm p-6" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)', boxShadow: '0 12px 28px color-mix(in srgb, var(--advertisement-card-shadow) 24%, transparent)' }}>
-          <div className="flex items-center gap-4 mb-6">
-            <div className="h-20 w-20 rounded-2xl flex items-center justify-center overflow-hidden shadow-sm border" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 76%, var(--app-accent-bg))', color: 'var(--advertisement-title)', borderColor: 'var(--advertisement-card-border)' }}>
+      <div className="member-details-content p-6">
+        <div className="member-details-card rounded-2xl shadow-sm p-6" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)', boxShadow: '0 12px 28px color-mix(in srgb, var(--advertisement-card-shadow) 24%, transparent)' }}>
+          <div className="member-details-profile flex items-center gap-4 mb-6" style={{ flexDirection: 'column'}}>
+            <div className="member-details-avatar h-20 w-20 rounded-2xl flex items-center justify-center overflow-hidden shadow-sm border" style={{ background: 'color-mix(in srgb, var(--advertisement-card-bg) 76%, var(--app-accent-bg))', color: 'var(--advertisement-title)', borderColor: 'var(--advertisement-card-border)' }}>
               {profilePhoto ? (
                 <img
                   src={profilePhoto}
@@ -169,13 +181,13 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
             </div>
             <div>
               <h2 className="text-xl font-bold" style={{ color: 'var(--advertisement-title)' }}>{displayName}</h2>
-              {!member.isHospitalMember && displayRole && (
+              {/* {!member.isHospitalMember && displayRole && (
                 <p className="text-sm font-medium" style={{ color: theme.primary }}>{displayRole}</p>
-              )}
+              )} */}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          <div className="member-details-grid grid grid-cols-1 gap-4">
             {/* Determine if this is a healthcare member (from opd_schedule) or committee member */}
             {(() => {
               const isHealthcareMember = member.isHealthcareMember ||
@@ -371,7 +383,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                 return (
                   <>
                     {member['Membership number'] && member['Membership number'] !== 'N/A' && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <Award className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div>
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Membership No</p>
@@ -380,18 +392,27 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                       </div>
                     )}
 
-                    {member['Name'] && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    {/* {member['Name'] && (
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <User className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div>
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Name</p>
                           <p className="font-medium text-gray-800">{member['Name']}</p>
                         </div>
                       </div>
+                    )} */}
+                    {(member.role || member.type) && (
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
+                        <Users className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Role</p>
+                          <p className="font-medium text-gray-800">{displayRole || 'N/A'}</p>
+                        </div>
+                      </div>
                     )}
-
+                    
                     {member['Company Name'] && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <Building2 className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div>
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Company</p>
@@ -401,7 +422,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                     )}
 
                     {member['Address Home'] && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <MapPin className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Address Home</p>
@@ -411,7 +432,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                     )}
 
                     {member['Address Office'] && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <MapPin className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Office Address</p>
@@ -421,7 +442,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                     )}
 
                     {toPhoneText(member['Mobile']) && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <Phone className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Mobile</p>
@@ -433,7 +454,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                     )}
 
                     {toPhoneText(member['Resident Landline']) && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <Phone className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Resident Landline</p>
@@ -445,7 +466,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                     )}
 
                     {toPhoneText(member['Office Landline']) && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <Phone className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Office Landline</p>
@@ -457,7 +478,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                     )}
 
                     {member['Email'] && member['Email'] !== 'N/A' && (
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                         <Mail className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Email</p>
@@ -476,7 +497,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
               return (
                 <>
                   {member.consultant_name && member.consultant_name !== 'N/A' && (
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                       <User className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Consultant Name</p>
@@ -486,7 +507,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                   )}
 
                   {member.department && member.department !== 'N/A' && (
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                       <Building2 className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Department</p>
@@ -496,7 +517,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                   )}
 
                   {member.designation && member.designation !== 'N/A' && (
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                       <User className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Designation</p>
@@ -506,7 +527,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                   )}
 
                   {member.qualification && member.qualification !== 'N/A' && (
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                       <Award className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Qualification</p>
@@ -516,7 +537,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                   )}
 
                   {member.unit && member.unit !== 'N/A' && (
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                       <Building2 className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Unit</p>
@@ -526,7 +547,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                   )}
 
                   {member.general_opd_days && member.general_opd_days !== 'N/A' && (
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                       <Clock className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">General OPD Days</p>
@@ -536,7 +557,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                   )}
 
                   {member.private_opd_days && member.private_opd_days !== 'N/A' && (
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                       <Clock className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Private OPD Days</p>
@@ -546,7 +567,7 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
                   )}
 
                   {toPhoneText(member['Mobile']) && (
-                    <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-2xl">
+                    <div className="flex items-start gap-3 p-1 bg-gray-50 rounded-2xl">
                       <Phone className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Mobile</p>
@@ -572,6 +593,65 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
         }
         .member-details-theme .text-gray-500 {
           color: var(--advertisement-subtitle) !important;
+        }
+
+        @media (min-width: 1024px) {
+          .member-details-content {
+            padding: 32px clamp(28px, 3vw, 52px) !important;
+          }
+
+          .member-details-card {
+            display: grid;
+            grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+            gap: 32px;
+            align-items: start;
+            width: 100%;
+            max-width: none;
+            padding: 32px !important;
+            min-height: auto;
+          }
+
+          .member-details-profile {
+            position: sticky;
+            top: 128px;
+            align-items: center !important;
+            justify-content: flex-start;
+            margin-bottom: 0 !important;
+            padding: 18px;
+            border-radius: 18px;
+            background: color-mix(in srgb, var(--advertisement-card-bg) 78%, var(--page-bg));
+            border: 0 !important;
+          }
+
+          .member-details-avatar {
+            width: 148px !important;
+            height: 148px !important;
+            border-radius: 24px !important;
+          }
+
+          .member-details-profile h2 {
+            text-align: center;
+            font-size: 24px !important;
+            line-height: 1.2;
+            margin-top: 6px;
+          }
+
+          .member-details-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 16px !important;
+          }
+
+          .member-details-grid > div {
+            min-height: 88px;
+            padding: 16px !important;
+            align-items: center !important;
+            border: 0 !important;
+            background: transparent !important;
+          }
+
+          .member-details-grid > div:has(.flex-1) {
+            grid-column: span 1;
+          }
         }
       `}</style>
     </div>

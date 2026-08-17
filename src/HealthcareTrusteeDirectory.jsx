@@ -1,11 +1,11 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { User, Users, Stethoscope, Building2, Star, ChevronRight, ChevronLeft, Menu, X, Home as HomeIcon, Clock, FileText, UserPlus, Phone, Mail, MapPin, Search, Filter, ArrowLeft, ArrowRight } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { getAllCommitteeMembers, getAllDoctors, getAllElectedMembers, getProfilePhotos } from './services/api';
 import { getExecutiveBodyMembers, getTrusteesAndPatrons } from './services/supabaseService';
 import { registerSidebarState, useAndroidBack } from './hooks';
 import { useAppTheme } from './context/ThemeContext';
-import { fetchFeatureFlags, subscribeFeatureFlags } from './services/featureFlags';
+import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureVisible } from './services/featureFlags';
 import { fetchSubFeatureFlags, subscribeSubFeatureFlags } from './services/subFeatureFlags';
 import { getNavbarThemeStyles } from './utils/themeUtils';
 
@@ -35,8 +35,32 @@ const getMembershipSortMeta = (member) => {
   return { hasMembership: true, numericPart, textPart: text.toLowerCase() };
 };
 
+const getPrioritySortMeta = (member) => {
+  const rawPriority = String(member?.priority ?? '').trim();
+  if (!rawPriority) return { hasPriority: false, numericPart: MAX_ORDER_VALUE };
+
+  const numericPart = Number(rawPriority);
+  if (!Number.isFinite(numericPart)) {
+    return { hasPriority: false, numericPart: MAX_ORDER_VALUE };
+  }
+
+  return { hasPriority: true, numericPart };
+};
+
 const sortMembersByMembershipNumber = (members = []) => {
   return [...members].sort((a, b) => {
+    const priorityA = getPrioritySortMeta(a);
+    const priorityB = getPrioritySortMeta(b);
+
+    if (priorityA.hasPriority || priorityB.hasPriority) {
+      if (priorityA.hasPriority !== priorityB.hasPriority) {
+        return priorityA.hasPriority ? -1 : 1;
+      }
+      if (priorityA.numericPart !== priorityB.numericPart) {
+        return priorityA.numericPart - priorityB.numericPart;
+      }
+    }
+
     const metaA = getMembershipSortMeta(a);
     const metaB = getMembershipSortMeta(b);
 
@@ -119,7 +143,6 @@ const HealthcareTrusteeDirectory = ({ onNavigate }) => {
   // Ref for the content area to scroll to
   const contentRef = useRef(null);
 
-  const isFeatureEnabled = (key) => featureFlags[key] !== false;
   const hasSubFeatureConfig = Object.keys(subFeatureFlags || {}).length > 0;
   const isSubFeatureEnabled = (key) => {
     if (!hasSubFeatureConfig) return true;
@@ -139,9 +162,9 @@ const HealthcareTrusteeDirectory = ({ onNavigate }) => {
     return Number.isFinite(parsed) ? parsed : fallback;
   };
 
-  const isDirectoryEnabled = isFeatureEnabled('feature_directory');
-  const isCommitteeEnabled = isFeatureEnabled('feature_committee');
-  const isElectedEnabled = isFeatureEnabled('feature_elected_members');
+  const isDirectoryEnabled = isFeatureVisible(featureFlags, 'feature_directory');
+  const isCommitteeEnabled = isFeatureVisible(featureFlags, 'feature_committee');
+  const isElectedEnabled = isFeatureVisible(featureFlags, 'feature_elected_members');
 
   const isMembersTabEnabled = hasSubFeatureConfig ? isSubFeatureEnabled('members') : true;
   const isDoctorsTabEnabled = hasSubFeatureConfig

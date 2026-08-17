@@ -5,8 +5,7 @@ import { useAppTheme } from './context/ThemeContext';
 import { applyOpacity } from './utils/colorUtils';
 import { fetchDonationsByTrust, getDonationFormPrefill } from './services/donationService';
 import { TRUST_VERSION_UPDATED_EVENT } from './services/trustVersionService';
-import Sidebar from './components/Sidebar';
-
+import Sidebar from './features/sidebar/Sidebar';
 const formatCurrency = (amount) => {
   const numeric = Number(amount);
   if (!Number.isFinite(numeric)) return null;

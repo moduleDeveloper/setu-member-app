@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Home as HomeIcon, Menu, X, Star, ChevronRight, FileText } from 'lucide-react';
+import { Calendar, Home as HomeIcon, Menu, X, ChevronRight, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
+import Sidebar from './features/sidebar/Sidebar';
 import { useAppTheme } from './context/ThemeContext';
 import {
   facilitiesConfig,
@@ -155,21 +155,10 @@ const Facilities = ({ onNavigate }) => {
       '[Facilities][Debug] page=',
       page,
       'returned_ids=',
-      Array.isArray(res?.facilities) ? res.facilities.map((n) => n?.id).filter(Boolean) : [],
-      'returned_types=',
-      Array.isArray(res?.facilities) ? res.facilities.map((n) => n?.type).filter(Boolean) : []
+      Array.isArray(res?.facilities) ? res.facilities.map((n) => n?.id).filter(Boolean) : []
     );
     if (res?.debug) {
-      console.log(
-        '[Facilities][Debug] trust=',
-        res.debug.trustId,
-        'member=',
-        res.debug.memberId,
-        'vipEligible=',
-        res.debug.vipEligible,
-        'regMemberMatch=',
-        res.debug.regMemberMatch?.id || null
-      );
+      console.log('[Facilities][Debug] trust=', res.debug.trustId, 'page=', res.debug.page, 'pageSize=', res.debug.pageSize);
     }
     if (res?.error) setError(res.error);
   };
@@ -330,10 +319,9 @@ const Facilities = ({ onNavigate }) => {
       )}
 
       {!loading && !error && (
-        <div className="px-6 py-4 space-y-4">
+        <div className="facilities-list px-6 py-4 space-y-4">
           {facilities.map((facility, index) => {
             const dateLabel = formatTimestamp(facility.created_at, facility.updated_at);
-            const isVip = String(facility?.type || '').toLowerCase() === 'vip';
             const rawAttachments = Array.isArray(facility.attachments) ? facility.attachments : [];
             const normalizedAttachments = rawAttachments
               .map((attachment, idx) => {
@@ -353,30 +341,19 @@ const Facilities = ({ onNavigate }) => {
               ? getOptimizedImageUrl(firstAttachment.url)
               : '';
             const shouldPrioritizeImage = index < 2;
-            const extraAttachmentCount = attachCount > 1 ? attachCount - 1 : 0;
             return (
-              <button
-                key={facility.id}
-                onClick={() => openFacilityDetail(facility.id)}
-                className="w-full text-left rounded-2xl p-4 sm:p-5 border transition-all hover:shadow-md active:scale-[0.995] border-l-4 shadow-sm"
-                style={{
-                  borderLeftColor: isVip ? 'color-mix(in srgb, var(--brand-red) 45%, #d4af37)' : theme.primary,
-                  borderColor: isVip ? 'color-mix(in srgb, var(--brand-red) 20%, #f1e2a4)' : 'var(--advertisement-card-border)',
+                <button
+                  key={facility.id}
+                  onClick={() => openFacilityDetail(facility.id)}
+                  className="facility-card w-full text-left rounded-2xl p-4 sm:p-5 border transition-all hover:shadow-md active:scale-[0.995] border-l-4 shadow-sm"
+                  style={{
+                  borderLeftColor: theme.primary,
+                  borderColor: 'var(--advertisement-card-border)',
                   background: 'var(--advertisement-card-bg)'
                 }}
-              >
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full inline-flex items-center gap-1"
-                    style={
-                      isVip
-                        ? { color: 'color-mix(in srgb, var(--brand-red-dark) 50%, #8A6A00)', background: 'color-mix(in srgb, var(--brand-red-light) 48%, #FDF3C7)' }
-                        : { color: theme.primary, background: `color-mix(in srgb, ${theme.primary} 12%, white)` }
-                    }
-                  >
-                    {isVip ? <Star className="h-3 w-3" fill="color-mix(in srgb, var(--brand-red) 45%, #d4af37)" color="color-mix(in srgb, var(--brand-red) 45%, #d4af37)" /> : null}
-                    {isVip ? 'VIP Facility' : 'GEN'}
-                  </span>
+                >
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    
                   {dateLabel && (
                     <div className="flex items-center gap-1.5 text-[10px] font-bold whitespace-nowrap" style={{ color: 'var(--advertisement-subtitle)' }}>
                       <Calendar className="h-3 w-3" />
@@ -399,7 +376,7 @@ const Facilities = ({ onNavigate }) => {
 
                 {firstAttachment && (
                   <div
-                    className="mb-3 rounded-xl overflow-hidden border"
+                    className="facility-card-media mb-3 rounded-xl overflow-hidden border"
                     style={{ borderColor: 'color-mix(in srgb, var(--brand-navy) 12%, transparent)' }}
                   >
                     {firstAttachment.type === 'image' ? (
@@ -446,6 +423,60 @@ const Facilities = ({ onNavigate }) => {
 
         </div>
       )}
+      <style>{`
+        @media (min-width: 1024px) {
+          .facilities-list {
+            padding-left: 2rem;
+            padding-right: 2rem;
+          }
+
+          .facility-card {
+            display: grid;
+            grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
+            grid-template-areas:
+              "media meta"
+              "media title"
+              "media description"
+              "media footer";
+            column-gap: 1.25rem;
+            align-items: start;
+            min-height: 180px;
+          }
+
+          .facility-card > .flex:first-child {
+            grid-area: meta;
+            margin-bottom: 0.45rem;
+          }
+
+          .facility-card > h3 {
+            grid-area: title;
+            margin-bottom: 0.4rem;
+          }
+
+          .facility-card > div:has(> p.line-clamp-3) {
+            grid-area: description;
+            margin-bottom: 0.75rem;
+          }
+
+          .facility-card-media {
+            grid-area: media;
+            margin-bottom: 0 !important;
+            height: 160px;
+            align-self: stretch;
+          }
+
+          .facility-card-media img,
+          .facility-card-media > div {
+            height: 100% !important;
+          }
+
+          .facility-card > .pt-3 {
+            grid-area: footer;
+            align-self: end;
+            margin-top: auto;
+          }
+        }
+      `}</style>
     </div>
   );
 };

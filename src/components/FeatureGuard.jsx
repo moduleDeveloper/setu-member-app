@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isFeatureEnabled } from '../services/featureFlags';
+import { isFeatureVisible } from '../services/featureFlags';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 
 const FeatureGuard = ({ featureKey, fallbackPath = '/', children }) => {
@@ -10,7 +10,7 @@ const FeatureGuard = ({ featureKey, fallbackPath = '/', children }) => {
   if (!featureKey) return children;
   if (loading) return null;
 
-  const enabled = isFeatureEnabled(flags, featureKey);
+  const enabled = isFeatureVisible(flags, featureKey);
   if (!enabled) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">

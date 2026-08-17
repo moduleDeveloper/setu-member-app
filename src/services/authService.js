@@ -1,9 +1,9 @@
 ﻿// authService.js - Frontend auth helpers
-import { supabase } from './supabaseClient';
 
 const USE_MOCK_AUTH = import.meta.env.VITE_AUTH_MOCK === 'true';
 const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
-const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const AUTH_API_URL = import.meta.env.VITE_AUTH_API_URL || (API_BASE_URL ? `${String(API_BASE_URL).replace(/\/$/, '')}/auth` : '');
 
 const postAuthJson = async (endpoint, payload) => {
   if (!AUTH_API_URL) {
@@ -25,7 +25,7 @@ const postAuthJson = async (endpoint, payload) => {
   return data;
 };
 
-const triggerOtpSend = async (phoneNumber) => {
+const _triggerOtpSend = async (phoneNumber) => {
   const cleanedPhone = normalizeTo10Digits(phoneNumber);
   try {
     await postAuthJson('/check-phone', { phoneNumber: cleanedPhone });
@@ -101,7 +101,7 @@ const pickPrimaryMembership = (memberships = [], preferredTrustId = '') => {
 
 const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== '';
 
-const scoreMemberCandidate = (member, membershipStats = null) => {
+const _scoreMemberCandidate = (member, membershipStats = null) => {
   let score = 0;
   if (membershipStats?.activeInPreferredTrust) score += 120;
   if (membershipStats?.anyInPreferredTrust) score += 90;
@@ -125,7 +125,7 @@ const buildTrustPayload = (membership = null) => {
   };
 };
 
-const buildMemberAccount = ({
+const _buildMemberAccount = ({
   member,
   cleanedPhone,
   allMemberships = [],
@@ -206,6 +206,30 @@ export const checkPhoneNumber = async (phoneNumber) => {
       return { success: false, message: 'Please enter a valid 10-digit mobile number.' };
     }
 
+    // Use the backend auth route so the browser never talks to Members directly.
+    const response = await postAuthJson('/check-phone', { phoneNumber: cleanedPhone });
+    const resolvedUser = response?.data?.user || response?.data?.accounts?.[0] || null;
+    const resolvedAccounts = Array.isArray(response?.data?.accounts) && response.data.accounts.length > 0
+      ? response.data.accounts
+      : (resolvedUser ? [resolvedUser] : []);
+
+    if (!resolvedUser) {
+      return {
+        success: false,
+        message: response?.message || 'Unable to verify number. Please try again.'
+      };
+    }
+
+    return {
+      success: true,
+      message: response?.message || 'Mobile verified',
+      data: {
+        user: resolvedUser,
+        accounts: resolvedAccounts
+      }
+    };
+
+    /*
     // Always work with last 10 digits â€” avoids format mismatch (91xxxxxxxxxx vs xxxxxxxxxx)
     const last10 = normalizeTo10Digits(cleanedPhone);
 
@@ -305,7 +329,7 @@ export const checkPhoneNumber = async (phoneNumber) => {
     if (membersIds.length > 0) {
       const regResult = await supabase
         .from('reg_members')
-        .select('id, trust_id, "Membership number", role, is_active, members_id, joined_date')
+        .select('id, trust_id, "Membership number", role, is_active, members_id, joined_date, qr_code')
         .in('members_id', membersIds);
 
       if (regResult.error) {
@@ -346,6 +370,8 @@ export const checkPhoneNumber = async (phoneNumber) => {
           membership_number: m['Membership number'] || null,
           role: m.role || null,
           members_id: m.members_id || null,
+          joined_date: m.joined_date || null,
+          qr_code: m.qr_code || null,
           source: 'reg_members'
         };
       });
@@ -451,7 +477,6 @@ export const checkPhoneNumber = async (phoneNumber) => {
     console.log(
       `User check complete: accounts=${accounts.length}, trusts=${hospitalMemberships.length}, selectedMember=${user?.members_id || user?.id}`
     );
-
     const otpSendResult = await triggerOtpSend(last10);
     if (!otpSendResult.success) {
       return {
@@ -468,6 +493,7 @@ export const checkPhoneNumber = async (phoneNumber) => {
         accounts
       }
     };
+  */
   } catch (error) {
     console.error('Error checking phone:', error);
     throw error;
@@ -515,5 +541,3 @@ export const specialLogin = async (phoneNumber, passcode, trustId = '') => {
     return { success: false, message: error?.message || 'Invalid passcode' };
   }
 };
-
-

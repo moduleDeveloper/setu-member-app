@@ -11,7 +11,7 @@ export const getAllMembers = async () => {
 
     while (hasMore) {
       let { data, error } = await supabase
-        .from('Members Table')
+        .from('Members')
         .select('*')
         .order('Name', { ascending: true })
         .range(from, from + batchSize - 1);
@@ -51,14 +51,14 @@ export const getMemberById = async (id) => {
   try {
     // Try with "Members Table" first
     let { data, error } = await supabase
-      .from('Members Table')
+      .from('Members')
       .select('*')
       .eq('id', id)
       .single();
 
     if (error && error.code === 'PGRST116') {
       const result = await supabase
-        .from('members_table')
+        .from('Members')
         .select('*')
         .eq('id', id)
         .single();
@@ -69,7 +69,7 @@ export const getMemberById = async (id) => {
     // If not found by id, try by "S. No."
     if (!data || error) {
       const result2 = await supabase
-        .from('Members Table')
+        .from('Members')
         .select('*')
         .eq('S. No.', id)
         .single();
@@ -90,14 +90,14 @@ export const getMemberById = async (id) => {
 export const createMember = async (memberData) => {
   try {
     let { data, error } = await supabase
-      .from('Members Table')
+      .from('Members')
       .insert([memberData])
       .select()
       .single();
 
     if (error && error.code === 'PGRST116') {
       const result = await supabase
-        .from('members_table')
+        .from('Members')
         .insert([memberData])
         .select()
         .single();
@@ -117,7 +117,7 @@ export const updateMember = async (id, memberData) => {
   try {
     // Try updating by id first
     let { data, error } = await supabase
-      .from('Members Table')
+      .from('Members')
       .update(memberData)
       .eq('id', id)
       .select()
@@ -125,7 +125,7 @@ export const updateMember = async (id, memberData) => {
 
     if (error && error.code === 'PGRST116') {
       const result = await supabase
-        .from('members_table')
+        .from('Members')
         .update(memberData)
         .eq('id', id)
         .select()
@@ -137,7 +137,7 @@ export const updateMember = async (id, memberData) => {
     // If not found by id, try by "S. No."
     if (!data || error) {
       const result2 = await supabase
-        .from('Members Table')
+        .from('Members')
         .update(memberData)
         .eq('S. No.', id)
         .select()
@@ -160,13 +160,13 @@ export const deleteMember = async (id) => {
   try {
     // Try deleting by id first
     let { error } = await supabase
-      .from('Members Table')
+      .from('Members')
       .delete()
       .eq('id', id);
 
     if (error && error.code === 'PGRST116') {
       const result = await supabase
-        .from('members_table')
+        .from('Members')
         .delete()
         .eq('id', id);
       error = result.error;
@@ -176,7 +176,7 @@ export const deleteMember = async (id) => {
     // If not found by id, try by "S. No."
     if (error) {
       const result2 = await supabase
-        .from('Members Table')
+        .from('Members')
         .delete()
         .eq('S. No.', id);
       if (!result2.error) return true;

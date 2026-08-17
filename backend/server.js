@@ -17,6 +17,7 @@ import sponsorRoutes from './routes/sponsorRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import galleryRoutes from './routes/galleryRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
+import orderHistoryRoutes from './routes/orderHistoryRoutes.js';
 import { initFirebaseAdmin } from './config/firebaseAdmin.js';
 import { startNotificationPushWorker } from './services/notificationPushWorker.js';
 
@@ -29,7 +30,7 @@ dotenv.config();
 
 // Initialize express app
 const app = express();
-const PORT = process.env.PORT || 5003;
+const PORT = process.env.PORT || 5005;
 const TRUST_BRAND_NAME = process.env.VITE_DEFAULT_TRUST_NAME || process.env.DEFAULT_TRUST_NAME || 'Trust';
 
 // --------------------
@@ -95,6 +96,7 @@ app.get('/', (req, res) => {
       profile: '/api/profile',
       familyMembers: '/api/family-members',
       sponsors: '/api/sponsors',
+      orderHistory: '/api/order-history',
       admin: '/api/admin'
     }
   });
@@ -114,6 +116,7 @@ app.get('/api', (req, res) => {
       profile: '/api/profile',
       familyMembers: '/api/family-members',
       sponsors: '/api/sponsors',
+      orderHistory: '/api/order-history',
       admin: '/api/admin'
     }
   });
@@ -132,6 +135,7 @@ app.use('/api/family-members', familyRoutes);
 app.use('/api/sponsors', sponsorRoutes); // Sponsor routes
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/gallery', galleryRoutes); // Gallery routes
+app.use('/api/order-history', orderHistoryRoutes);
 app.use('/api/admin', adminRoutes); // Admin routes
 app.use('/api', memberRoutes); // Member routes last to avoid catching other routes
 // --------------------
@@ -153,5 +157,3 @@ app.listen(PORT, () => {
 
 initFirebaseAdmin();
 startNotificationPushWorker();
-
-
