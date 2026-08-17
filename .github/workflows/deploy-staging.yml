@@ -45,11 +45,8 @@ jobs:
             npm install
 
             echo "Restarting backend..."
-            pm2 restart app-live --update-env || pm2 start npm --name app-live -- start
+            pm2 restart app-live || pm2 start npm --name app-live -- start
             pm2 save
-
-            echo "Checking PM2 status..."
-            pm2 status
 
             echo "Reloading nginx..."
             nginx -t
