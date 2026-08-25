@@ -30,6 +30,24 @@ const normalizeTo10Digits = (value) => {
   return digits;
 };
 
+const scoreAccount = (account = {}) => {
+  const memberships = Array.isArray(account.hospital_memberships) ? account.hospital_memberships : [];
+  let score = 0;
+  if (memberships.some((membership) => membership?.is_active && membership?.trust_id)) score += 100;
+  if (memberships.some((membership) => membership?.trust_id)) score += 60;
+  if (account.membership_number || account['Membership number']) score += 25;
+  if (account.Name || account.name) score += 10;
+  if (account.Email) score += 5;
+  return score;
+};
+
+const sortAccounts = (accounts = []) =>
+  [...accounts].sort((a, b) => {
+    const scoreDiff = scoreAccount(b) - scoreAccount(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return Number(b?.['S. No.'] || b?.id || 0) - Number(a?.['S. No.'] || a?.id || 0);
+  });
+
 /**
  * Send OTP via MSG91
  */
@@ -280,7 +298,8 @@ export const checkPhoneExists = async (phoneNumber) => {
           members_id
         `)
         .or(memberSearchCondition)
-        .limit(1);
+        .order('"S.No."', { ascending: false })
+        .limit(25);
       memberData = memberQuery.data || [];
       memberError = memberQuery.error || null;
     }
@@ -318,7 +337,7 @@ export const checkPhoneExists = async (phoneNumber) => {
             .select(memberSelectColumns)
             .or(memberSearchCondition)
             .order('"S.No."', { ascending: false })
-            .limit(1);
+            .limit(25);
 
           if (!refetchError && existingMembers && existingMembers.length > 0) {
             memberData = existingMembers;
@@ -333,34 +352,21 @@ export const checkPhoneExists = async (phoneNumber) => {
 
     if (memberData && memberData.length > 0) {
       console.log('âœ… Phone found in Members');
-      const member = memberData[0];
-      const memberUuid = isUuid(member.members_id) ? member.members_id : null;
-      
-      const mergedUser = {
-        'S. No.': member['S.No.'],
-        'Membership number': null,        // Will be populated from reg_members
-        'Name': member['Name'],
-        'Address Home': member['Address Home'],
-        'Company Name': member['Company Name'],
-        'Address Office': member['Address Office'],
-        'Resident Landline': member['Resident Landline'],
-        'Office Landline': member['Office Landline'],
-        'Mobile': member['Mobile'],
-        'Email': member['Email'],
-        'type': 'Guest',                   // Will be populated from reg_members
-        id: member['S.No.'],
-        name: member['Name'],
-        mobile: member['Mobile'],
-        members_id: memberUuid,
-        membership_number: null
-      };
+      const memberUuids = Array.from(
+        new Set(
+          memberData
+            .map((member) => (isUuid(member.members_id) ? member.members_id : null))
+            .filter(Boolean)
+        )
+      );
 
-      // â”€â”€ (2) Fetch trust memberships from reg_members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      if (memberUuid) {
+      let membershipsByMemberId = new Map();
+      if (memberUuids.length > 0) {
         const { data: regMemberships, error: membershipError } = await supabase
           .from('reg_members')
           .select(`
             id,
+            members_id,
             trust_id,
             role,
             joined_date,
@@ -374,46 +380,77 @@ export const checkPhoneExists = async (phoneNumber) => {
               remark
             )
           `)
-          .eq('members_id', memberUuid);
+          .in('members_id', memberUuids);
 
         if (membershipError) {
           console.warn('Could not fetch reg_member memberships:', membershipError);
         } else if (regMemberships && regMemberships.length > 0) {
-          const memberships = regMemberships.map((row) => ({
-            id: row.id,
-            trust_id: row.trust_id,
-            trust_name: row.trust?.name || null,
-            trust_icon_url: row.trust?.icon_url || null,
-            trust_remark: row.trust?.remark || null,
-            role: row.role || null,
-            joined_date: row.joined_date || null,
-            is_active: row.is_active,
-            qr_code: row.qr_code || null,
-            membership_number: row['Membership number'] || null
-          }));
-
-          const activeMembership = memberships.find((m) => m.is_active);
-          const primaryTrust = activeMembership || memberships[0];
-
-          mergedUser.hospital_memberships = memberships;
-          mergedUser['Membership number'] = primaryTrust?.membership_number || null;
-          mergedUser.membership_number = primaryTrust?.membership_number || null;
-          mergedUser.type = primaryTrust?.role || null;
-          if (primaryTrust) {
-            mergedUser.primary_trust = {
-              id: primaryTrust.trust_id,
-              name: primaryTrust.trust_name,
-              icon_url: primaryTrust.trust_icon_url,
-              remark: primaryTrust.trust_remark
-            };
-          }
+          membershipsByMemberId = regMemberships.reduce((acc, row) => {
+            const memberId = String(row.members_id || '');
+            if (!memberId) return acc;
+            const memberships = acc.get(memberId) || [];
+            memberships.push({
+              id: row.id,
+              members_id: row.members_id || null,
+              trust_id: row.trust_id,
+              trust_name: row.trust?.name || null,
+              trust_icon_url: row.trust?.icon_url || null,
+              trust_remark: row.trust?.remark || null,
+              role: row.role || null,
+              joined_date: row.joined_date || null,
+              is_active: row.is_active,
+              qr_code: row.qr_code || null,
+              membership_number: row['Membership number'] || null
+            });
+            acc.set(memberId, memberships);
+            return acc;
+          }, new Map());
         }
       }
+
+      const accounts = sortAccounts(memberData.map((member) => {
+        const memberUuid = isUuid(member.members_id) ? member.members_id : null;
+        const memberships = memberUuid ? (membershipsByMemberId.get(String(memberUuid)) || []) : [];
+        const activeMembership = memberships.find((m) => m.is_active);
+        const primaryTrust = activeMembership || memberships[0] || null;
+
+        const mergedUser = {
+          'S. No.': member['S.No.'],
+          'Membership number': primaryTrust?.membership_number || null,
+          'Name': member['Name'],
+          'Address Home': member['Address Home'],
+          'Company Name': member['Company Name'],
+          'Address Office': member['Address Office'],
+          'Resident Landline': member['Resident Landline'],
+          'Office Landline': member['Office Landline'],
+          'Mobile': member['Mobile'],
+          'Email': member['Email'],
+          'type': primaryTrust?.role || 'Guest',
+          id: member['S.No.'],
+          name: member['Name'],
+          mobile: member['Mobile'],
+          members_id: memberUuid,
+          membership_number: primaryTrust?.membership_number || null,
+          hospital_memberships: memberships
+        };
+
+        if (primaryTrust) {
+          mergedUser.primary_trust = {
+            id: primaryTrust.trust_id,
+            name: primaryTrust.trust_name,
+            icon_url: primaryTrust.trust_icon_url,
+            remark: primaryTrust.trust_remark
+          };
+        }
+
+        return mergedUser;
+      }));
       
       return {
         exists: true,
         table: 'Members',
-        user: mergedUser
+        user: accounts[0],
+        accounts
       };
     }
     
@@ -444,7 +481,15 @@ export const checkPhoneExists = async (phoneNumber) => {
           type: 'Doctor',
           department: opdData[0].department,
           designation: opdData[0].designation
-        }
+        },
+        accounts: [{
+          id: opdData[0].id,
+          name: opdData[0].consultant_name,
+          mobile: opdData[0].mobile,
+          type: 'Doctor',
+          department: opdData[0].department,
+          designation: opdData[0].designation
+        }]
       };
     }
     
@@ -473,7 +518,14 @@ export const checkPhoneExists = async (phoneNumber) => {
           mobile: hospitalData[0].contact_phone,
           type: 'Hospital',
           trust_name: hospitalData[0].trust_name
-        }
+        },
+        accounts: [{
+          id: hospitalData[0].id,
+          name: hospitalData[0].hospital_name,
+          mobile: hospitalData[0].contact_phone,
+          type: 'Hospital',
+          trust_name: hospitalData[0].trust_name
+        }]
       };
     }
     
@@ -555,6 +607,7 @@ export const initializePhoneAuth = async (phoneNumber) => {
       data: {
         phoneNumber: formattedPhone,
         user: phoneCheck?.user || null,
+        accounts: Array.isArray(phoneCheck?.accounts) ? phoneCheck.accounts : (phoneCheck?.user ? [phoneCheck.user] : []),
         requestId: sendResult.requestId
       }
     };

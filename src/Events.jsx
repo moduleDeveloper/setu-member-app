@@ -703,7 +703,7 @@ const Events = ({ onNavigate }) => {
       {isMenuOpen && <div className="fixed inset-0 z-25" style={{ background: applyOpacity('var(--brand-navy-dark)', 0.01) }} onClick={() => setIsMenuOpen(false)} />}
       <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="events" />
 
-      <div className="px-4 pb-4 pt-3">
+      <div className="events-tabs px-4 pb-4 pt-3">
         <div
           className="relative flex items-center p-1 rounded-2xl gap-1"
           style={{
@@ -1083,6 +1083,33 @@ const Events = ({ onNavigate }) => {
             padding-right: 2rem;
           }
 
+          .events-tabs {
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+          }
+
+          .events-tabs button {
+            font-size: 0.95rem !important;
+            line-height: 1.35rem;
+            gap: 0.5rem;
+            height: 3rem;
+            padding-top: 0.85rem;
+            padding-bottom: 0.85rem;
+            transform: none !important;
+          }
+
+          .events-tabs button > svg {
+            width: 17px !important;
+            height: 17px !important;
+          }
+
+          .events-tabs button > span.text-\\[9px\\] {
+            min-width: 24px;
+            font-size: 0.72rem !important;
+            line-height: 1rem;
+            padding: 0.2rem 0.45rem;
+          }
+
           .event-card {
             display: flex;
             min-height: 190px;
@@ -1109,9 +1136,35 @@ const Events = ({ onNavigate }) => {
             border-left: 2px solid var(--advertisement-card-border);
           }
 
+          .event-card-content > .flex:first-child .text-\\[10px\\] {
+            font-size: 0.82rem !important;
+            line-height: 1.2rem;
+          }
+
+          .event-card-content > .flex:first-child svg {
+            width: 14px !important;
+            height: 14px !important;
+          }
+
           .event-card-content h3 {
-            font-size: 1.05rem;
-            margin-bottom: 0.35rem;
+            font-size: 1.35rem;
+            line-height: 1.25;
+            margin-bottom: 0.45rem;
+          }
+
+          .event-card-content > p {
+            font-size: 0.95rem;
+            line-height: 1.55;
+          }
+
+          .event-card-content > .flex.flex-wrap {
+            font-size: 0.9rem;
+            line-height: 1.4;
+          }
+
+          .event-card-content > .flex.flex-wrap svg {
+            width: 14px !important;
+            height: 14px !important;
           }
 
           .event-card-content > div:last-child {

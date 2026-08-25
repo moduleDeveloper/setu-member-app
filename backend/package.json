@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-     "build": "echo 'No build step'",
+    "build": "echo 'No build step'",
     "update-appointment-notification": "node update_appointment_with_notification.js",
     "setup-trust": "node setup_trust.js",
     "theme-rollout-audit": "node theme_rollout_audit.js",
@@ -30,6 +30,7 @@
     "firebase-admin": "^13.6.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
+    "razorpay": "^2.9.8",
     "sharp": "^0.34.4"
   },
   "devDependencies": {

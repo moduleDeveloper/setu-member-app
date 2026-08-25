@@ -18,6 +18,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import galleryRoutes from './routes/galleryRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
 import orderHistoryRoutes from './routes/orderHistoryRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 import { initFirebaseAdmin } from './config/firebaseAdmin.js';
 import { startNotificationPushWorker } from './services/notificationPushWorker.js';
 
@@ -97,6 +98,7 @@ app.get('/', (req, res) => {
       familyMembers: '/api/family-members',
       sponsors: '/api/sponsors',
       orderHistory: '/api/order-history',
+      payments: '/api/payments',
       admin: '/api/admin'
     }
   });
@@ -117,6 +119,7 @@ app.get('/api', (req, res) => {
       familyMembers: '/api/family-members',
       sponsors: '/api/sponsors',
       orderHistory: '/api/order-history',
+      payments: '/api/payments',
       admin: '/api/admin'
     }
   });
@@ -136,6 +139,7 @@ app.use('/api/sponsors', sponsorRoutes); // Sponsor routes
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/gallery', galleryRoutes); // Gallery routes
 app.use('/api/order-history', orderHistoryRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes); // Admin routes
 app.use('/api', memberRoutes); // Member routes last to avoid catching other routes
 // --------------------

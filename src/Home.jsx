@@ -2243,11 +2243,7 @@ const Home = ({ onNavigate, onLogout }) => {
           versionToken={trustIconVersionById[normalizedTrustId] || resolveTrustIconToken(trust, '')}
           state={isActive}
         />
-        {isActive && (
-          <div className="absolute bottom-0 right-[6px] w-4 h-4 rounded-full flex items-center justify-center" style={{ background: theme.primary }}>
-            <span className="text-[10px] text-white">✓</span>
-          </div>
-        )}
+        
       </button>
     );
   };
@@ -2696,7 +2692,7 @@ const Home = ({ onNavigate, onLogout }) => {
           const SECTIONS = {
             trustList: showTrustSelector && (selectedTrust || otherTrusts.length > 0) ? (
               <div className="home-section home-section-full" key="trustList">
-                <p className="text-sm font-semibold text-muted-foreground ml-4 mt-1" style={{color: ` ${theme.primary}`}}>Our trusts</p>
+                <p className="text-sm font-semibold text-muted-foreground ml-4 mt-1" style={{color: ` ${theme.primary}`}}>My trusts</p>
                 <div
                   className="flex items-center gap-2 px-4 py-2"
                   style={{
@@ -3110,7 +3106,10 @@ const Home = ({ onNavigate, onLogout }) => {
           };
 
           return (
-            <div className="home-section-layout">
+            <div
+              key={`home-sections-${normalizeTrustId(selectedTrustId || trustInfo?.id || '')}`}
+              className="home-section-layout home-load-sequence"
+            >
               {resolvedHomeLayout.map((key) => {
                 if (key === 'trustList' && !showTrustSelector) return null;
                 return SECTIONS[key] || null;
@@ -3156,6 +3155,10 @@ const Home = ({ onNavigate, onLogout }) => {
 
         @media (min-width: 1024px) {
           .home-desktop-shell {
+            animation: homeDesktopPageIn 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .home-desktop-shell {
             overflow: visible !important;
             min-height: 100% !important;
           }
@@ -3181,6 +3184,7 @@ const Home = ({ onNavigate, onLogout }) => {
             top: 0;
             z-index: 55;
             box-shadow: 0 10px 26px color-mix(in srgb, var(--brand-navy-dark) 16%, transparent) !important;
+            animation: homeDesktopNavbarIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
           }
 
           .home-navbar-row {
@@ -3221,11 +3225,19 @@ const Home = ({ onNavigate, onLogout }) => {
             
             border-radius: 16px !important;
             background: transparent !important;
+            transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+          }
+
+          .home-navbar .notification-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 22px color-mix(in srgb, var(--navbar-text) 12%, transparent);
           }
 
           .home-navbar .notification-dropdown {
             top: 82px !important;
             right: 32px !important;
+            transform-origin: top right;
+            animation: homeDesktopDropdownIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
           }
 
           .home-section-layout {
@@ -3234,6 +3246,7 @@ const Home = ({ onNavigate, onLogout }) => {
             gap: 18px;
             padding: 0;
             align-items: stretch;
+            animation: homeDesktopContentIn 560ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both;
           }
 
           .home-section-full {
@@ -3248,12 +3261,26 @@ const Home = ({ onNavigate, onLogout }) => {
             padding-right: 0 !important;
           }
 
+          .home-load-sequence > .home-section {
+            opacity: 0;
+            animation: homeDesktopSectionIn 620ms cubic-bezier(0.22, 1, 0.36, 1) both !important;
+            will-change: transform, opacity;
+          }
+
+          .home-load-sequence > .home-section:nth-child(1) { animation-delay: 120ms !important; }
+          .home-load-sequence > .home-section:nth-child(2) { animation-delay: 190ms !important; }
+          .home-load-sequence > .home-section:nth-child(3) { animation-delay: 260ms !important; }
+          .home-load-sequence > .home-section:nth-child(4) { animation-delay: 330ms !important; }
+          .home-load-sequence > .home-section:nth-child(5) { animation-delay: 400ms !important; }
+
           .home-section-gallery {
             order: 20;
+            margin-left: 1rem !important;
           }
 
           .home-section-sponsors {
             order: 21;
+            margin-right: 1rem !important;
           }
 
           .home-section-quick-actions {
@@ -3263,11 +3290,99 @@ const Home = ({ onNavigate, onLogout }) => {
           .home-gallery-card,
           .home-sponsor-card {
             height: 260px;
+            transition:
+              transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 260ms ease,
+              filter 260ms ease;
+            will-change: transform;
           }
 
           .home-gallery-card {
             display: flex;
             flex-direction: column;
+          }
+
+          .home-gallery-card:hover,
+          .home-sponsor-card:hover {
+            transform: translateY(-4px);
+            filter: saturate(1.03);
+          }
+
+          .home-gallery-card img,
+          .home-sponsor-card img {
+            transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), filter 280ms ease;
+          }
+
+          .home-gallery-card:hover img,
+          .home-sponsor-card:hover img {
+            transform: scale(1.035);
+          }
+
+          .home-section-quick-actions button {
+            position: relative;
+            opacity: 0;
+            transform: translateY(0);
+            animation: homeDesktopQuickCardIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+            transition:
+              transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 220ms ease,
+              border-color 220ms ease,
+              filter 220ms ease;
+            will-change: transform;
+          }
+
+          .home-section-quick-actions button:nth-child(1) { animation-delay: 420ms; }
+          .home-section-quick-actions button:nth-child(2) { animation-delay: 490ms; }
+          .home-section-quick-actions button:nth-child(3) { animation-delay: 560ms; }
+          .home-section-quick-actions button:nth-child(4) { animation-delay: 630ms; }
+          .home-section-quick-actions button:nth-child(5) { animation-delay: 700ms; }
+          .home-section-quick-actions button:nth-child(6) { animation-delay: 770ms; }
+          .home-section-quick-actions button:nth-child(7) { animation-delay: 840ms; }
+          .home-section-quick-actions button:nth-child(8) { animation-delay: 910ms; }
+          .home-section-quick-actions button:nth-child(9) { animation-delay: 980ms; }
+          .home-section-quick-actions button:nth-child(n + 10) { animation-delay: 1050ms; }
+
+          .home-section-quick-actions button::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            background: linear-gradient(120deg, transparent 0%, color-mix(in srgb, var(--surface-color) 42%, transparent) 48%, transparent 78%);
+            transform: translateX(-32%);
+            transition: opacity 220ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+          }
+
+          .home-section-quick-actions button:hover {
+            transform: translateY(-3px);
+            filter: saturate(1.04);
+          }
+
+          .home-section-quick-actions button:hover::after {
+            opacity: 0.42;
+            transform: translateX(32%);
+          }
+
+          .home-section-quick-actions button img,
+          .home-section-quick-actions button svg {
+            transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+          }
+
+          .home-section-quick-actions button:hover img,
+          .home-section-quick-actions button:hover svg {
+            transform: scale(1.08);
+          }
+
+          .home-section-full:first-child button,
+          .home-section-full:first-child img {
+            transition:
+              transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 220ms ease,
+              filter 220ms ease;
+          }
+
+          .home-section-full:first-child button:hover {
+            transform: translateY(-2px);
           }
 
           .home-gallery-card > div:first-child {
@@ -3285,6 +3400,76 @@ const Home = ({ onNavigate, onLogout }) => {
           .home-sponsor-fill {
             height: 100% !important;
             min-height: 0 !important;
+          }
+
+          .home-footer {
+            animation: homeDesktopFooterIn 520ms cubic-bezier(0.22, 1, 0.36, 1) 420ms both;
+          }
+        }
+
+        @keyframes homeDesktopPageIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes homeDesktopNavbarIn {
+          from { opacity: 0; transform: translateY(-12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes homeDesktopContentIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes homeDesktopSectionIn {
+          from { opacity: 0; transform: translateY(16px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes homeDesktopDropdownIn {
+          from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes homeDesktopQuickCardIn {
+          from { opacity: 0; transform: translateY(18px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes homeDesktopFooterIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (min-width: 1024px) and (prefers-reduced-motion: reduce) {
+          .home-desktop-shell,
+          .home-navbar,
+          .home-section-layout,
+          .home-section,
+          .home-footer,
+          .home-navbar .notification-dropdown {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+          }
+
+          .home-gallery-card,
+          .home-sponsor-card,
+          .home-section-quick-actions button,
+          .home-section-quick-actions button::after,
+          .home-section-quick-actions button img,
+          .home-section-quick-actions button svg,
+          .home-gallery-card img,
+          .home-sponsor-card img,
+          .home-navbar .notification-button {
+            transition: none !important;
+          }
+
+          .home-section-quick-actions button {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
           }
         }
 

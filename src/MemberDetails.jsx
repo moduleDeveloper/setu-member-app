@@ -624,8 +624,8 @@ const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
           }
 
           .member-details-avatar {
-            width: 148px !important;
-            height: 148px !important;
+            width: 301px !important;
+            height: 301px !important;
             border-radius: 24px !important;
           }
 

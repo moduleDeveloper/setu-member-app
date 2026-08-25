@@ -142,6 +142,7 @@ export const checkPhone = async (req, res, next) => {
       data: {
         phoneNumber: result.data.phoneNumber,
         user: result.data.user,
+        accounts: Array.isArray(result.data.accounts) ? result.data.accounts : (result.data.user ? [result.data.user] : []),
         requestId: result.data.requestId
       }
     });
