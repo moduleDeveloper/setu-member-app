@@ -1107,54 +1107,85 @@ const Notices = ({ onNavigate }) => {
 
           .notice-card {
             display: grid;
-            grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
+            grid-template-columns: minmax(300px, 34%) minmax(0, 1fr);
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
             grid-template-areas:
               "media meta"
               "media title"
               "media description"
               "media footer";
-            column-gap: 1.25rem;
-            align-items: start;
-            min-height: 180px;
+            min-height: 190px;
+            overflow: hidden;
+            padding: 0 !important;
           }
 
           .notice-card > .flex:first-child {
             grid-area: meta;
-            margin-bottom: 0.45rem;
+            margin: 1.25rem 1.35rem 0.45rem;
+          }
+
+          .notice-card > .flex:first-child .text-\\[10px\\] {
+            font-size: 0.82rem !important;
+            line-height: 1.2rem;
+          }
+
+          .notice-card > .flex:first-child svg {
+            width: 14px;
+            height: 14px;
           }
 
           .notice-card > h3 {
             grid-area: title;
-            margin-bottom: 0.4rem;
+            margin: 0.8rem 1.35rem 1rem;
+            font-size: 1.35rem;
+            line-height: 1.25;
           }
 
           .notice-card > div:has(> p.line-clamp-3) {
             grid-area: description;
-            margin-bottom: 0.75rem;
+            margin: 0 1.35rem 0.75rem;
+          }
+
+          .notice-card > div:has(> p.line-clamp-3) > p {
+            display: block;
+            overflow: visible;
+            -webkit-box-orient: initial;
+            -webkit-line-clamp: unset;
+            line-clamp: unset;
           }
 
           .notice-card-media {
             grid-area: media;
             margin-bottom: 0 !important;
-            height: 160px;
             align-self: stretch;
-            padding: 0.5rem !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
           }
 
           .notice-card-media .aspect-\\[4\\/3\\] {
             height: 100%;
             aspect-ratio: auto !important;
+            border-radius: 0 !important;
           }
 
           .notice-card-media img,
           .notice-card-media > div {
+            height: 100%;
             max-height: 100%;
+          }
+
+          .notice-card-media img {
+            object-fit: cover !important;
           }
 
           .notice-card > .pt-3 {
             grid-area: footer;
             align-self: end;
             margin-top: auto;
+            margin-left: 1.35rem;
+            margin-right: 1.35rem;
+            margin-bottom: 1.25rem;
           }
         }
       `}</style>

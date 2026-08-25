@@ -703,20 +703,26 @@ const Achievements = ({ onNavigate }) => {
           }
 
           .achievement-card {
-            overflow: hidden;
+            overflow: visible;
+            min-height: 190px;
+            padding-left: 0 !important;
           }
 
           .achievement-card-body {
             display: grid;
-            grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
+            grid-template-columns: minmax(300px, 34%) minmax(0, 1fr);
             grid-template-areas:
               "media header"
               "media description"
               "media badges"
               "media footer";
-            column-gap: 1.25rem;
+            grid-template-rows: auto minmax(0, 1fr) auto auto;
             align-items: start;
-            min-height: 180px;
+            min-height: 190px;
+            max-height: fit-content;
+            padding: 0 !important;
+            overflow: hidden;
+            border-radius: 1rem;
           }
 
           .achievement-card-body > button:first-child {
@@ -725,44 +731,74 @@ const Achievements = ({ onNavigate }) => {
 
           .achievement-card-body > button:first-child > div:first-child {
             grid-area: header;
-            margin-bottom: 0.35rem;
+            margin: 1.25rem 1.35rem 0.45rem;
           }
 
           .achievement-card-body > button:first-child > p {
             grid-area: description;
             margin-top: 0 !important;
+            margin-left: 1.35rem;
+            margin-right: 1.35rem;
           }
 
           .achievement-card-body > button:first-child > div:nth-child(3) {
             grid-area: badges;
-            margin-top: 0.75rem !important;
+            margin: 0.75rem 1.35rem 0 !important;
           }
 
           .achievement-card-media {
             grid-area: media;
             margin-top: 0 !important;
-            height: 160px;
             align-self: stretch;
+            min-height: 190px;
+            max-height: fit-content;
+            overflow: hidden;
           }
 
           .achievement-card-media > button,
-          .achievement-card-media > button > div,
+          .achievement-card-media > button > div {
+            height: 100% !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: var(--surface-color);
+          }
+
           .achievement-card-media img {
             height: 100% !important;
+            width: 100% !important;
+            object-fit: cover !important;
+            object-position: center !important;
+            border-radius: 0 !important;
           }
 
           .achievement-card-body > button:last-child {
             grid-area: footer;
             align-self: end;
+            width: auto !important;
+            min-width: 0;
             margin-top: auto;
+            margin-left: 1.35rem;
+            margin-right: 1.35rem;
+            margin-bottom: 1.25rem;
+          }
+
+          .achievement-card-body > button:last-child > div {
+            min-width: 0;
           }
 
           .achievements-timeline {
-            padding-left: 0 !important;
+            padding-left: 1.75rem !important;
+            left: -15px !important;
           }
 
           .achievements-timeline > .absolute {
-            display: none;
+            display: block;
+            left: 0.875rem;
+          }
+
+          .achievement-card > .absolute {
+            left: -1.375rem !important;
+            top: 1.25rem;
           }
 
           .achievements-timeline .space-y-6 > :not([hidden]) ~ :not([hidden]) {
