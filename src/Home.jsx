@@ -3232,23 +3232,3 @@ const Home = ({ onNavigate, onLogout }) => {
 };
 
 export default Home;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

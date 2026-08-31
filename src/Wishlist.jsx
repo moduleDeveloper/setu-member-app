@@ -133,9 +133,24 @@ const isVariantSelectionComplete = (options = {}, selected = {}) => (
 );
 
 const resolveImageUrl = (item) => {
-  const images = Array.isArray(item?.images) ? [...item.images] : [];
-  images.sort((a, b) => (Number(a?.sort_order) || 0) - (Number(b?.sort_order) || 0));
-  return normalizeText(item?.selected_image || item?.image_url || item?.imageUrl || images[0]?.image_url);
+  const activeImages = (Array.isArray(item?.images) ? [...item.images] : [])
+    .filter((image) => {
+      const status = normalizeText(image?.status).toLowerCase();
+      return !['inactive', 'disabled', 'deleted', 'archived'].includes(status)
+        && image?.is_active !== false
+        && image?.isActive !== false;
+    })
+    .sort((a, b) => (Number(a?.sort_order) || 0) - (Number(b?.sort_order) || 0));
+  const selectedImage = normalizeText(item?.selected_image || item?.image_url || item?.imageUrl);
+  const imageUrls = (Array.isArray(item?.images) ? item.images : [])
+    .map((image) => normalizeText(image?.image_url))
+    .filter(Boolean);
+
+  if (selectedImage && (!imageUrls.includes(selectedImage) || activeImages.some((image) => normalizeText(image?.image_url) === selectedImage))) {
+    return selectedImage;
+  }
+
+  return normalizeText(activeImages[0]?.image_url);
 };
 
 const resolvePrice = (item) => {
