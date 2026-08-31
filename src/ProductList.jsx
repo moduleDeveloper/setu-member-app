@@ -249,9 +249,16 @@ const isVisibleProduct = (product) => {
   return status === 'active';
 };
 
+const isActiveImage = (image) => {
+  const status = pickText(image?.status).toLowerCase();
+  if (['inactive', 'disabled', 'deleted', 'archived'].includes(status)) return false;
+  if (image?.is_active === false || image?.isActive === false) return false;
+  return true;
+};
+
 const resolveProductImages = (product) =>
   (Array.isArray(product?.images) ? product.images : [])
-    .filter((image) => pickText(image?.image_url))
+    .filter((image) => pickText(image?.image_url) && isActiveImage(image))
     .sort((a, b) => normalizeOrder(a?.sort_order) - normalizeOrder(b?.sort_order));
 
 const resolveProductPrice = (product) => {

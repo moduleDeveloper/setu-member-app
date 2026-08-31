@@ -13,6 +13,7 @@ import {
 import { useAppTheme } from './context/ThemeContext';
 import { getProfile } from './services/api';
 import { resolveOrderHistoryMemberId } from './services/orderHistoryService';
+import { openRazorpayCheckout } from './services/paymentService';
 import { supabase } from './services/supabaseClient';
 import { applyOpacity } from './utils/colorUtils';
 import { clearCartItems, getCartItemPricing, getCartSummary, readCartItems, refreshCartCache, subscribeCart } from './utils/productCart';
@@ -190,7 +191,7 @@ const resolvePurchaseProductPriceId = (item = {}) => normalizeRpcValue(
   || item?.productPriceId
 );
 
-const buildPurchaseRequests = (items = [], memberId, trustId) => {
+const buildPurchaseRequests = (items = [], memberId, trustId, status = 'order_payment_pending') => {
   const normalizedItems = Array.isArray(items) ? items : [];
 
   return normalizedItems.map((item, index) => {
@@ -225,7 +226,7 @@ const buildPurchaseRequests = (items = [], memberId, trustId) => {
           type: 'order',
           quantity,
           unit_price: Number.isFinite(unitPrice) ? unitPrice : 0,
-          status: 'order_payment_pending',
+          status,
           selected_attributes: item?.selected_attributes || {},
         },
       };
@@ -244,7 +245,7 @@ const buildPurchaseRequests = (items = [], memberId, trustId) => {
         type: 'order',
         quantity,
         unit_price: Number.isFinite(unitPrice) ? unitPrice : 0,
-        status: 'order_payment_pending',
+        status,
         selected_attributes: item?.selected_attributes || {},
       },
     };
@@ -510,11 +511,6 @@ function CreateOrder() {
         return;
       }
 
-      if (selectedTrustPaymentGateway === true) {
-        // TODO: Add payment gateway flow here when Trust.payment_gateway is true.
-        return null;
-      }
-
       if (!Array.isArray(items) || items.length === 0) {
         setError('Your cart is empty. Please add items before paying.');
         return;
@@ -532,14 +528,44 @@ function CreateOrder() {
         return;
       }
 
-      const purchaseRequests = buildPurchaseRequests(items, memberId, trustId);
-      for (const request of purchaseRequests) {
-        const { data, error: rpcError } = await supabase.rpc('manage_purchase_by_member', request);
-        if (rpcError) throw rpcError;
+      const runPurchaseRequests = async (status) => {
+        const purchaseRequests = buildPurchaseRequests(items, memberId, trustId, status);
+        for (const request of purchaseRequests) {
+          const { data, error: rpcError } = await supabase.rpc('manage_purchase_by_member', request);
+          if (rpcError) throw rpcError;
 
-        if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
-          throw new Error(normalizeText(data.message) || 'Unable to save your purchase right now.');
+          if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
+            throw new Error(normalizeText(data.message) || 'Unable to save your purchase right now.');
+          }
         }
+      };
+
+      if (selectedTrustPaymentGateway === true) {
+        // Convert the cart rows into a pending order before Razorpay opens, so a
+        // dropped/closed checkout still leaves a traceable pending order in the DB.
+        await runPurchaseRequests('order_payment_pending');
+
+        try {
+          await openRazorpayCheckout({
+            amountInRupees: summary.totalAmount,
+            receipt: `order_${trustId}_${Date.now()}`,
+            name: trustName,
+            description: `Order payment for ${trustName}`,
+            prefill: {
+              name: customerInfo.fullName || form.fullName,
+              email: customerInfo.email || form.email,
+              contact: customerInfo.mobile || form.mobile,
+            },
+            notes: { trust_id: trustId, member_id: memberId },
+          });
+        } catch (paymentError) {
+          setError(paymentError?.message || 'Payment was not completed. Please try again.');
+          return;
+        }
+
+        await runPurchaseRequests('order_payment_done');
+      } else {
+        await runPurchaseRequests('order_payment_pending');
       }
 
       try {
