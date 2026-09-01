@@ -5,6 +5,20 @@ import TermsModal from './components/TermsModal';
 import ImageSlider from './components/ImageSlider';
 import { getProfile, getMarqueeUpdates, getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification } from './services/api';
 import { useGalleryContext } from './context/GalleryContext';
+import { GalleryContent } from './Gallery';
+import { SponsorsContent } from './SponsorsList';
+import { NoticesContent } from './Notices';
+import { FacilitiesContent } from './Facilities';
+import { EventsContent } from './Events';
+import { AchievementsContent } from './Achievements';
+import { DonationContent } from './Donation';
+import { ReportsContent } from './Reports';
+import { DirectoryContent } from './Directory';
+import { ExecutiveBodyContent } from './ExecutiveBody';
+import { AppointmentsContent } from './Appointments';
+import { CategoriesProductsContent } from './CategoriesProducts';
+import { OrderHistoryContent } from './OrderHistory';
+import { ReferralContent } from './Referral';
 import { useAppTheme } from './context/ThemeContext';
 import { registerSidebarState, useTrustDataVersion } from './hooks';
 import { supabase } from './services/supabaseClient';
@@ -31,10 +45,50 @@ import {
   getFooterThemeStyles,
   getNavbarThemeStyles,
   getThemeToken,
-  normalizeHomeLayout
+  normalizeHomeLayout,
+  HOME_LAYOUT_MODE_KEY_ALIASES
 } from './utils/themeUtils';
 import { applyOpacity } from './utils/colorUtils';
 import { resolveNotificationRedirectRoute } from './services/notificationRedirectService';
+
+// Quick-action modules with a registered chrome-free *Content component.
+// route slug (matches enabledQuickActions[].route / theme.homeLayoutModes key) -> component.
+// Any route not listed here always renders as its normal tile, regardless of home_layout_modes,
+// so DB values for not-yet-supported features degrade safely instead of breaking anything.
+const HOME_CONTENT_RENDERERS = {
+  gallery: GalleryContent,
+  sponsors: SponsorsContent,
+  notices: NoticesContent,
+  facilities: FacilitiesContent,
+  events: EventsContent,
+  achievements: AchievementsContent,
+  donation: DonationContent,
+  reports: ReportsContent,
+  directory: DirectoryContent,
+  'executive-body': ExecutiveBodyContent,
+  appointment: AppointmentsContent,
+  products: CategoriesProductsContent,
+  'order-history': OrderHistoryContent,
+  reference: ReferralContent,
+};
+
+// Resolves the box/content mode for a section, checking each candidate key (canonical
+// route slug and/or raw feature_flags name) both as an exact theme.homeLayoutModes key
+// and via HOME_LAYOUT_MODE_KEY_ALIASES. Falls back to "box" when nothing matches.
+const resolveHomeSectionMode = (theme, ...candidateKeys) => {
+  const modes = theme?.homeLayoutModes || {};
+  const isValidMode = (value) => value === 'box' || value === 'content';
+
+  for (const rawKey of candidateKeys) {
+    const key = String(rawKey || '').trim();
+    if (key && isValidMode(modes[key])) return modes[key];
+  }
+  for (const rawKey of candidateKeys) {
+    const normalizedKey = HOME_LAYOUT_MODE_KEY_ALIASES[String(rawKey || '').trim().toLowerCase()];
+    if (normalizedKey && isValidMode(modes[normalizedKey])) return modes[normalizedKey];
+  }
+  return 'box';
+};
 
 const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
 const SPONSOR_CHUNK_SIZE = sponsorConfig.CAROUSEL_BATCH_SIZE;
@@ -2690,6 +2744,8 @@ const Home = ({ onNavigate, onLogout }) => {
       >
       
         {(() => {
+          const galleryHomeMode = resolveHomeSectionMode(theme, 'gallery', 'feature_gallery');
+          const sponsorsHomeMode = resolveHomeSectionMode(theme, 'sponsors', 'feature_sponsors');
           const SECTIONS = {
             trustList: showTrustSelector && (selectedTrust || otherTrusts.length > 0) ? (
               <div key="trustList">
@@ -2754,6 +2810,11 @@ const Home = ({ onNavigate, onLogout }) => {
               </div>
             ) : null,
             gallery: ff('feature_gallery') ? (
+              galleryHomeMode === 'content' ? (
+                <div className="relative px-4 mt-5 mb-3" style={{ animation: resolveAnimation('gallery', 'zoomIn') }} key="gallery">
+                  <GalleryContent variant="home" onNavigate={onNavigate} />
+                </div>
+              ) : (
               <div className="relative px-4 mt-5 mb-3" style={{ animation: resolveAnimation('gallery', 'zoomIn') }} key="gallery">
                 <div className="pointer-events-none absolute -top-1.5 left-7 z-20 ">
                   <span
@@ -2818,62 +2879,103 @@ const Home = ({ onNavigate, onLogout }) => {
                   )}
                 </div>
               </div>
+              )
             ) : null,
 
             quickActions: enabledQuickActions.length > 0 ? (
               <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('quickActions', 'cards') }} key="quickActions">
-                <div className="grid grid-cols-2 gap-3">
-                  {enabledQuickActions.map((action) => {
-                    return (
-                      <button
-                        key={action.id}
-                        onClick={() => onNavigate(action.route)}
-                        className="rounded-2xl text-left transition-all active:scale-[0.97] duration-150"
-                        style={{
-                          background: quickActionsBg,
-                          border: `1px solid color-mix(in srgb, ${quickActionsText} 22%, transparent)`,
-                          boxShadow: `0 4px 16px color-mix(in srgb, ${quickActionsText} 14%, transparent), 0 1px 4px color-mix(in srgb, ${quickActionsText} 10%, transparent)`,
-                          overflow: 'hidden',
-                        }}
-                      >
+                {(() => {
+                  const renderTile = (action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => onNavigate(action.route)}
+                      className="rounded-2xl text-left transition-all active:scale-[0.97] duration-150"
+                      style={{
+                        background: quickActionsBg,
+                        border: `1px solid color-mix(in srgb, ${quickActionsText} 22%, transparent)`,
+                        boxShadow: `0 4px 16px color-mix(in srgb, ${quickActionsText} 14%, transparent), 0 1px 4px color-mix(in srgb, ${quickActionsText} 10%, transparent)`,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        className="h-[4px]"
+                        style={{ background: `linear-gradient(90deg, ${quickActionsText} 0%, color-mix(in srgb, ${quickActionsText} 60%, var(--surface-color)) 100%)` }}
+                      />
+                      <div className="p-3.5">
                         <div
-                          className="h-[4px]"
-                          style={{ background: `linear-gradient(90deg, ${quickActionsText} 0%, color-mix(in srgb, ${quickActionsText} 60%, var(--surface-color)) 100%)` }}
-                        />
-                        <div className="p-3.5">
-                          <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center mb-2.5"
-                            style={{
-                              background: quickActionsIconBg,
-                              border: `1px solid color-mix(in srgb, ${quickActionsText} 20%, transparent)`,
-                            }}
-                          >
-                            <img
-                              src={action.icon_url}
-                              alt={action.displayName}
-                              className="h-[18px] w-[18px] object-contain"
-                            />
-                          </div>
-                          <div className="flex items-start justify-between gap-1">
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-[12px] font-extrabold leading-snug" style={{ color: quickActionsText }}>
-                                {action.displayName}
-                              </h3>
-                              <p className="text-[10px] font-medium mt-0.5 leading-snug" style={{ color: `color-mix(in srgb, ${quickActionsText} 80%, var(--surface-color))` }}>
-                                {action.tagline}
-                              </p>
-                            </div>
-                            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: `color-mix(in srgb, ${quickActionsText} 72%, transparent)` }} />
-                          </div>
+                          className="w-10 h-10 rounded-xl flex items-center justify-center mb-2.5"
+                          style={{
+                            background: quickActionsIconBg,
+                            border: `1px solid color-mix(in srgb, ${quickActionsText} 20%, transparent)`,
+                          }}
+                        >
+                          <img
+                            src={action.icon_url}
+                            alt={action.displayName}
+                            className="h-[18px] w-[18px] object-contain"
+                          />
                         </div>
-                      </button>
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-[12px] font-extrabold leading-snug" style={{ color: quickActionsText }}>
+                              {action.displayName}
+                            </h3>
+                            <p className="text-[10px] font-medium mt-0.5 leading-snug" style={{ color: `color-mix(in srgb, ${quickActionsText} 80%, var(--surface-color))` }}>
+                              {action.tagline}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: `color-mix(in srgb, ${quickActionsText} 72%, transparent)` }} />
+                        </div>
+                      </div>
+                    </button>
+                  );
+
+                  // Group consecutive box-mode actions into shared tile grids, and render any
+                  // action explicitly set to "content" (with a registered *Content component)
+                  // as its own full-width block, preserving enabledQuickActions order.
+                  const groups = [];
+                  let tileBatch = [];
+                  enabledQuickActions.forEach((action) => {
+                    const mode = resolveHomeSectionMode(theme, action.route, action.id);
+                    const ContentRenderer = mode === 'content' ? HOME_CONTENT_RENDERERS[action.route] : null;
+                    if (ContentRenderer) {
+                      if (tileBatch.length > 0) {
+                        groups.push({ type: 'tiles', items: tileBatch });
+                        tileBatch = [];
+                      }
+                      groups.push({ type: 'content', action, ContentRenderer });
+                    } else {
+                      tileBatch.push(action);
+                    }
+                  });
+                  if (tileBatch.length > 0) groups.push({ type: 'tiles', items: tileBatch });
+
+                  return groups.map((group, groupIndex) => {
+                    const spacingClass = groupIndex > 0 ? 'mt-4' : '';
+                    if (group.type === 'content') {
+                      const { action, ContentRenderer } = group;
+                      return (
+                        <div key={`quickaction-content-${action.id}`} className={spacingClass}>
+                          <ContentRenderer variant="home" onNavigate={onNavigate} />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={`quickaction-tiles-${groupIndex}`} className={`grid grid-cols-2 gap-3 ${spacingClass}`}>
+                        {group.items.map((action) => renderTile(action))}
+                      </div>
                     );
-                  })}
-                </div>
+                  });
+                })()}
               </div>
             ) : null,
 
             sponsors: ff('feature_sponsors') ? (
+              sponsorsHomeMode === 'content' ? (
+                <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('sponsors', 'cards') }} key="sponsors">
+                  <SponsorsContent variant="home" onNavigate={onNavigate} />
+                </div>
+              ) : (
               <div className="px-4 mt-5 mb-4" style={{ animation: resolveAnimation('sponsors', 'cards') }} key="sponsors">
                 {sponsors.length > 0 ? (
                   <div className="relative">
@@ -3103,6 +3205,7 @@ const Home = ({ onNavigate, onLogout }) => {
                 )}
 
               </div>
+              )
             ) : null,
           };
 

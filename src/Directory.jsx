@@ -88,7 +88,8 @@ const readCurrentUserPhotoCache = () => {
   }
 };
 
-const Directory = ({ onNavigate }) => {
+export const DirectoryContent = ({ onNavigate, variant = 'page' }) => {
+  const isPageVariant = variant === 'page';
   const navigate = useNavigate();
   const theme = useAppTheme();
   const navbarTheme = getNavbarThemeStyles(theme);
@@ -482,51 +483,55 @@ const Directory = ({ onNavigate }) => {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--page-bg, var(--app-page-bg))' }}>
-      <div
-        className="theme-navbar sticky top-0 z-20"
-        style={{
-          background: navbarTheme?.backgroundStyle || 'var(--navbar-bg, var(--app-navbar-bg))',
-          backdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
-          WebkitBackdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
-          borderBottom: '1px solid var(--navbar-border)',
-          boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy) 16%, transparent)',
-        }}
-      >
-        <div className="h-[3px]" style={{ background: 'var(--navbar-accent)' }} />
-        <div className="px-4 pt-4 pb-4">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-              className="p-2 rounded-xl transition-colors"
-              style={{ color: navbarTextColor, background: 'color-mix(in srgb, var(--navbar-bg) 72%, var(--surface-color))' }}
-              aria-label="Open menu"
-            >
-              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-            <h1 className="text-lg font-extrabold tracking-wide" style={{ color: navbarTextColor }}>Directory</h1>
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="p-2 rounded-xl transition-colors"
-              style={{ color: navbarTextColor, background: 'transparent' }}
-              aria-label="Home"
-            >
-              <HomeIcon className="h-5 w-5" />
-            </button>
+    <div className={isPageVariant ? 'min-h-screen' : undefined} style={isPageVariant ? { background: 'var(--page-bg, var(--app-page-bg))' } : undefined}>
+      {isPageVariant && (
+        <div
+          className="theme-navbar sticky top-0 z-20"
+          style={{
+            background: navbarTheme?.backgroundStyle || 'var(--navbar-bg, var(--app-navbar-bg))',
+            backdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
+            WebkitBackdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
+            borderBottom: '1px solid var(--navbar-border)',
+            boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy) 16%, transparent)',
+          }}
+        >
+          <div className="h-[3px]" style={{ background: 'var(--navbar-accent)' }} />
+          <div className="px-4 pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setIsMenuOpen((prev) => !prev)}
+                className="p-2 rounded-xl transition-colors"
+                style={{ color: navbarTextColor, background: 'color-mix(in srgb, var(--navbar-bg) 72%, var(--surface-color))' }}
+                aria-label="Open menu"
+              >
+                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+              <h1 className="text-lg font-extrabold tracking-wide" style={{ color: navbarTextColor }}>Directory</h1>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="p-2 rounded-xl transition-colors"
+                style={{ color: navbarTextColor, background: 'transparent' }}
+                aria-label="Home"
+              >
+                <HomeIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {isMenuOpen && (
+      {isPageVariant && isMenuOpen && (
         <div
           className="fixed inset-0 z-25"
           style={{ background: applyOpacity('var(--brand-navy-dark)', 0.12) }}
           onClick={() => setIsMenuOpen(false)}
         />
       )}
-      <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="directory" />
+      {isPageVariant && (
+        <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="directory" />
+      )}
 
       {/* <div className="px-4 pt-4 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_220px]"> */}
       <div className="px-4 pt-4 flex items-center gap-2 w-full justify-between">
@@ -790,5 +795,7 @@ const Directory = ({ onNavigate }) => {
     </div>
   );
 };
+
+const Directory = ({ onNavigate }) => <DirectoryContent onNavigate={onNavigate} variant="page" />;
 
 export default Directory;

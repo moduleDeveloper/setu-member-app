@@ -145,7 +145,8 @@ function buildPaginationItems(currentPage, totalPages) {
   return items;
 }
 
-export function Gallery({ onNavigate }) {
+export function GalleryContent({ onNavigate, variant = 'page' }) {
+  const isPageVariant = variant === 'page';
   const navigate = useNavigate();
   const {
     trustId,
@@ -403,37 +404,39 @@ export function Gallery({ onNavigate }) {
   const actionBg = 'var(--app-button-bg, var(--brand-red))';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--page-bg, var(--app-page-bg))', fontFamily: "var(--font-family, 'Inter', sans-serif)" }}>
-      <div style={{ background: navbarBackground, padding: '16px', paddingTop: 'max(env(safe-area-inset-top,0px),16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy-dark) 18%, transparent)', backdropFilter: 'blur(var(--navbar-blur, 12px))', WebkitBackdropFilter: 'blur(var(--navbar-blur, 12px))', borderBottom: '1px solid var(--navbar-border)' }}>
-        <button onClick={() => setIsMenuOpen(!isMenuOpen)} style={nb.iconBtn}>
-          {isMenuOpen ? <X style={{ width: 24, height: 24, color: 'var(--app-button-text, var(--surface-color))' }} /> : <Menu style={{ width: 24, height: 24, color: 'var(--app-button-text, var(--surface-color))' }} />}
-        </button>
+    <div style={isPageVariant ? { minHeight: '100vh', background: 'var(--page-bg, var(--app-page-bg))', fontFamily: "var(--font-family, 'Inter', sans-serif)" } : undefined}>
+      {isPageVariant && (
+        <div style={{ background: navbarBackground, padding: '16px', paddingTop: 'max(env(safe-area-inset-top,0px),16px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy-dark) 18%, transparent)', backdropFilter: 'blur(var(--navbar-blur, 12px))', WebkitBackdropFilter: 'blur(var(--navbar-blur, 12px))', borderBottom: '1px solid var(--navbar-border)' }}>
+          <button onClick={() => setIsMenuOpen(!isMenuOpen)} style={nb.iconBtn}>
+            {isMenuOpen ? <X style={{ width: 24, height: 24, color: 'var(--app-button-text, var(--surface-color))' }} /> : <Menu style={{ width: 24, height: 24, color: 'var(--app-button-text, var(--surface-color))' }} />}
+          </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {selectedAlbumId && (
-            <button
-              onClick={() => {
-                setSelectedAlbumId(null);
-                setAlbumPageImages([]);
-                setAlbumTotalPages(0);
-                setCurrentPage(1);
-              }}
-              style={{ ...nb.iconBtn, width: 34, height: 34, background: 'color-mix(in srgb, var(--surface-color) 18%, transparent)', marginRight: 2 }}
-            >
-              <ArrowLeft style={{ width: 18, height: 18, color: 'var(--app-button-text, var(--surface-color))' }} />
-            </button>
-          )}
-          <span style={{ color: 'var(--app-button-text, var(--surface-color))', fontWeight: 800, fontSize: 17, letterSpacing: '-0.3px' }}>
-            {selectedAlbumId ? (selectedAlbum?.name || 'Album') : 'Gallery'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {selectedAlbumId && (
+              <button
+                onClick={() => {
+                  setSelectedAlbumId(null);
+                  setAlbumPageImages([]);
+                  setAlbumTotalPages(0);
+                  setCurrentPage(1);
+                }}
+                style={{ ...nb.iconBtn, width: 34, height: 34, background: 'color-mix(in srgb, var(--surface-color) 18%, transparent)', marginRight: 2 }}
+              >
+                <ArrowLeft style={{ width: 18, height: 18, color: 'var(--app-button-text, var(--surface-color))' }} />
+              </button>
+            )}
+            <span style={{ color: 'var(--app-button-text, var(--surface-color))', fontWeight: 800, fontSize: 17, letterSpacing: '-0.3px' }}>
+              {selectedAlbumId ? (selectedAlbum?.name || 'Album') : 'Gallery'}
+            </span>
+          </div>
+
+          <button onClick={() => navigate('/')} style={nb.iconBtn}>
+            <HomeIcon style={{ width: 22, height: 22, color: 'var(--app-button-text, var(--surface-color))' }} />
+          </button>
         </div>
+      )}
 
-        <button onClick={() => navigate('/')} style={nb.iconBtn}>
-          <HomeIcon style={{ width: 22, height: 22, color: 'var(--app-button-text, var(--surface-color))' }} />
-        </button>
-      </div>
-
-      <div style={{ padding: '16px 14px 40px', maxWidth: 520, margin: '0 auto' }}>
+      <div style={isPageVariant ? { padding: '16px 14px 40px', maxWidth: 520, margin: '0 auto' } : { maxWidth: 520, margin: '0 auto' }}>
         {isLoading && !showLoadingFallback && !hasSettledInitialAlbums && (
           <div style={gl.folderGrid}>
             {Array.from({ length: 6 }).map((_, i) => (
@@ -599,7 +602,9 @@ export function Gallery({ onNavigate }) {
         )}
       </div>
 
-      <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="gallery" />
+      {isPageVariant && (
+        <Sidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={onNavigate} currentPage="gallery" />
+      )}
 
       {selectedImage && (
         <div
@@ -826,6 +831,10 @@ const pg = {
     userSelect: 'none',
   },
 };
+
+export function Gallery({ onNavigate }) {
+  return <GalleryContent onNavigate={onNavigate} variant="page" />;
+}
 
 export default Gallery;
 

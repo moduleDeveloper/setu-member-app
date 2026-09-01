@@ -9,7 +9,8 @@ import {
 } from './services/sponsorStore';
 import { useAppTheme } from './context/ThemeContext';
 
-const SponsorsList = ({ onNavigate, onBack }) => {
+export const SponsorsContent = ({ onNavigate, onBack, variant = 'page' }) => {
+  const isPageVariant = variant === 'page';
   const theme = useAppTheme();
   const selectedTrustId = localStorage.getItem('selected_trust_id') || '';
   const hasTrust = Boolean(selectedTrustId);
@@ -64,20 +65,22 @@ const SponsorsList = ({ onNavigate, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--page-bg, var(--app-page-bg))' }}>
-      <div className="theme-navbar backdrop-blur border-b px-5 py-4 flex items-center gap-3 sticky top-0 z-10">
-        <button onClick={onBack} className="p-2 rounded-xl transition-colors" style={{ background: 'color-mix(in srgb, var(--app-accent-bg) 45%, transparent)' }}>
-          <ArrowLeft className="h-5 w-5" style={{ color: 'var(--navbar-text)' }} />
-        </button>
-        <div>
-          <h1 className="text-lg font-extrabold" style={{ color: 'var(--navbar-text)' }}>Sponsors</h1>
-          <p className="text-[11px] font-medium" style={{ color: 'var(--advertisement-subtitle)' }}>
-            {trustName}{list.length > 0 ? ` · ${list.length} sponsors` : ''}
-          </p>
+    <div className={isPageVariant ? 'min-h-screen' : undefined} style={isPageVariant ? { background: 'var(--page-bg, var(--app-page-bg))' } : undefined}>
+      {isPageVariant && (
+        <div className="theme-navbar backdrop-blur border-b px-5 py-4 flex items-center gap-3 sticky top-0 z-10">
+          <button onClick={onBack} className="p-2 rounded-xl transition-colors" style={{ background: 'color-mix(in srgb, var(--app-accent-bg) 45%, transparent)' }}>
+            <ArrowLeft className="h-5 w-5" style={{ color: 'var(--navbar-text)' }} />
+          </button>
+          <div>
+            <h1 className="text-lg font-extrabold" style={{ color: 'var(--navbar-text)' }}>Sponsors</h1>
+            <p className="text-[11px] font-medium" style={{ color: 'var(--advertisement-subtitle)' }}>
+              {trustName}{list.length > 0 ? ` · ${list.length} sponsors` : ''}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="px-4 py-4">
+      <div className={isPageVariant ? 'px-4 py-4' : ''}>
         {list.length === 0 ? (
           <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--advertisement-card-bg)', border: '1px solid var(--advertisement-card-border)' }}>
             <p className="text-sm font-semibold" style={{ color: 'var(--advertisement-description)' }}>
@@ -130,7 +133,8 @@ const SponsorsList = ({ onNavigate, onBack }) => {
   );
 };
 
+const SponsorsList = ({ onNavigate, onBack }) => (
+  <SponsorsContent onNavigate={onNavigate} onBack={onBack} variant="page" />
+);
+
 export default SponsorsList;
-
-
-

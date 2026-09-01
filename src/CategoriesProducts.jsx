@@ -290,7 +290,8 @@ function CardGrid({ section, onOpen }) {
   );
 }
 
-function CategoriesProducts() {
+export function CategoriesProductsContent({ variant = 'page' } = {}) {
+  const isPageVariant = variant === 'page';
   const navigate = useNavigate();
   const theme = useAppTheme();
   const navbarTheme = getNavbarThemeStyles(theme);
@@ -379,72 +380,74 @@ function CategoriesProducts() {
 
   return (
     <main
-      className="min-h-screen flex flex-col"
-      style={{
+      className={isPageVariant ? 'min-h-screen flex flex-col' : undefined}
+      style={isPageVariant ? {
         background: THEME.page,
         color: THEME.text,
         fontFamily: "var(--font-family, 'Inter', sans-serif)",
-      }}
+      } : undefined}
     >
       <div className="ws-page">
-        <div
-          className="theme-navbar sticky top-0 z-20"
-          style={{
-            background: navbarTheme?.backgroundStyle || 'var(--navbar-bg, var(--app-navbar-bg))',
-            backdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
-            WebkitBackdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
-            borderBottom: '1px solid var(--navbar-border)',
-            boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy) 16%, transparent)',
-          }}
-        >
-          <div className="h-[3px]" style={{ background: 'var(--navbar-accent)' }} />
-          <div className="px-4 pt-4 pb-4">
-            <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                className="rounded-xl p-2 transition-colors"
-                style={{
-                  color: navbarTextColor,
-                  background: 'color-mix(in srgb, var(--navbar-bg) 72%, var(--surface-color))',
-                }}
-                aria-label="Go back to home"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-
-              <div className="min-w-0 flex-1 text-center">
-                <h1
-                  className="truncate text-lg font-extrabold tracking-wide"
-                  style={{ color: navbarTextColor }}
-                >
-                  Categories
-                </h1>
-              </div>
-
-              <div className="flex h-10 items-center justify-end gap-3">
+        {isPageVariant && (
+          <div
+            className="theme-navbar sticky top-0 z-20"
+            style={{
+              background: navbarTheme?.backgroundStyle || 'var(--navbar-bg, var(--app-navbar-bg))',
+              backdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
+              WebkitBackdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
+              borderBottom: '1px solid var(--navbar-border)',
+              boxShadow: '0 2px 16px color-mix(in srgb, var(--brand-navy) 16%, transparent)',
+            }}
+          >
+            <div className="h-[3px]" style={{ background: 'var(--navbar-accent)' }} />
+            <div className="px-4 pt-4 pb-4">
+              <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  className="ws-header-icon-btn"
-                  onClick={() => navigate('/wishlist')}
-                  aria-label="Open wishlist"
+                  onClick={() => navigate('/')}
+                  className="rounded-xl p-2 transition-colors"
+                  style={{
+                    color: navbarTextColor,
+                    background: 'color-mix(in srgb, var(--navbar-bg) 72%, var(--surface-color))',
+                  }}
+                  aria-label="Go back to home"
                 >
-                  <Heart size={20} strokeWidth={1.8} />
-                  {wishlistItems.length > 0 && <span className="ws-cart-badge ">{wishlistItems.length}</span>}
+                  <ChevronLeft className="h-5 w-5" />
                 </button>
-                <button
-                  type="button"
-                  className="ws-header-icon-btn"
-                  onClick={() => navigate('/cart')}
-                  aria-label="Open cart"
-                >
-                  <ShoppingCart size={20} strokeWidth={1.5} />
-                  {cartCount > 0 && <span className="ws-cart-badge">{cartCount}</span>}
-                </button>
+
+                <div className="min-w-0 flex-1 text-center">
+                  <h1
+                    className="truncate text-lg font-extrabold tracking-wide"
+                    style={{ color: navbarTextColor }}
+                  >
+                    Categories
+                  </h1>
+                </div>
+
+                <div className="flex h-10 items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    className="ws-header-icon-btn"
+                    onClick={() => navigate('/wishlist')}
+                    aria-label="Open wishlist"
+                  >
+                    <Heart size={20} strokeWidth={1.8} />
+                    {wishlistItems.length > 0 && <span className="ws-cart-badge ">{wishlistItems.length}</span>}
+                  </button>
+                  <button
+                    type="button"
+                    className="ws-header-icon-btn"
+                    onClick={() => navigate('/cart')}
+                    aria-label="Open cart"
+                  >
+                    <ShoppingCart size={20} strokeWidth={1.5} />
+                    {cartCount > 0 && <span className="ws-cart-badge">{cartCount}</span>}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="ws-scroll" ref={scrollRef}>
           {showLoading ? (
@@ -681,6 +684,10 @@ function CategoriesProducts() {
       `}</style>
     </main>
   );
+}
+
+function CategoriesProducts() {
+  return <CategoriesProductsContent variant="page" />;
 }
 
 export default CategoriesProducts;
