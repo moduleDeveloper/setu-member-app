@@ -9,6 +9,7 @@ import TrustIdCard from './TrustIdCard';
 import { useAppTheme } from './context/ThemeContext';
 import { applyOpacity } from './utils/colorUtils';
 import { getNavbarThemeStyles, getThemeToken } from './utils/themeUtils';
+import { fetchActiveTrustsByMobile } from './services/trustService';
 
 // ─── Supabase helpers ──────────────────────────────────────────────────────
 
@@ -210,6 +211,52 @@ const getMemberProfileFields = (parsedUser = {}) => {
   };
 };
 
+const getMemberLookupFields = (parsedUser = {}) => ({
+  mobile: pickFirstText(
+    parsedUser?.Mobile,
+    parsedUser?.mobile,
+    parsedUser?.phone,
+    parsedUser?.Phone
+  ),
+  name: pickFirstText(
+    parsedUser?.Name,
+    parsedUser?.name,
+    parsedUser?.full_name
+  ),
+});
+
+const refreshUserMembershipsFromActiveTrusts = async (parsedUser = {}) => {
+  const lookup = getMemberLookupFields(parsedUser);
+  if (!lookup.mobile) return parsedUser;
+
+  const activeTrustResult = await fetchActiveTrustsByMobile({
+    mobile: lookup.mobile,
+    name: lookup.name || null,
+  });
+
+  const memberships = Array.isArray(activeTrustResult?.memberships)
+    ? activeTrustResult.memberships
+    : [];
+
+  if (memberships.length === 0) return parsedUser;
+
+  const refreshedUser = {
+    ...parsedUser,
+    members_id: activeTrustResult?.member_id || parsedUser?.members_id,
+    member_id: activeTrustResult?.member_id || parsedUser?.member_id,
+    hospital_memberships: memberships,
+    trusts_loaded_from_active_api: true,
+  };
+
+  try {
+    localStorage.setItem('user', JSON.stringify(refreshedUser));
+  } catch {
+    // Keep the refreshed in-memory payload even if storage is unavailable.
+  }
+
+  return refreshedUser;
+};
+
 const enrichTrustCardData = (link = {}, parsedUser = getStoredUser()) => {
   const cardData = { ...(link && typeof link === 'object' ? link : {}) };
   const profileFields = getMemberProfileFields(parsedUser);
@@ -325,7 +372,7 @@ const buildTrustLinksFromUserPayload = (parsedUser = {}) => {
       member_phone: memberPhone || null,
       member_photo_url: memberPhotoUrl || null,
       qr_code: hm.qr_code || hm.qrCode || null,
-      source: 'reg_members',
+      source: hm.source || 'reg_members',
       is_vip: true,
       is_current_trust: isCurrentTrust,
     };
@@ -433,7 +480,13 @@ const OtherMemberships = ({ onNavigate }) => {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const parsedUser = getStoredUser();
+      const storedUser = getStoredUser();
+      let parsedUser = storedUser;
+      try {
+        parsedUser = await refreshUserMembershipsFromActiveTrusts(storedUser);
+      } catch (e) {
+        console.warn('active trusts refresh failed:', e);
+      }
       const resolvedId = await resolveOtherMembershipMemberId(parsedUser);
       const id = resolvedId || normalizeText(parsedUser?.members_id);
       if (!id) {

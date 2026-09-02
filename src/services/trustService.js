@@ -99,6 +99,59 @@ const mapMembershipRowsWithTrusts = (regMemberships = [], trustById = {}) =>
     };
   });
 
+const mapActiveTrustResponseToMemberships = (payload = {}) => {
+  const trusts = Array.isArray(payload?.trusts) ? payload.trusts : [];
+  return trusts
+    .filter((trust) => trust?.trust_id)
+    .map((trust, index) => ({
+      id: trust?.trust_id || `active-trust-${index}`,
+      trust_id: trust?.trust_id || null,
+      trust_name: trust?.trust_name || null,
+      trust_icon_url: trust?.icon_url || null,
+      trust_remark: trust?.remark || null,
+      is_active: trust?.is_active !== false,
+      membership_number: trust?.membership_number || null,
+      role: trust?.role || null,
+      members_id: payload?.member_id || null,
+      member_id: payload?.member_id || null,
+      qr_code: trust?.qr_code || null,
+      trust_status: trust?.trust_status ?? null,
+      source: 'active_trusts_by_mobile'
+    }))
+    .sort((a, b) => {
+      const activeDiff = Number(Boolean(b?.is_active)) - Number(Boolean(a?.is_active));
+      if (activeDiff !== 0) return activeDiff;
+      return String(a?.trust_name || '').localeCompare(String(b?.trust_name || ''));
+    });
+};
+
+export const fetchActiveTrustsByMobile = async ({ mobile = '', name = null } = {}) => {
+  const normalizedMobile = String(mobile || '').replace(/\D/g, '').slice(-10);
+  const normalizedName = normalizeText(name);
+  if (!normalizedMobile) return null;
+
+  const { data, error } = await supabase.rpc('get_member_active_trusts_by_mobile', {
+      p_mobile: normalizedMobile,
+      p_name: normalizedName || null
+  });
+
+  if (error) {
+    throw new Error(error?.message || 'Unable to fetch active trusts for this mobile number.');
+  }
+
+  const payload = Array.isArray(data) ? data[0] : data;
+  if (payload?.success === false) {
+    throw new Error(payload?.message || 'Unable to fetch active trusts for this mobile number.');
+  }
+
+  const memberships = mapActiveTrustResponseToMemberships(payload);
+  return {
+    ...payload,
+    mobile: payload?.mobile || normalizedMobile,
+    memberships
+  };
+};
+
 export const fetchMemberTrustMemberships = async ({ membersId = null, membershipNumber = '' } = {}) => {
   const normalizedMembersId = normalizeText(membersId);
   const normalizedMembershipNo = normalizeText(membershipNumber);

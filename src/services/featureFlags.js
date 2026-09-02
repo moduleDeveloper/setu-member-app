@@ -39,6 +39,10 @@ const FEATURE_KEY_ALIASES = {
   order_history: 'feature_order_history',
   'order-history': 'feature_order_history',
   feature_order_history: 'feature_order_history',
+  memberbanner: 'feature_member_banner',
+  member_banner: 'feature_member_banner',
+  'member-banner': 'feature_member_banner',
+  feature_member_banner: 'feature_member_banner',
 };
 
 export const normalizeFeatureKey = (...values) => {
