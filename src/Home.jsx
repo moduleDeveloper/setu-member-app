@@ -26,7 +26,7 @@ import { clearLoginTermsPromptPending, isLoginTermsPromptPending, resolveLegalTr
 import { readNotificationCache, writeNotificationCache } from './services/notificationCache';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
 import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureVisible } from './services/featureFlags';
-import { fetchMemberTrusts, fetchTrustById, fetchDefaultTrust } from './services/trustService';
+import { fetchActiveTrustsByMobile, fetchMemberTrusts, fetchTrustById, fetchDefaultTrust } from './services/trustService';
 import {
   ensureAllSponsorsLoaded,
   getCachedCarouselBatch,
@@ -225,6 +225,33 @@ const resolveTrustIconToken = (trust, fallback = '1') =>
     fallback
   );
 
+const hasAuthoritativeApiMemberships = () => {
+  try {
+    const parsedUser = JSON.parse(localStorage.getItem('user') || 'null');
+    return Boolean(parsedUser?.trusts_loaded_from_active_api)
+      || Array.isArray(parsedUser?.hospital_memberships)
+      && parsedUser.hospital_memberships.some((membership) => membership?.source === 'active_trusts_by_mobile');
+  } catch {
+    return false;
+  }
+};
+
+const getStoredUserForTrustApi = () => {
+  try {
+    const parsedUser = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!parsedUser) return null;
+    const mobile = String(parsedUser?.mobile || parsedUser?.Mobile || parsedUser?.phone || '').replace(/\D/g, '').slice(-10);
+    if (!mobile) return null;
+    return {
+      ...parsedUser,
+      mobile,
+      name: normalizeMemberName(parsedUser?.name || parsedUser?.Name || '')
+    };
+  } catch {
+    return null;
+  }
+};
+
 const TrustChipIcon = memo(({ iconUrl, altText, versionToken, state }) => {
   const [failedSrc, setFailedSrc] = useState('');
 
@@ -353,8 +380,13 @@ const Home = ({ onNavigate, onLogout }) => {
     return null;
   });
 
-  // trustList: pre-populate from full trust list cache so selector shows instantly
+  const [strictTrustApiState, setStrictTrustApiState] = useState(() =>
+    getStoredUserForTrustApi() ? 'loading' : 'fallback'
+  );
+
+  // trustList: in strict API mode, start empty so stale cached chips do not flash.
   const [trustList, setTrustList] = useState(() => {
+    if (getStoredUserForTrustApi()) return [];
     try {
       const listCached = localStorage.getItem('trust_list_cache');
       if (listCached) {
@@ -543,6 +575,98 @@ const Home = ({ onNavigate, onLogout }) => {
   };
 
   useEffect(() => {
+    const storedUser = getStoredUserForTrustApi();
+    if (!storedUser) {
+      setStrictTrustApiState('fallback');
+      return undefined;
+    }
+
+    let active = true;
+    setStrictTrustApiState('loading');
+    setTrustList([]);
+
+    const loadApiTrusts = async () => {
+      try {
+        const result = await fetchActiveTrustsByMobile({
+          mobile: storedUser.mobile,
+          name: storedUser.name || null
+        });
+        if (!active) return;
+
+        const apiMemberships = Array.isArray(result?.memberships) ? result.memberships : [];
+        if (!result?.success || result?.member_found === false) {
+          setStrictTrustApiState('fallback');
+          return;
+        }
+
+        const apiTrusts = mergeUniqueTrusts(apiMemberships.map((membership) => ({
+          id: membership?.trust_id || membership?.id || null,
+          name: membership?.trust_name || null,
+          icon_url: membership?.trust_icon_url || null,
+          remark: membership?.trust_remark || null,
+          is_active: membership?.is_active !== false,
+          role: membership?.role || null,
+          membership_number: membership?.membership_number || null,
+          members_id: membership?.members_id || membership?.member_id || null,
+        })));
+
+        setTrustList(apiTrusts);
+        try { localStorage.setItem('trust_list_cache', JSON.stringify(apiTrusts)); } catch { /* ignore */ }
+
+        const nextUser = {
+          ...storedUser,
+          id: result?.member_id || storedUser?.id || null,
+          members_id: result?.member_id || storedUser?.members_id || null,
+          member_id: result?.member_id || storedUser?.member_id || null,
+          member_ids: result?.member_id ? [String(result.member_id)] : (storedUser?.member_ids || []),
+          Name: result?.member_name || storedUser?.Name || storedUser?.name || '',
+          name: result?.member_name || storedUser?.name || storedUser?.Name || '',
+          Mobile: result?.mobile || storedUser?.Mobile || storedUser?.mobile || '',
+          mobile: result?.mobile || storedUser?.mobile || storedUser?.Mobile || '',
+          hospital_memberships: apiMemberships,
+          trusts_loaded_from_active_api: true
+        };
+        try { localStorage.setItem('user', JSON.stringify(nextUser)); } catch { /* ignore */ }
+
+        const currentSelected = normalizeTrustId(localStorage.getItem('selected_trust_id') || selectedTrustId);
+        const selectedExists = apiTrusts.some((trust) => normalizeTrustId(trust?.id) === currentSelected);
+        const effectiveTrust = (selectedExists
+          ? apiTrusts.find((trust) => normalizeTrustId(trust?.id) === currentSelected)
+          : apiTrusts.find((trust) => trust?.is_active !== false) || apiTrusts[0]) || null;
+
+        if (effectiveTrust?.id) {
+          const effectiveTrustId = normalizeTrustId(effectiveTrust.id);
+          setSelectedTrustId(effectiveTrustId);
+          setTrustInfo(effectiveTrust);
+          localStorage.setItem('selected_trust_id', effectiveTrustId);
+          localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, effectiveTrustId);
+          if (effectiveTrust?.name) localStorage.setItem('selected_trust_name', effectiveTrust.name);
+          window.dispatchEvent(new CustomEvent('trust-changed', {
+            detail: { trustId: effectiveTrustId, trustName: effectiveTrust?.name || null }
+          }));
+        } else {
+          localStorage.removeItem('selected_trust_id');
+          localStorage.removeItem(LAST_SELECTED_TRUST_ID_KEY);
+          setSelectedTrustId('');
+          setTrustInfo(null);
+        }
+
+        hasLoadedMemberTrusts.current = true;
+        setStrictTrustApiState('success');
+      } catch (error) {
+        if (!active) return;
+        console.warn('[Home] Strict trust API failed, falling back:', error?.message || error);
+        setStrictTrustApiState('fallback');
+      }
+    };
+
+    loadApiTrusts();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: strict refresh runs on mount from stored user
+  }, []);
+
+  useEffect(() => {
+    if (strictTrustApiState !== 'fallback') return undefined;
     let isActive = true;
     const loadDefaultTrust = async () => {
       try {
@@ -561,6 +685,7 @@ const Home = ({ onNavigate, onLogout }) => {
         if (isActive && trust) {
           const normalizedDefaultId = normalizeTrustId(trust.id);
           const currentSelected = normalizeTrustId(localStorage.getItem('selected_trust_id') || selectedTrustId);
+          const isApiAuthoritative = hasAuthoritativeApiMemberships();
 
           setDefaultTrust(trust);
           setTrustList((prev) => {
@@ -570,6 +695,7 @@ const Home = ({ onNavigate, onLogout }) => {
                 normalizeTrustId(t.id) === normalizedDefaultId ? { ...t, ...trust } : t
               );
             }
+            if (isApiAuthoritative) return prev || [];
             return [trust, ...(prev || [])];
           });
 
@@ -577,8 +703,10 @@ const Home = ({ onNavigate, onLogout }) => {
           // Also apply default when selected trust is just stale env id
           // that failed to resolve (common after env/db trust id changes).
           const shouldApplyDefaultSelection =
-            !currentSelected ||
-            (!resolvedViaEnv && normalizedEnvTrustId && currentSelected === normalizedEnvTrustId);
+            !isApiAuthoritative && (
+              !currentSelected ||
+              (!resolvedViaEnv && normalizedEnvTrustId && currentSelected === normalizedEnvTrustId)
+            );
           if (shouldApplyDefaultSelection) {
             setSelectedTrustId(normalizedDefaultId);
             localStorage.setItem('selected_trust_id', normalizedDefaultId);
@@ -595,7 +723,7 @@ const Home = ({ onNavigate, onLogout }) => {
     loadDefaultTrust();
     return () => { isActive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: run once on mount, selectedTrustId only read as an initial fallback
-  }, []);
+  }, [strictTrustApiState]);
   // Close sidebar when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -801,6 +929,7 @@ const Home = ({ onNavigate, onLogout }) => {
 
   // Load trusts from user localStorage
   useEffect(() => {
+    if (strictTrustApiState === 'loading') return;
     const user = localStorage.getItem('user');
     if (!user) return;
     try {
@@ -835,9 +964,11 @@ const Home = ({ onNavigate, onLogout }) => {
         localStorage.getItem('selected_trust_id') || selectedTrustId
       );
       const selectedExistsInMerged = mergedTrusts.some((t) => normalizeTrustId(t.id) === normalizedSelected);
+      const lastSelectedTrustId = normalizeTrustId(localStorage.getItem(LAST_SELECTED_TRUST_ID_KEY) || '');
+      const lastSelectedExistsInMerged = mergedTrusts.some((t) => normalizeTrustId(t.id) === lastSelectedTrustId);
       const effectiveTrustId =
         (selectedExistsInMerged ? normalizedSelected : '') ||
-        normalizeTrustId(localStorage.getItem(LAST_SELECTED_TRUST_ID_KEY) || '') ||
+        (lastSelectedExistsInMerged ? lastSelectedTrustId : '') ||
         normalizeTrustId(primaryTrust?.id) ||
         normalizeTrustId(defaultTrust?.id) ||
         normalizeTrustId(mergedTrusts[0]?.id) ||
@@ -868,7 +999,7 @@ const Home = ({ onNavigate, onLogout }) => {
       console.warn('Could not parse user trust info:', error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: re-run only when defaultTrust id changes; selectedTrustId/defaultTrust read fresh from localStorage/closure each run
-  }, [defaultTrust?.id]);
+  }, [defaultTrust?.id, strictTrustApiState]);
 
   // Hydrate trust visuals from Trust table so stale membership/cache values are corrected.
   useEffect(() => {
@@ -994,7 +1125,15 @@ const Home = ({ onNavigate, onLogout }) => {
               icon_url: freshTrust?.icon_url || trust?.icon_url || null,
             };
           });
-          const finalList = found ? next : [...next, freshTrust];
+          const hasStoredMembershipTrusts = (() => {
+            try {
+              const parsedUser = JSON.parse(localStorage.getItem('user') || 'null');
+              return Array.isArray(parsedUser?.hospital_memberships) && parsedUser.hospital_memberships.length > 0;
+            } catch {
+              return false;
+            }
+          })();
+          const finalList = found || hasStoredMembershipTrusts ? next : [...next, freshTrust];
           try { localStorage.setItem('trust_list_cache', JSON.stringify(finalList)); } catch { /* ignore */ }
           return finalList;
         });
@@ -1052,11 +1191,45 @@ const Home = ({ onNavigate, onLogout }) => {
         name: m?.trust_name || null,
         icon_url: m?.trust_icon_url || null,
         remark: m?.trust_remark || null,
-        is_active: m?.is_active
+        is_active: m?.is_active,
+        role: m?.role || null,
+        membership_number: m?.membership_number || m?.['Membership number'] || null,
+        members_id: m?.members_id || m?.member_id || null,
       }))
       : [];
+    const hasAuthoritativeApiTrusts = strictTrustApiState === 'success' || Array.isArray(parsedUser?.hospital_memberships)
+      && parsedUser.hospital_memberships.some((membership) => membership?.source === 'active_trusts_by_mobile');
 
     console.log('📋 User derived trusts from hospital_memberships:', userDerivedTrusts.length, userDerivedTrusts.map(t => t.name).join(', '));
+
+    if (hasAuthoritativeApiTrusts) {
+      let apiTrusts = mergeUniqueTrusts(userDerivedTrusts);
+      apiTrusts = mergeTrustsWithExistingVisuals(apiTrusts, readCachedTrustList());
+      setTrustList(apiTrusts);
+      try { localStorage.setItem('trust_list_cache', JSON.stringify(apiTrusts)); } catch { /* ignore */ }
+
+      const normalizedSelected = normalizeTrustId(selectedTrustId);
+      const selectedExists = apiTrusts.some((trust) => normalizeTrustId(trust?.id) === normalizedSelected);
+      const effectiveTrust = (selectedExists
+        ? apiTrusts.find((trust) => normalizeTrustId(trust?.id) === normalizedSelected)
+        : apiTrusts.find((trust) => trust?.is_active !== false) || apiTrusts[0]) || null;
+
+      if (effectiveTrust?.id) {
+        const effectiveTrustId = normalizeTrustId(effectiveTrust.id);
+        if (effectiveTrustId !== selectedTrustId) {
+          setSelectedTrustId(effectiveTrustId);
+          localStorage.setItem('selected_trust_id', effectiveTrustId);
+          localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, effectiveTrustId);
+          window.dispatchEvent(new CustomEvent('trust-changed', {
+            detail: { trustId: effectiveTrustId, trustName: effectiveTrust?.name || null }
+          }));
+        }
+        setTrustInfo(effectiveTrust);
+        if (effectiveTrust.name) localStorage.setItem('selected_trust_name', effectiveTrust.name);
+      }
+      hasLoadedMemberTrusts.current = true;
+      return;
+    }
 
     const fallbackIdsFromMemberships = Array.isArray(parsedUser?.hospital_memberships)
       ? parsedUser.hospital_memberships.map((m) => m?.members_id).filter(Boolean)
@@ -1129,9 +1302,11 @@ const Home = ({ onNavigate, onLogout }) => {
         });
         const normalizedSelected = normalizeTrustId(selectedTrustId);
         const selectedExistsInFinalList = withDefault.some((t) => normalizeTrustId(t.id) === normalizedSelected);
+        const lastSelectedTrustId = normalizeTrustId(localStorage.getItem(LAST_SELECTED_TRUST_ID_KEY) || '');
+        const lastSelectedExistsInFinalList = withDefault.some((t) => normalizeTrustId(t.id) === lastSelectedTrustId);
         const effectiveTrustId =
           (selectedExistsInFinalList ? normalizedSelected : '') ||
-          normalizeTrustId(localStorage.getItem(LAST_SELECTED_TRUST_ID_KEY) || '') ||
+          (lastSelectedExistsInFinalList ? lastSelectedTrustId : '') ||
           normalizeTrustId(primaryTrust?.id) ||
           normalizeTrustId(withDefault[0]?.id) ||
           '';
@@ -1162,7 +1337,7 @@ const Home = ({ onNavigate, onLogout }) => {
       }
     };
     loadMemberTrusts();
-  }, [selectedTrustId, defaultTrust?.id]);
+  }, [selectedTrustId, defaultTrust?.id, strictTrustApiState]);
 
 
   // Feature flags
@@ -1191,6 +1366,20 @@ const Home = ({ onNavigate, onLogout }) => {
 
   const handleTrustSelect = async (trustId) => {
     const normalizedId = normalizeTrustId(trustId);
+    const isApiAuthoritative = hasAuthoritativeApiMemberships();
+    const selectedFromList = (trustList || []).find((t) => normalizeTrustId(t.id) === normalizedId) || null;
+    if (isApiAuthoritative && !selectedFromList) {
+      const fallbackTrust = (trustList || []).find((trust) => trust?.is_active !== false) || trustList?.[0] || null;
+      const fallbackTrustId = normalizeTrustId(fallbackTrust?.id);
+      if (fallbackTrustId) {
+        setSelectedTrustId(fallbackTrustId);
+        setTrustInfo(fallbackTrust);
+        localStorage.setItem('selected_trust_id', fallbackTrustId);
+        localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, fallbackTrustId);
+        if (fallbackTrust?.name) localStorage.setItem('selected_trust_name', fallbackTrust.name);
+      }
+      return;
+    }
     if (normalizedId === normalizeTrustId(selectedTrustId)) return;
     console.log(`🔄 Switching trust from "${selectedTrustId}" to "${normalizedId}"`);
 
@@ -1222,7 +1411,7 @@ const Home = ({ onNavigate, onLogout }) => {
     localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, normalizedId);
     setSessionSelectionFlag();
 
-    const selected = trustList.find((t) => normalizeTrustId(t.id) === normalizedId) || null;
+    const selected = selectedFromList;
     setTrustInfo(selected);
     if (selected?.name) {
       localStorage.setItem('selected_trust_name', selected.name);
@@ -1981,6 +2170,7 @@ const Home = ({ onNavigate, onLogout }) => {
   };
 
   const ff = (key) => isFeatureVisible(featureFlags, key);
+  const showMemberBannerFeature = ff('feature_member_banner');
   const normalizeQuickRoute = (route) => {
     const raw = String(route || '').trim().toLowerCase();
     const value = raw
@@ -2168,12 +2358,15 @@ const Home = ({ onNavigate, onLogout }) => {
 
   const activeTrust = useMemo(() => (
     trustList.find((trust) => normalizeTrustId(trust?.id) === normalizeTrustId(selectedTrustId)) ||
-    trustInfo ||
-    defaultTrust ||
+    (trustList.length === 0 ? trustInfo : null) ||
+    (trustList.length === 0 ? defaultTrust : null) ||
     null
   ), [selectedTrustId, trustList, trustInfo, defaultTrust]);
 
-  const selectedTrust = activeTrust;
+  const selectedTrust = useMemo(() => {
+    if (!Array.isArray(trustList) || trustList.length === 0) return activeTrust;
+    return trustList.find((trust) => normalizeTrustId(trust?.id) === normalizeTrustId(activeTrust?.id)) || null;
+  }, [activeTrust, trustList]);
   const otherTrusts = useMemo(() => {
     if (!Array.isArray(trustList) || trustList.length === 0) return [];
     const normalizedSelectedTrustId = normalizeTrustId(selectedTrustId);
@@ -2297,11 +2490,7 @@ const Home = ({ onNavigate, onLogout }) => {
           versionToken={trustIconVersionById[normalizedTrustId] || resolveTrustIconToken(trust, '')}
           state={isActive}
         />
-        {isActive && (
-          <div className="absolute bottom-0 right-[6px] w-4 h-4 rounded-full flex items-center justify-center" style={{ background: theme.primary }}>
-            <span className="text-[10px] text-white">✓</span>
-          </div>
-        )}
+        
       </button>
     );
   };
@@ -2645,7 +2834,7 @@ const Home = ({ onNavigate, onLogout }) => {
         </div>
 
         {/* Welcome strip / member banner */}
-        {(userProfile?.name || showSelectedTrustMemberBanner) && (
+        {showMemberBannerFeature && (userProfile?.name || showSelectedTrustMemberBanner) && (
           <div className="px-4 pb-3">
             <div
               className="rounded-[22px] px-3 py-2"
@@ -2749,7 +2938,6 @@ const Home = ({ onNavigate, onLogout }) => {
           const SECTIONS = {
             trustList: showTrustSelector && (selectedTrust || otherTrusts.length > 0) ? (
               <div key="trustList">
-                <p className="text-sm font-semibold text-muted-foreground ml-4 mt-1" style={{color: ` ${theme.primary}`}}>Our trusts</p>
                 <div
                   className="flex items-center gap-2 px-4 py-2"
                   style={{

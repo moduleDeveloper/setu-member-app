@@ -51,6 +51,8 @@ const compactMembership = (membership = {}) => ({
   members_id: membership?.members_id || membership?.member_id || null,
   membership_number: membership?.membership_number || membership?.['Membership number'] || null,
   qr_code: membership?.qr_code || null,
+  trust_status: membership?.trust_status ?? null,
+  source: membership?.source || null,
 });
 
 const normalizeTrustId = (value) => String(value || '').trim();
@@ -128,6 +130,7 @@ export const compactUserForStorage = (user = {}) => {
     isRegisteredMember: Boolean(user?.isRegisteredMember),
     vip_status: user?.vip_status || null,
     reg_member_id: user?.reg_member_id || null,
+    trusts_loaded_from_active_api: Boolean(user?.trusts_loaded_from_active_api),
     hospital_memberships: compactMemberships,
   };
 };
