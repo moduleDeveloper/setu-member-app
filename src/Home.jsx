@@ -3142,9 +3142,16 @@ const Home = ({ onNavigate, onLogout }) => {
                     const spacingClass = groupIndex > 0 ? 'mt-4' : '';
                     if (group.type === 'content') {
                       const { action, ContentRenderer } = group;
+                      const contentKey = action.route === 'products'
+                        ? `quickaction-content-${action.id}-${selectedTrustId || 'none'}`
+                        : `quickaction-content-${action.id}`;
                       return (
-                        <div key={`quickaction-content-${action.id}`} className={spacingClass}>
-                          <ContentRenderer variant="home" onNavigate={onNavigate} />
+                        <div key={contentKey} className={spacingClass}>
+                          <ContentRenderer
+                            variant="home"
+                            onNavigate={onNavigate}
+                            selectedTrustId={action.route === 'products' ? selectedTrustId : undefined}
+                          />
                         </div>
                       );
                     }
