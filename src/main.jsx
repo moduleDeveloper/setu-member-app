@@ -1,10 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import './index.css'
-import './App.css'
-import App from './App.jsx'
-import { NavigationProvider } from './context/ImprovedNavigationProvider'
+import '@/index.css'
+import '@/app/App.css'
+import App from '@/app/App.jsx'
+import { NavigationProvider } from '@/features/home-navigation/ImprovedNavigationProvider'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
