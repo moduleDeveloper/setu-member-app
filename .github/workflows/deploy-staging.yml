@@ -1,0 +1,56 @@
+name: App Staging Deploy
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy App Staging to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+
+          script: |
+            set -e
+
+            cd /var/www/app/staging
+
+            echo "Fetching latest develop..."
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519" git fetch origin
+
+            echo "Resetting server code to origin/develop..."
+            git reset --hard origin/develop
+
+            echo "Checking deployed commit..."
+            git log -1 --oneline
+
+            echo "Installing frontend dependencies..."
+            npm ci
+
+            echo "Building frontend..."
+            npm run build
+
+            echo "Installing backend dependencies..."
+            cd backend
+            npm ci
+
+            echo "Restarting backend..."
+            pm2 restart app-staging --update-env || pm2 start npm --name app-staging -- start
+
+            pm2 save
+
+            echo "Checking nginx..."
+            nginx -t
+
+            echo "Reloading nginx..."
+            systemctl reload nginx
+
+            echo "Deployment completed successfully"
