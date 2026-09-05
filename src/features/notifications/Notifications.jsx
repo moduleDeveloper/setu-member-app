@@ -1,12 +1,12 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Bell, ChevronRight, Home as HomeIcon, Menu, X, Check, Calendar, User, Stethoscope, Clock, MapPin, Building2, FileText } from 'lucide-react';
-import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification } from '@/shared/services/api';
-import { supabase } from '@/shared/services/supabaseClient';
-import { readNotificationCache, writeNotificationCache } from '@/features/notifications/notificationCache';
-import { getCurrentNotificationContext, matchesNotificationForContext } from '@/features/notifications/notificationAudience';
-import { tryNavigateNotificationRoute } from '@/features/notifications/notificationRedirectService';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { useAppTheme } from '@/shared/context/ThemeContext';
+import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification } from '../../shared/services/api';
+import { supabase } from '../../shared/services/supabaseClient';
+import { readNotificationCache, writeNotificationCache } from './notificationCache';
+import { getCurrentNotificationContext, matchesNotificationForContext } from './notificationAudience';
+import { tryNavigateNotificationRoute } from './notificationRedirectService';
+import Sidebar from '../home-navigation/Sidebar';
+import { useAppTheme } from '../../shared/context/ThemeContext';
 
 const buildNotificationContentKey = (notification) => {
   const title = String(notification?.title || '').trim().toLowerCase();

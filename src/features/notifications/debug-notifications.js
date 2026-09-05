@@ -27,7 +27,7 @@
   // Step 2: Test Supabase connection
   console.log('\n📱 Step 2: Testing Supabase connection...');
   try {
-    const supabase = (await import('@/supabaseClient.js')).supabase;
+    const supabase = (await import('../../supabaseClient.js')).supabase;
     console.log('✅ Supabase client imported');
 
     // Test table access
@@ -49,7 +49,7 @@
   // Step 3: Try fetching notifications using the app's method
   console.log('\n📱 Step 3: Fetching notifications using app method...');
   try {
-    const { getUserNotifications } = await import('@/shared/services/api.js');
+    const { getUserNotifications } = await import('../../shared/services/api.js');
     const response = await getUserNotifications();
     console.log('✅ API Response:', response);
 
@@ -69,7 +69,7 @@
   // Step 4: Manual query with user ID
   console.log('\n📱 Step 4: Manual query for user notifications...');
   try {
-    const supabase = (await import('@/supabaseClient.js')).supabase;
+    const supabase = (await import('../../supabaseClient.js')).supabase;
     
     const { data, error } = await supabase
       .from('notifications')
