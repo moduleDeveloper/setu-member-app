@@ -1,32 +1,32 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { User, Users, Clock, FileText, UserPlus, Bell, ChevronRight, Heart, Shield, Plus, ArrowRight, Pill, ShoppingCart, Calendar, Stethoscope, Building2, QrCode, Monitor, Brain, Package, FileCheck, Search, Filter, Star, HelpCircle, BookOpen, Video, Headphones, Menu, X, Home as HomeIcon, Settings, UserCircle, Image, Trash2, Code, FolderOpen, Crown } from 'lucide-react';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import TermsModal from '@/shared/components/TermsModal';
-import ImageSlider from '@/shared/components/ImageSlider';
-import { getProfile, getMarqueeUpdates, getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification } from '@/shared/services/api';
-import { useGalleryContext } from '@/features/gallery-sponsors/GalleryContext';
-import { GalleryContent } from '@/features/gallery-sponsors/Gallery';
-import { SponsorsContent } from '@/features/gallery-sponsors/SponsorsList';
-import { NoticesContent } from '@/features/quick-actions/Notices';
-import { FacilitiesContent } from '@/features/quick-actions/Facilities';
-import { EventsContent } from '@/features/quick-actions/Events';
-import { AchievementsContent } from '@/features/quick-actions/Achievements';
-import { DonationContent } from '@/features/products/Donation';
-import { ReportsContent } from '@/features/appointments-reports-referral/Reports';
-import { DirectoryContent } from '@/features/directory-executivebody/Directory';
-import { ExecutiveBodyContent } from '@/features/directory-executivebody/ExecutiveBody';
-import { AppointmentsContent } from '@/features/appointments-reports-referral/Appointments';
-import { CategoriesProductsContent } from '@/features/products/CategoriesProducts';
-import { OrderHistoryContent } from '@/features/products/OrderHistory';
-import { ReferralContent } from '@/features/appointments-reports-referral/Referral';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { registerSidebarState, useTrustDataVersion } from '@/shared/hooks';
-import { supabase } from '@/shared/services/supabaseClient';
-import { clearLoginTermsPromptPending, isLoginTermsPromptPending, resolveLegalTrustId } from '@/shared/utils/legalContent';
-import { readNotificationCache, writeNotificationCache } from '@/features/notifications/notificationCache';
-import { getCurrentNotificationContext, matchesNotificationForContext } from '@/features/notifications/notificationAudience';
-import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureVisible } from '@/shared/services/featureFlags';
-import { fetchActiveTrustsByMobile, fetchMemberTrusts, fetchTrustById, fetchDefaultTrust } from '@/shared/services/trustService';
+import Sidebar from './Sidebar';
+import TermsModal from '../../shared/components/TermsModal';
+import ImageSlider from '../../shared/components/ImageSlider';
+import { getProfile, getMarqueeUpdates, getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification } from '../../shared/services/api';
+import { useGalleryContext } from '../gallery-sponsors/GalleryContext';
+import { GalleryContent } from '../gallery-sponsors/Gallery';
+import { SponsorsContent } from '../gallery-sponsors/SponsorsList';
+import { NoticesContent } from '../quick-actions/Notices';
+import { FacilitiesContent } from '../quick-actions/Facilities';
+import { EventsContent } from '../quick-actions/Events';
+import { AchievementsContent } from '../quick-actions/Achievements';
+import { DonationContent } from '../products/Donation';
+import { ReportsContent } from '../appointments-reports-referral/Reports';
+import { DirectoryContent } from '../directory-executivebody/Directory';
+import { ExecutiveBodyContent } from '../directory-executivebody/ExecutiveBody';
+import { AppointmentsContent } from '../appointments-reports-referral/Appointments';
+import { CategoriesProductsContent } from '../products/CategoriesProducts';
+import { OrderHistoryContent } from '../products/OrderHistory';
+import { ReferralContent } from '../appointments-reports-referral/Referral';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { registerSidebarState, useTrustDataVersion } from '../../shared/hooks';
+import { supabase } from '../../shared/services/supabaseClient';
+import { clearLoginTermsPromptPending, isLoginTermsPromptPending, resolveLegalTrustId } from '../../shared/utils/legalContent';
+import { readNotificationCache, writeNotificationCache } from '../notifications/notificationCache';
+import { getCurrentNotificationContext, matchesNotificationForContext } from '../notifications/notificationAudience';
+import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureVisible } from '../../shared/services/featureFlags';
+import { fetchActiveTrustsByMobile, fetchMemberTrusts, fetchTrustById, fetchDefaultTrust } from '../../shared/services/trustService';
 import {
   ensureAllSponsorsLoaded,
   getCachedCarouselBatch,
@@ -40,16 +40,16 @@ import {
   setPinnedSponsor,
   setSelectedSponsorId,
   sponsorConfig
-} from '@/features/gallery-sponsors/sponsorStore';
+} from '../gallery-sponsors/sponsorStore';
 import {
   getFooterThemeStyles,
   getNavbarThemeStyles,
   getThemeToken,
   normalizeHomeLayout,
   HOME_LAYOUT_MODE_KEY_ALIASES
-} from '@/shared/utils/themeUtils';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { resolveNotificationRedirectRoute } from '@/features/notifications/notificationRedirectService';
+} from '../../shared/utils/themeUtils';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { resolveNotificationRedirectRoute } from '../notifications/notificationRedirectService';
 
 // Quick-action modules with a registered chrome-free *Content component.
 // route slug (matches enabledQuickActions[].route / theme.homeLayoutModes key) -> component.
