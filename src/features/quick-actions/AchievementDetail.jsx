@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Calendar, ChevronLeft, ChevronRight, FileText, Home as HomeIcon, Link as LinkIcon, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { supabase } from '@/shared/services/supabaseClient';
-import ImageSlider from '@/shared/components/ImageSlider';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { supabase } from '../../shared/services/supabaseClient';
+import ImageSlider from '../../shared/components/ImageSlider';
 
 const normalizeText = (value) => String(value || '').trim();
 

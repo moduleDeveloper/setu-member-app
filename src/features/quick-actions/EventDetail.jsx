@@ -3,10 +3,10 @@ import { ArrowLeft, Calendar, Clock3, Download, Eye, FileText, Loader2, MapPin, 
 import { useNavigate, useParams } from 'react-router-dom';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { loadEventDetail } from '@/features/quick-actions/eventsStore';
-import { formatEventDate, formatTimeRange } from '@/features/quick-actions/eventsService';
-import { downloadAttachmentFile } from '@/shared/utils/attachmentDownload';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { loadEventDetail } from './eventsStore';
+import { formatEventDate, formatTimeRange } from './eventsService';
+import { downloadAttachmentFile } from '../../shared/utils/attachmentDownload';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 

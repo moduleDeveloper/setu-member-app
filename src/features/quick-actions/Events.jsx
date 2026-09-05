@@ -3,9 +3,9 @@ import { Calendar, CheckCircle2, ChevronRight, Clock3, Download, Eye, FileText, 
 import { useNavigate } from 'react-router-dom';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { supabase } from '@/shared/services/supabaseClient';
+import Sidebar from '../home-navigation/Sidebar';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { supabase } from '../../shared/services/supabaseClient';
 import {
   CATEGORIES,
   clearEventsCache,
@@ -13,10 +13,10 @@ import {
   getEventsCounts,
   getEventsSnapshot,
   loadEventsPage,
-} from '@/features/quick-actions/eventsStore';
-import { formatEventDate, formatTimeRange } from '@/features/quick-actions/eventsService';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { downloadAttachmentFile } from '@/shared/utils/attachmentDownload';
+} from './eventsStore';
+import { formatEventDate, formatTimeRange } from './eventsService';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { downloadAttachmentFile } from '../../shared/utils/attachmentDownload';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
