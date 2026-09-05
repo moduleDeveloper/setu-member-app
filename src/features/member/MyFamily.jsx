@@ -17,10 +17,10 @@ import {
   Users,
   X
 } from 'lucide-react';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { createFamilyMember, deleteFamilyMember, getFamilyMembers, updateFamilyMember } from '@/shared/services/api';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+import Sidebar from '../home-navigation/Sidebar';
+import { createFamilyMember, deleteFamilyMember, getFamilyMembers, updateFamilyMember } from '../../shared/services/api';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 
 const RELATION_OPTIONS = ['Spouse', 'Father', 'Mother', 'Son', 'Daughter', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Uncle', 'Aunt', 'Other'];
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];

@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, FileText, HomeIcon, Menu, Plus, ShieldCheck, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { getFamilyMembers } from '@/shared/services/api';
-import { supabase } from '@/shared/services/supabaseClient';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
-import Sidebar from '@/features/home-navigation/Sidebar';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { getFamilyMembers } from '../../shared/services/api';
+import { supabase } from '../../shared/services/supabaseClient';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
+import Sidebar from '../home-navigation/Sidebar';
 
 const resolveInitialMemberships = () => {
   try {

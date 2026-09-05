@@ -4,10 +4,10 @@ import {
   Shield, BadgeCheck, Phone, Droplet, UserCircle,
   Home as HomeIcon, Menu, X, Award, CheckCircle, AlertCircle,
 } from 'lucide-react';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { getProfile, saveProfile } from '@/shared/services/api';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+import Sidebar from '../home-navigation/Sidebar';
+import { getProfile, saveProfile } from '../../shared/services/api';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 
 // Classy input field — label on top, styled bordered input
 const RowField = ({ label, type = 'text', value, onChange, placeholder, disabled = false, icon: Icon }) => (
@@ -458,7 +458,7 @@ const Profile = ({ onNavigate, onProfileUpdate }) => {
           try {
             const membersIdForPhoto = effectiveProfile.members_id || user.members_id || user.member_id || user.id || '';
             if (membersIdForPhoto) {
-              const { supabase } = await import('@/shared/services/supabaseClient.js');
+              const { supabase } = await import('../../shared/services/supabaseClient.js');
               const { data: directPhotoRow } = await supabase
                 .from('member_profiles')
                 .select('profile_photo_url')
