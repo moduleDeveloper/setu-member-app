@@ -1,4 +1,4 @@
-import { fetchFacilitiesPage, fetchFacilityById } from '@/features/member/communityService';
+import { fetchFacilitiesPage, fetchFacilityById } from '../member/communityService';
 
 const FACILITIES_TTL_MS = 5 * 60 * 1000;
 const FACILITIES_CTX_TTL_MS = 5 * 60 * 1000;

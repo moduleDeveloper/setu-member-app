@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Calendar, FileText, Home as HomeIcon, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getFacilitiesSnapshot, loadFacilityDetail } from '@/features/quick-actions/facilitiesStore';
-import ImageSlider from '@/shared/components/ImageSlider';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getFacilitiesSnapshot, loadFacilityDetail } from './facilitiesStore';
+import ImageSlider from '../../shared/components/ImageSlider';
 
 const formatTimestamp = (createdAt, updatedAt) => {
   const value = updatedAt || createdAt;

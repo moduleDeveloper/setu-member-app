@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Award, ChevronRight, Home as HomeIcon, Link as LinkIcon, Menu, X } from 'lucide-react';
-import { supabase } from '@/shared/services/supabaseClient';
-import Sidebar from '@/features/home-navigation/Sidebar';
+import { supabase } from '../../shared/services/supabaseClient';
+import Sidebar from '../home-navigation/Sidebar';
 const normalizeText = (value) => String(value || '').trim();
 
 const formatDateTime = (value) => {

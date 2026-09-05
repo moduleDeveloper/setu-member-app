@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar, Home as HomeIcon, Menu, X, ChevronRight, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { useAppTheme } from '@/shared/context/ThemeContext';
+import Sidebar from '../home-navigation/Sidebar';
+import { useAppTheme } from '../../shared/context/ThemeContext';
 import {
   facilitiesConfig,
   getFacilitiesSnapshot,
   loadFacilitiesPage
-} from '@/features/quick-actions/facilitiesStore';
+} from './facilitiesStore';
 
 const LEGACY_ATTACHMENT_SEPARATOR = '||::||';
 

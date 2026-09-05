@@ -3,9 +3,9 @@ import { Calendar, ChevronRight, Download, Eye, FileText, Home as HomeIcon, Load
 import { useNavigate } from 'react-router-dom';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { downloadAttachmentFile } from '@/shared/utils/attachmentDownload';
+import Sidebar from '../home-navigation/Sidebar';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { downloadAttachmentFile } from '../../shared/utils/attachmentDownload';
 import {
   getNoticeboardCacheStatus,
   getNoticeboardSnapshot,
@@ -13,7 +13,7 @@ import {
   noticeboardConfig,
   readNoticeboardProgress,
   clearAllNoticeboardCache
-} from '@/features/quick-actions/noticeboardStore';
+} from './noticeboardStore';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 

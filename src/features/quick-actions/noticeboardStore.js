@@ -1,4 +1,4 @@
-import { fetchNoticeboardById, fetchNoticeboardPage } from '@/features/member/communityService';
+import { fetchNoticeboardById, fetchNoticeboardPage } from '../member/communityService';
 
 const NOTICEBOARD_TTL_MS = 5 * 60 * 1000;
 const NOTICEBOARD_CTX_TTL_MS = 5 * 60 * 1000;

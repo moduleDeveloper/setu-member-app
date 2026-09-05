@@ -1,4 +1,4 @@
-import { classifyEvent, fetchAllEventsForTrust, fetchEventById, sortEventsByCategory } from '@/features/quick-actions/eventsService';
+import { classifyEvent, fetchAllEventsForTrust, fetchEventById, sortEventsByCategory } from './eventsService';
 
 const TTL_MS = 30 * 60 * 1000;
 export const CATEGORIES = ['current', 'upcoming', 'past'];
