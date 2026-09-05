@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGalleryContext } from '@/features/gallery-sponsors/GalleryContext';
+import { useGalleryContext } from './GalleryContext';
 
 export function GalleryDebug() {
   const { folders, images, isLoading, error, lastFetchTime, cacheTimeRemaining } = useGalleryContext();

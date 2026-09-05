@@ -1,11 +1,11 @@
-import { useGalleryContext } from '@/features/gallery-sponsors/GalleryContext';
+import { useGalleryContext } from './GalleryContext';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Image as ImageIcon, X, ChevronLeft, ChevronRight,
   Menu, Home as HomeIcon, FolderOpen, Play, Pause, ArrowLeft
 } from 'lucide-react';
-import Sidebar from '@/features/home-navigation/Sidebar';
+import Sidebar from '../home-navigation/Sidebar';
 
 function FolderCover({ photos, folderName }) {
   const [p1Err, setP1Err] = useState(false);

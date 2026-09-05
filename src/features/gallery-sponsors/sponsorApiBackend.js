@@ -1,6 +1,6 @@
-import { api } from '@/shared/services/api';
-import { supabase } from '@/shared/services/supabaseClient.js';
-import { isDateValidForToday, isRowActive, toYmdOnly } from '@/features/gallery-sponsors/sponsorRules.js';
+import { api } from '../../shared/services/api';
+import { supabase } from '../../shared/services/supabaseClient.js';
+import { isDateValidForToday, isRowActive, toYmdOnly } from './sponsorRules.js';
 
 const inFlight = new Map();
 
