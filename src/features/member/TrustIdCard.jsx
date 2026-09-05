@@ -3,12 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Home as HomeIcon, Menu, User, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getProfile } from '@/shared/services/api';
-import { fetchTrustById } from '@/shared/services/trustService';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { getNavbarThemeStyles, getThemeToken } from '@/shared/utils/themeUtils';
+import Sidebar from '../home-navigation/Sidebar';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getProfile } from '../../shared/services/api';
+import { fetchTrustById } from '../../shared/services/trustService';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { getNavbarThemeStyles, getThemeToken } from '../../shared/utils/themeUtils';
 
 const SecureScreen = registerPlugin('SecureScreen');
 

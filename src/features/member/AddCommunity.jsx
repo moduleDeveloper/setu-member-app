@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Home as HomeIcon, Menu, Upload, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { getNavbarThemeStyles, getThemeToken } from '@/shared/utils/themeUtils';
-import { applyOpacity } from '@/shared/utils/colorUtils';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import Sidebar from '../home-navigation/Sidebar';
+import { getNavbarThemeStyles, getThemeToken } from '../../shared/utils/themeUtils';
+import { applyOpacity } from '../../shared/utils/colorUtils';
 
 const FieldLabel = ({ children, required = false }) => (
   <div className="mb-2">
@@ -107,7 +107,7 @@ const AddCommunity = ({ onNavigateBack }) => {
 
     setSubmitting(true);
     try {
-      const { supabase } = await import('@/shared/services/supabaseClient.js');
+      const { supabase } = await import('../../shared/services/supabaseClient.js');
       const { data, error } = await supabase.rpc('create_trust_from_member', {
         p_members_id: membersId,
         p_trust_name: trustName,

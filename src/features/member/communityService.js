@@ -1,4 +1,4 @@
-import { supabase } from '@/shared/services/supabaseClient';
+import { supabase } from '../../shared/services/supabaseClient';
 
 const resolveTrustId = async (trustId = null, trustName = null) => {
   if (trustId) return trustId;

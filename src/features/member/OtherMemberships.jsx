@@ -4,17 +4,17 @@ import {
   ArrowLeft, Users, Plus, X, CheckCircle, Menu, Home as HomeIcon,
   AlertCircle, Building2, Hash, Tag, FileText, Loader2, Save, ChevronRight, BadgeCheck
 } from 'lucide-react';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import TrustIdCard from '@/features/member/TrustIdCard';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { getNavbarThemeStyles, getThemeToken } from '@/shared/utils/themeUtils';
-import { fetchActiveTrustsByMobile } from '@/shared/services/trustService';
+import Sidebar from '../home-navigation/Sidebar';
+import TrustIdCard from './TrustIdCard';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { getNavbarThemeStyles, getThemeToken } from '../../shared/utils/themeUtils';
+import { fetchActiveTrustsByMobile } from '../../shared/services/trustService';
 
 // ─── Supabase helpers ──────────────────────────────────────────────────────
 
 const getSupabase = async () => {
-  const { supabase } = await import('@/shared/services/supabaseClient.js');
+  const { supabase } = await import('../../shared/services/supabaseClient.js');
   return supabase;
 };
 
