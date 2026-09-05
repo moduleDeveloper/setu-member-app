@@ -1,4 +1,4 @@
-import { supabase } from '@/shared/services/supabaseClient';
+import { supabase } from '../../shared/services/supabaseClient';
 
 const normalizeAction = (notification = {}) => {
   const candidates = [notification?.click_action, notification?.action, notification?.type];

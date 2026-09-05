@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { PushNotifications } from '@capacitor/push-notifications';
-import { api } from '@/shared/services/api';
+import { api } from '../../shared/services/api';
 
 // Safety default: keep FCM registration OFF unless explicitly enabled.
 // This avoids native crash when Firebase config (google-services.json) is missing.
