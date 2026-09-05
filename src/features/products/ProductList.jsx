@@ -6,10 +6,10 @@ import {
   Briefcase, Dumbbell, Baby, Footprints, Lamp, Droplet, Palette, Gem,
   RefreshCw, ArrowUp,
 } from "lucide-react";
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { supabase } from '@/shared/services/supabaseClient';
-import { colorToHex } from '@/shared/utils/colorUtils';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { supabase } from '../../shared/services/supabaseClient';
+import { colorToHex } from '../../shared/utils/colorUtils';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 import {
   getWishlistKey,
   isWishlistProductInItems,
@@ -17,16 +17,16 @@ import {
   subscribeWishlist,
   resolveWishlistProductPriceId,
   toggleWishlistProductAsync,
-} from '@/features/products/productWishlist';
+} from './productWishlist';
 import {
   readCartItems,
   subscribeCart,
-} from '@/features/products/productCart';
+} from './productCart';
 import {
   isTrustCatalogCacheFresh,
   readTrustCatalogCacheForCandidates,
   writeTrustCatalogCache,
-} from '@/shared/utils/trustCatalogCache';
+} from '../../shared/utils/trustCatalogCache';
 
 const THEME = {
   card: 'var(--advertisement-card-bg)',

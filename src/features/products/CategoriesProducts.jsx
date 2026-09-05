@@ -17,17 +17,17 @@ import {
   Palette,
   Gem,
 } from 'lucide-react';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { buildCategoryView, getCardRowPattern, splitIntoRows } from '@/features/products/categoryDisplay';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
-import { readWishlistItems, subscribeWishlist } from '@/features/products/productWishlist';
-import { readCartItems, subscribeCart } from '@/features/products/productCart';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { buildCategoryView, getCardRowPattern, splitIntoRows } from './categoryDisplay';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
+import { readWishlistItems, subscribeWishlist } from './productWishlist';
+import { readCartItems, subscribeCart } from './productCart';
 import {
   enrichPayloadWithPrices,
   fetchProductCategoryTree,
   readTrustCatalogCacheForCandidates,
   writeTrustCatalogCache,
-} from '@/shared/utils/trustCatalogCache';
+} from '../../shared/utils/trustCatalogCache';
 
 const THEME = {
   page: 'var(--page-bg, var(--app-page-bg))',

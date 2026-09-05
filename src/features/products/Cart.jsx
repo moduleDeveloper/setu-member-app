@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronDown, ChevronLeft, Heart, Home as HomeIcon, ShoppingCart, Trash2, X } from 'lucide-react';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 import {
   clearCartItems,
   fetchTrustProductsCategories,
@@ -15,16 +15,16 @@ import {
   moveCartProductToWishlist,
   setCartProductQuantity,
   subscribeCart,
-} from '@/features/products/productCart';
+} from './productCart';
 import {
   cacheWishlistProduct,
   readWishlistItems,
   subscribeWishlist,
-} from '@/features/products/productWishlist';
+} from './productWishlist';
 import {
   isTrustCatalogCacheFresh,
   readTrustCatalogCache,
-} from '@/shared/utils/trustCatalogCache';
+} from '../../shared/utils/trustCatalogCache';
 
 const T = {
   text: 'var(--body-text-color)',

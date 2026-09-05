@@ -1,22 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Home as HomeIcon, ShoppingCart, Shirt, Sparkles, Heart, Briefcase, Dumbbell, Baby, Footprints, Lamp, Droplet, Palette, Gem, RefreshCw, X } from "lucide-react";
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { supabase } from '@/shared/services/supabaseClient';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { supabase } from '../../shared/services/supabaseClient';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 import {
   isWishlistProductInItems,
   readWishlistItems,
   resolveWishlistProductPriceId,
   subscribeWishlist,
   toggleWishlistProductAsync,
-} from '@/features/products/productWishlist';
-import { getCartKey, readCartItems, setCartProductQuantity, subscribeCart } from '@/features/products/productCart';
+} from './productWishlist';
+import { getCartKey, readCartItems, setCartProductQuantity, subscribeCart } from './productCart';
 import {
   isTrustCatalogCacheFresh,
   readTrustCatalogCacheForCandidates,
   writeTrustCatalogCache,
-} from '@/shared/utils/trustCatalogCache';
+} from '../../shared/utils/trustCatalogCache';
 
 
 const THEME = {

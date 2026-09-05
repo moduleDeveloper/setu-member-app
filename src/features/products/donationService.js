@@ -1,6 +1,6 @@
-import { supabase } from '@/shared/services/supabaseClient.js';
-import { resolveSelectedTrustMembership } from '@/shared/utils/storageUtils';
-import { checkVipNoticeEligibility } from '@/features/member/communityService';
+import { supabase } from '../../shared/services/supabaseClient.js';
+import { resolveSelectedTrustMembership } from '../../shared/utils/storageUtils';
+import { checkVipNoticeEligibility } from '../member/communityService';
 
 const normalizeText = (value) => String(value || '').trim();
 

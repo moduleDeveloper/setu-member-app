@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Crown, HandHeart, Home as HomeIcon, IndianRupee, Menu, ShieldCheck, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { fetchDonationsByTrust, getDonationFormPrefill } from '@/features/products/donationService';
-import { TRUST_VERSION_UPDATED_EVENT } from '@/shared/services/trustVersionService';
-import Sidebar from '@/features/home-navigation/Sidebar';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { fetchDonationsByTrust, getDonationFormPrefill } from './donationService';
+import { TRUST_VERSION_UPDATED_EVENT } from '../../shared/services/trustVersionService';
+import Sidebar from '../home-navigation/Sidebar';
 const formatCurrency = (amount) => {
   const numeric = Number(amount);
   if (!Number.isFinite(numeric)) return null;
