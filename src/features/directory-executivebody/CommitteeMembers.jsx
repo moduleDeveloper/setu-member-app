@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, ChevronLeft, Phone, Mail, User, Search } from 'lucide-react';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from '@/shared/utils/memberIdentity';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from '../../shared/utils/memberIdentity';
 
 const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 const normalizePriorityValue = (value) => {

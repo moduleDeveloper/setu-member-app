@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpDown, Building, Check, Home as HomeIcon, Mail, Menu, Search, User, Users, X } from 'lucide-react';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getDirectoryMembers, getDirectoryViewRoles } from '@/shared/services/supabaseService';
-import { getProfilePhotos } from '@/shared/services/api';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from '@/shared/utils/memberIdentity';
-import Sidebar from '@/features/home-navigation/Sidebar';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getDirectoryMembers, getDirectoryViewRoles } from '../../shared/services/supabaseService';
+import { getProfilePhotos } from '../../shared/services/api';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from '../../shared/utils/memberIdentity';
+import Sidebar from '../home-navigation/Sidebar';
 
 const MEMBERS_PER_PAGE = 20;
 const DIRECTORY_CACHE_TTL_MS = 10 * 60 * 1000;

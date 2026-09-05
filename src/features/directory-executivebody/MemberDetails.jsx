@@ -1,8 +1,8 @@
-import { useAppTheme } from '@/shared/context/ThemeContext';
+import { useAppTheme } from '../../shared/context/ThemeContext';
 import React, { useState, useEffect } from 'react';
 import { User, Users, Stethoscope, Building2, Star, Award, ChevronLeft, Phone, Mail, MapPin, FileText, Clock, HomeIcon } from 'lucide-react';
-import { getProfilePhotos } from '@/shared/services/api';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+import { getProfilePhotos } from '../../shared/services/api';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 import { useNavigate } from 'react-router-dom';
 
 const MemberDetails = ({ member, onNavigateBack, previousScreenName }) => {
