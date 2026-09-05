@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Users, Clock, FileText, UserPlus, Bell, ChevronRight, LogOut, Heart, Shield, Plus, ArrowRight, Pill, ShoppingCart, Calendar, Stethoscope, Building2, Phone, QrCode, Monitor, Brain, Package, FileCheck, Search, Filter, MapPin, Star, HelpCircle, BookOpen, Video, Headphones, Menu, X, Home as HomeIcon, Settings, Eye, Edit2, Info, CheckCircle2, ArrowLeft } from 'lucide-react';
-import { createReferral, getUserReferrals, getReferralCounts, updateReferral, deleteReferral } from '@/shared/services/api';
-import { supabase } from '@/shared/services/supabaseClient';
-import { registerSidebarState, useAndroidBack } from '@/shared/hooks';
+import { createReferral, getUserReferrals, getReferralCounts, updateReferral, deleteReferral } from '../../shared/services/api';
+import { supabase } from '../../shared/services/supabaseClient';
+import { registerSidebarState, useAndroidBack } from '../../shared/hooks';
 
-import Sidebar from '@/features/home-navigation/Sidebar';
+import Sidebar from '../home-navigation/Sidebar';
 
 const DEFAULT_NEW_REFERENCE = {
   patientName: '',

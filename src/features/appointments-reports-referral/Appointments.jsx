@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Phone, Menu, X, Calendar, Stethoscope, Home as HomeIcon, Mail, AlertCircle, Clock, ArrowLeft, ChevronRight, Star, MapPin, IndianRupee, Award, History, CheckCircle2, XCircle, RefreshCw, Trash2 } from 'lucide-react';
 
-import { getDoctorsWithSchedule } from '@/shared/services/supabaseService';
-import { bookAppointment } from '@/features/appointments-reports-referral/appointmentService';
-import { createUserNotification } from '@/shared/services/api';
-import { supabase } from '@/shared/services/supabaseClient';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { registerSidebarState, useAndroidBack } from '@/shared/hooks';
-import { useAppTheme } from '@/shared/context/ThemeContext';
+import { getDoctorsWithSchedule } from '../../shared/services/supabaseService';
+import { bookAppointment } from './appointmentService';
+import { createUserNotification } from '../../shared/services/api';
+import { supabase } from '../../shared/services/supabaseClient';
+import Sidebar from '../home-navigation/Sidebar';
+import { registerSidebarState, useAndroidBack } from '../../shared/hooks';
+import { useAppTheme } from '../../shared/context/ThemeContext';
 
 // Specialty ID â†’ department keyword mapping (matches opd_schedule.department)
 // Keywords are matched using .toLowerCase().includes() against doctor's department field
