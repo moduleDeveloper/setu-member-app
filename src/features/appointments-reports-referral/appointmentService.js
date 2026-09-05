@@ -1,5 +1,5 @@
 // appointmentService.js - Frontend service for appointment booking
-import { api } from '@/shared/services/api';
+import { api } from '../../shared/services/api';
 
 /**
  * Book a new appointment

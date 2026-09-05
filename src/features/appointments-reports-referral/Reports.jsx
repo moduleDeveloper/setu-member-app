@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Plus, Calendar, Download, X, Home as HomeIcon, ChevronLeft, Upload, CheckCircle, AlertCircle, Image as ImageIcon, File, Menu } from 'lucide-react';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { getUserReports, uploadUserReport } from '@/shared/services/api';
+import Sidebar from '../home-navigation/Sidebar';
+import { getUserReports, uploadUserReport } from '../../shared/services/api';
 
 export const ReportsContent = ({ onNavigate, variant = 'page' }) => {
   const isPageVariant = variant === 'page';
