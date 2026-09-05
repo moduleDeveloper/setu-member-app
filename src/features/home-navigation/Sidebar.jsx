@@ -4,17 +4,17 @@ import { flushSync } from 'react-dom';
 import { Users, ChevronRight, LogOut, Share2, PhoneCall, FileText, CirclePlus, Clock3, Lock, Facebook, Instagram, Linkedin, MessageCircle } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
-import { getProfile, updateMemberPrivacy } from '@/shared/services/api';
-import { fetchFeatureFlags, isFeatureVisible } from '@/shared/services/featureFlags';
-import { fetchShareAppLinksByTrustId } from '@/shared/services/trustService';
-import { logUserSessionEvent } from '@/features/auth/sessionAuditService';
-import { useTrustDataVersion } from '@/shared/hooks/useTrustDataVersion';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { getThemeToken } from '@/shared/utils/themeUtils';
-import { getShareAppTargetLink } from '@/shared/utils/shareApp';
-import { resolveSelectedTrustMembership } from '@/shared/utils/storageUtils';
-import { MEMBER_PRIVACY_UPDATED_EVENT } from '@/shared/utils/memberIdentity';
+import { getProfile, updateMemberPrivacy } from '../../shared/services/api';
+import { fetchFeatureFlags, isFeatureVisible } from '../../shared/services/featureFlags';
+import { fetchShareAppLinksByTrustId } from '../../shared/services/trustService';
+import { logUserSessionEvent } from '../auth/sessionAuditService';
+import { useTrustDataVersion } from '../../shared/hooks/useTrustDataVersion';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { getThemeToken } from '../../shared/utils/themeUtils';
+import { getShareAppTargetLink } from '../../shared/utils/shareApp';
+import { resolveSelectedTrustMembership } from '../../shared/utils/storageUtils';
+import { MEMBER_PRIVACY_UPDATED_EVENT } from '../../shared/utils/memberIdentity';
 
 const normalizeSidebarRoute = (route = '', featureKey = '') => {
   const routeValue = String(route || '')

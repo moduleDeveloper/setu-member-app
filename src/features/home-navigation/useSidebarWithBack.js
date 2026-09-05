@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { registerSidebarState } from '@/shared/hooks/useAndroidBackHandler';
+import { registerSidebarState } from '../../shared/hooks/useAndroidBackHandler';
 
 /**
  * Hook that manages sidebar state and handles Android back button to close sidebar

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useNavigation } from '@/features/home-navigation/NavigationContext';
+import { useNavigation } from './NavigationContext';
 
 /**
  * Wrapper component to automatically register back button callbacks for routes
