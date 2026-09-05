@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchFeatureFlags, subscribeFeatureFlags } from '@/shared/services/featureFlags';
+import { fetchFeatureFlags, subscribeFeatureFlags } from '../services/featureFlags';
 
 export const useFeatureFlags = (trustIdParam = null) => {
   const [flags, setFlags] = useState({});

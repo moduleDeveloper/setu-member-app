@@ -5,4 +5,4 @@
 // All the back button logic is now centralized there
 // ============================================================
 
-export { useAndroidBackHandler, registerSidebarState } from '@/features/home-navigation/ImprovedNavigationProvider';
+export { useAndroidBackHandler, registerSidebarState } from '../../features/home-navigation/ImprovedNavigationProvider';

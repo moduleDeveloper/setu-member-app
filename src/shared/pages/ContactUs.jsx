@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, Mail, PhoneCall, UserRound } from 'lucide-react';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { clearContactTrustCache, fetchContactTrustRows } from '@/shared/services/contactTrustService';
-import { fetchTrustById } from '@/shared/services/trustService';
+import { useAppTheme } from '../context/ThemeContext';
+import { applyOpacity } from '../utils/colorUtils';
+import { clearContactTrustCache, fetchContactTrustRows } from '../services/contactTrustService';
+import { fetchTrustById } from '../services/trustService';
 
 const ContactUs = ({ onNavigateBack }) => {
   const theme = useAppTheme();

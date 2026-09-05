@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useNavigation } from '@/features/home-navigation/ImprovedNavigationProvider';
+import { useNavigation } from '../../features/home-navigation/ImprovedNavigationProvider';
 
 /**
  * useBackNavigation Hook

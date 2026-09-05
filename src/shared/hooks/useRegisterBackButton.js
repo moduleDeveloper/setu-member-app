@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useNavigation } from '@/features/home-navigation/NavigationContext';
+import { useNavigation } from '../../features/home-navigation/NavigationContext';
 
 /**
  * Hook to register a back button callback for the current route

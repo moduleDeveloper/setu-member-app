@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { supabase } from '@/shared/services/supabaseClient.js';
+import { supabase } from './supabaseClient.js';
 
 // Force local backend for current development flow.
 const resolveDevApiBaseUrl = () => {
@@ -356,7 +356,7 @@ const resolveMembersIdForProfile = async (parsedUser, profileData = {}, trustId 
     if (isUuid(id)) return String(id);
   }
 
-  const { supabase } = await import('@/shared/services/supabaseClient.js');
+  const { supabase } = await import('./supabaseClient.js');
   const mobileRaw = profileData?.mobile || parsedUser?.Mobile || parsedUser?.mobile || parsedUser?.phone || '';
   const mobileDigits = String(mobileRaw).replace(/\D/g, '');
   const mobileVariants = Array.from(new Set([mobileRaw, mobileDigits, mobileDigits.slice(-10), `+91${mobileDigits.slice(-10)}`].filter(Boolean)));
@@ -1278,7 +1278,7 @@ export const getMemberTrustLinks = async (memberId) => {
     if (!memberId) {
       throw new Error('memberId is required');
     }
-    const { supabase } = await import('@/shared/services/supabaseClient.js');
+    const { supabase } = await import('./supabaseClient.js');
     const { data: links, error } = await supabase
       .from('reg_members')
       .select(`

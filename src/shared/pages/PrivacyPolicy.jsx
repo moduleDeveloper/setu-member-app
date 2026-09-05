@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBackNavigation } from '@/shared/hooks';
-import { fetchTrustById } from '@/shared/services/trustService';
-import { parseLegalSections, resolveLegalTrustId } from '@/shared/utils/legalContent';
+import { useBackNavigation } from '../hooks';
+import { fetchTrustById } from '../services/trustService';
+import { parseLegalSections, resolveLegalTrustId } from '../utils/legalContent';
 
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
 

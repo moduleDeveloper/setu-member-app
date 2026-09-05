@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
-import { parseLegalSections } from '@/shared/utils/legalContent';
+import { parseLegalSections } from '../utils/legalContent';
 
 const TermsModal = ({ isOpen, onAccept, content = '', trustName = '', loading = false, error = '' }) => {
   if (!isOpen) return null;

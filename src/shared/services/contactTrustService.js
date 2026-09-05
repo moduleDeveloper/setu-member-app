@@ -1,4 +1,4 @@
-import { supabase } from '@/shared/services/supabaseClient';
+import { supabase } from './supabaseClient';
 
 const CACHE_KEY = 'contact_trust_cache_v1';
 const CACHE_TTL_MS = 5 * 60 * 1000;

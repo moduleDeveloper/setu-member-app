@@ -1,68 +1,68 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { ThemeContext } from '@/shared/context/ThemeContext';
-import { GalleryProvider } from '@/features/gallery-sponsors/GalleryContext';
-import Login from '@/features/auth/Login';
-import VIPLogin from '@/features/auth/VIPLogin';
-import Home from '@/features/home-navigation/Home';
-import OTPVerification from '@/features/auth/OTPVerification';
-import SpecialOTPVerification from '@/features/auth/SpecialOTPVerification';
-import Directory from '@/features/directory-executivebody/Directory';
-import Profile from '@/features/member/Profile';
-import Appointments from '@/features/appointments-reports-referral/Appointments';
-import Reports from '@/features/appointments-reports-referral/Reports';
-import Referral from '@/features/appointments-reports-referral/Referral';
-import Notices from '@/features/quick-actions/Notices';
-import NoticeDetail from '@/features/quick-actions/NoticeDetail';
-import Facilities from '@/features/quick-actions/Facilities';
-import FacilityDetail from '@/features/quick-actions/FacilityDetail';
-import Events from '@/features/quick-actions/Events';
-import EventDetail from '@/features/quick-actions/EventDetail';
-import Achievements from '@/features/quick-actions/Achievements';
-import AchievementDetail from '@/features/quick-actions/AchievementDetail';
-import Donation from '@/features/products/Donation';
-import DonationForm from '@/features/products/DonationForm';
-import CategoriesProducts from '@/features/products/CategoriesProducts';
-import ProductList from '@/features/products/ProductList';
-import ProductDetail from '@/features/products/ProductDetail';
-import Wishlist from '@/features/products/Wishlist';
-import Cart from '@/features/products/Cart';
-import CreateOrder from '@/features/products/CreateOrder';
-import OrderHistory from '@/features/products/OrderHistory';
-import ExecutiveBody from '@/features/directory-executivebody/ExecutiveBody';
-import Notifications from '@/features/notifications/Notifications';
-import HealthcareTrusteeDirectory from '@/features/directory-executivebody/HealthcareTrusteeDirectory';
-import MemberDetails from '@/features/directory-executivebody/MemberDetails';
-import CommitteeMembers from '@/features/directory-executivebody/CommitteeMembers';
-import ProtectedRoute from '@/app/ProtectedRoute';
-import SponsorDetails from '@/features/gallery-sponsors/SponsorDetails';
-import SponsorsList from '@/features/gallery-sponsors/SponsorsList';
-import DeveloperDetails from '@/shared/pages/DeveloperDetails';
-import FeatureGuard from '@/shared/components/FeatureGuard';
+import { ThemeContext } from '../shared/context/ThemeContext';
+import { GalleryProvider } from '../features/gallery-sponsors/GalleryContext';
+import Login from '../features/auth/Login';
+import VIPLogin from '../features/auth/VIPLogin';
+import Home from '../features/home-navigation/Home';
+import OTPVerification from '../features/auth/OTPVerification';
+import SpecialOTPVerification from '../features/auth/SpecialOTPVerification';
+import Directory from '../features/directory-executivebody/Directory';
+import Profile from '../features/member/Profile';
+import Appointments from '../features/appointments-reports-referral/Appointments';
+import Reports from '../features/appointments-reports-referral/Reports';
+import Referral from '../features/appointments-reports-referral/Referral';
+import Notices from '../features/quick-actions/Notices';
+import NoticeDetail from '../features/quick-actions/NoticeDetail';
+import Facilities from '../features/quick-actions/Facilities';
+import FacilityDetail from '../features/quick-actions/FacilityDetail';
+import Events from '../features/quick-actions/Events';
+import EventDetail from '../features/quick-actions/EventDetail';
+import Achievements from '../features/quick-actions/Achievements';
+import AchievementDetail from '../features/quick-actions/AchievementDetail';
+import Donation from '../features/products/Donation';
+import DonationForm from '../features/products/DonationForm';
+import CategoriesProducts from '../features/products/CategoriesProducts';
+import ProductList from '../features/products/ProductList';
+import ProductDetail from '../features/products/ProductDetail';
+import Wishlist from '../features/products/Wishlist';
+import Cart from '../features/products/Cart';
+import CreateOrder from '../features/products/CreateOrder';
+import OrderHistory from '../features/products/OrderHistory';
+import ExecutiveBody from '../features/directory-executivebody/ExecutiveBody';
+import Notifications from '../features/notifications/Notifications';
+import HealthcareTrusteeDirectory from '../features/directory-executivebody/HealthcareTrusteeDirectory';
+import MemberDetails from '../features/directory-executivebody/MemberDetails';
+import CommitteeMembers from '../features/directory-executivebody/CommitteeMembers';
+import ProtectedRoute from './ProtectedRoute';
+import SponsorDetails from '../features/gallery-sponsors/SponsorDetails';
+import SponsorsList from '../features/gallery-sponsors/SponsorsList';
+import DeveloperDetails from '../shared/pages/DeveloperDetails';
+import FeatureGuard from '../shared/components/FeatureGuard';
 
-import TermsAndConditions from '@/shared/pages/TermsAndConditions';
-import PrivacyPolicy from '@/shared/pages/PrivacyPolicy';
-import Gallery from '@/features/gallery-sponsors/Gallery';
-import OtherMemberships from '@/features/member/OtherMemberships';
-import AdminUserProfiles from '@/features/admin/AdminUserProfiles';
-import ContactUs from '@/shared/pages/ContactUs';
-import MyFamily from '@/features/member/MyFamily';
-import NominationDetails from '@/features/member/NominationDetails';
-import AddCommunity from '@/features/member/AddCommunity';
-import TrustIdCard from '@/features/member/TrustIdCard';
-import AppVersionUpdatePrompt from '@/shared/components/AppVersionUpdatePrompt';
-import { getCurrentNotificationContext, matchesNotificationForContext } from '@/features/notifications/notificationAudience';
-import { initPushNotifications } from '@/features/notifications/pushNotificationService';
-import { createUserNotification } from '@/shared/services/api';
-import { syncTrustVersion } from '@/shared/services/trustVersionService';
-import { logUserSessionEvent } from '@/features/auth/sessionAuditService';
-import { applyThemeCssVariables, scopeCustomCss } from '@/shared/utils/themeUtils';
-import { clearLoginTermsPromptPending } from '@/shared/utils/legalContent';
-import { colorToHex } from '@/shared/utils/colorUtils';
+import TermsAndConditions from '../shared/pages/TermsAndConditions';
+import PrivacyPolicy from '../shared/pages/PrivacyPolicy';
+import Gallery from '../features/gallery-sponsors/Gallery';
+import OtherMemberships from '../features/member/OtherMemberships';
+import AdminUserProfiles from '../features/admin/AdminUserProfiles';
+import ContactUs from '../shared/pages/ContactUs';
+import MyFamily from '../features/member/MyFamily';
+import NominationDetails from '../features/member/NominationDetails';
+import AddCommunity from '../features/member/AddCommunity';
+import TrustIdCard from '../features/member/TrustIdCard';
+import AppVersionUpdatePrompt from '../shared/components/AppVersionUpdatePrompt';
+import { getCurrentNotificationContext, matchesNotificationForContext } from '../features/notifications/notificationAudience';
+import { initPushNotifications } from '../features/notifications/pushNotificationService';
+import { createUserNotification } from '../shared/services/api';
+import { syncTrustVersion } from '../shared/services/trustVersionService';
+import { logUserSessionEvent } from '../features/auth/sessionAuditService';
+import { applyThemeCssVariables, scopeCustomCss } from '../shared/utils/themeUtils';
+import { clearLoginTermsPromptPending } from '../shared/utils/legalContent';
+import { colorToHex } from '../shared/utils/colorUtils';
 import {
   THEME_REFRESH_EVENT
-} from '@/shared/utils/themeEvents';
+} from '../shared/utils/themeEvents';
 
 import {
   useAndroidBackHandler,
@@ -73,7 +73,7 @@ import {
   useSwipeBackNavigation,
   useTheme,
   useInAppUpdate
-} from '@/shared/hooks';
+} from '../shared/hooks';
 
 const LAST_THEME_CACHE_KEY = 'last_theme_cache_v3';
 const LEGACY_LAST_THEME_CACHE_KEYS = ['last_theme_cache_v2', 'last_theme_cache_v1'];
@@ -636,7 +636,7 @@ const HospitalTrusteeApp = () => {
         }
 
         // Import supabase dynamically to avoid circular deps
-        const { supabase } = await import('@/shared/services/supabaseClient');
+        const { supabase } = await import('../shared/services/supabaseClient');
 
         if (!membersId) {
           return;
@@ -746,7 +746,7 @@ const HospitalTrusteeApp = () => {
           return;
         }
 
-        const { supabase } = await import('@/shared/services/supabaseClient');
+        const { supabase } = await import('../shared/services/supabaseClient');
         supabaseRef = supabase;
 
         const notificationTracker = new Set();
