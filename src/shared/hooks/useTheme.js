@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/shared/services/supabaseClient';
+import { supabase } from '../services/supabaseClient';
 import {
   DEFAULT_THEME,
   buildThemeFromTemplate,
   mergeResolvedThemes,
   sanitizeCustomCss,
   getThemeToken
-} from '@/shared/utils/themeUtils';
+} from '../utils/themeUtils';
 import {
   THEME_TEMPLATE_APPLIED_EVENT,
   dispatchThemeRefresh,
   dispatchThemeTemplateApplied
-} from '@/shared/utils/themeEvents';
+} from '../utils/themeEvents';
 
 const LAST_THEME_CACHE_KEY = 'last_theme_cache_v4';
 const LEGACY_LAST_THEME_CACHE_KEYS = ['last_theme_cache_v3', 'last_theme_cache_v2', 'last_theme_cache_v1'];

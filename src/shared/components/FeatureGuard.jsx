@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isFeatureVisible } from '@/shared/services/featureFlags';
-import { useFeatureFlags } from '@/shared/hooks/useFeatureFlags';
+import { isFeatureVisible } from '../services/featureFlags';
+import { useFeatureFlags } from '../hooks/useFeatureFlags';
 
 const FeatureGuard = ({ featureKey, fallbackPath = '/', children }) => {
   const { flags, loading } = useFeatureFlags();

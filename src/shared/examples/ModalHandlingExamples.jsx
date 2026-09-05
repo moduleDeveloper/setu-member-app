@@ -6,7 +6,7 @@
 // ============================================================
 
 import React, { useState, useEffect } from 'react';
-import { useAndroidBack } from '@/examples/hooks';
+import { useAndroidBack } from '../../examples/hooks';
 
 /**
  * Example 1: Simple Modal

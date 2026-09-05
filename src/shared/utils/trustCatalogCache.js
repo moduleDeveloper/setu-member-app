@@ -1,4 +1,4 @@
-import { supabase } from '@/shared/services/supabaseClient';
+import { supabase } from '../services/supabaseClient';
 
 const CATALOG_CACHE_PREFIX = 'trust_catalog_cache_v1';
 const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;

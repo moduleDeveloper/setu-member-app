@@ -1,4 +1,4 @@
-import { supabase } from '@/shared/services/supabaseClient';
+import { supabase } from './supabaseClient';
 
 const attachProfilePhotosByMembersId = async (items = []) => {
   const membersIds = Array.from(new Set((items || []).map((item) => item?.members_id).filter(Boolean)));

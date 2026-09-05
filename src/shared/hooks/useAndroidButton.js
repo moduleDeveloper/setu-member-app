@@ -1,4 +1,4 @@
-import { useHapticFeedback } from '@/shared/hooks/useHapticFeedback';
+import { useHapticFeedback } from './useHapticFeedback';
 import { Capacitor } from '@capacitor/core';
 
 /**

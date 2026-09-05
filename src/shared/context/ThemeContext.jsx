@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { DEFAULT_THEME, getThemeToken } from '@/shared/utils/themeUtils';
+import { DEFAULT_THEME, getThemeToken } from '../utils/themeUtils';
 
 /**
  * ThemeContext - makes the active trust theme + full theme_config available app-wide.

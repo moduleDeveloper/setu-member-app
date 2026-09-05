@@ -1,4 +1,4 @@
-import { supabase } from '@/shared/services/supabaseClient';
+import { supabase } from './supabaseClient';
 
 const CACHE_KEY = 'feature_flags_cache_v4';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes

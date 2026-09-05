@@ -1,4 +1,4 @@
-import { supabase } from '@/shared/services/supabaseClient';
+import { supabase } from './supabaseClient';
 
 const TRUST_VERSION_KEY_PREFIX = 'trust_version_';
 const TRUST_VERSION_UPDATED_EVENT = 'trust-version-updated';

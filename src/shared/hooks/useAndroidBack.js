@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useNavigation } from '@/features/home-navigation/ImprovedNavigationProvider';
+import { useNavigation } from '../../features/home-navigation/ImprovedNavigationProvider';
 
 /**
  * ✅ IMPROVED Android Back Handler Hook

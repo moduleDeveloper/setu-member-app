@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { AlertTriangle, Clock3, Download } from 'lucide-react';
-import { fetchShareAppLinksByTrustId } from '@/shared/services/trustService';
-import { getShareAppTargetLink } from '@/shared/utils/shareApp';
-import { TRUST_APP_VERSION } from '@/shared/constants/appVersion';
+import { fetchShareAppLinksByTrustId } from '../services/trustService';
+import { getShareAppTargetLink } from '../utils/shareApp';
+import { TRUST_APP_VERSION } from '../constants/appVersion';
 
 const APP_UPDATE_SNOOZE_MS = 24 * 60 * 60 * 1000;
 const APP_UPDATE_SNOOZE_PREFIX = 'app_update_snooze_v1_';
