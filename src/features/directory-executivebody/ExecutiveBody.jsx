@@ -1,18 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home as HomeIcon, Mail, Menu, Phone, Search, User, Users, X } from 'lucide-react';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getExecutiveBodyMembers } from '@/shared/services/supabaseService';
-import { getProfilePhotos } from '@/shared/services/api';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from '@/shared/utils/memberIdentity';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getExecutiveBodyMembers } from '../../shared/services/supabaseService';
+import { getProfilePhotos } from '../../shared/services/api';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from '../../shared/utils/memberIdentity';
 import {
   buildExecutiveBodyCommitteeSearchResults,
   getExecutiveBodySearchFields,
   getSearchRankFromFields,
-} from '@/features/directory-executivebody/executiveBodySearch';
-import Sidebar from '@/features/home-navigation/Sidebar';
+} from './executiveBodySearch';
+import Sidebar from '../home-navigation/Sidebar';
 
 const TAB_OPTIONS = [
   

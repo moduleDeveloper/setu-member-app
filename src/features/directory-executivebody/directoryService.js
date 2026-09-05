@@ -1,4 +1,4 @@
-import { getMemberTypes, getAllHospitals, getAllElectedMembers, getAllCommitteeMembers, getMembersPage } from '@/shared/services/api';
+import { getMemberTypes, getAllHospitals, getAllElectedMembers, getAllCommitteeMembers, getMembersPage } from '../../shared/services/api';
 
 const CACHE_KEY = 'directory_data_cache';
 const CACHE_TIMESTAMP_KEY = 'directory_cache_timestamp';

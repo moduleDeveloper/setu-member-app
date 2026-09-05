@@ -1,13 +1,13 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { User, Users, Stethoscope, Building2, Star, ChevronRight, ChevronLeft, Menu, X, Home as HomeIcon, Clock, FileText, UserPlus, Phone, Mail, MapPin, Search, Filter, ArrowLeft, ArrowRight } from 'lucide-react';
-import Sidebar from '@/features/home-navigation/Sidebar';
-import { getAllCommitteeMembers, getAllDoctors, getAllElectedMembers, getProfilePhotos } from '@/shared/services/api';
-import { getExecutiveBodyMembers, getTrusteesAndPatrons } from '@/shared/services/supabaseService';
-import { registerSidebarState, useAndroidBack } from '@/shared/hooks';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureVisible } from '@/shared/services/featureFlags';
-import { fetchSubFeatureFlags, subscribeSubFeatureFlags } from '@/shared/services/subFeatureFlags';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+import Sidebar from '../home-navigation/Sidebar';
+import { getAllCommitteeMembers, getAllDoctors, getAllElectedMembers, getProfilePhotos } from '../../shared/services/api';
+import { getExecutiveBodyMembers, getTrusteesAndPatrons } from '../../shared/services/supabaseService';
+import { registerSidebarState, useAndroidBack } from '../../shared/hooks';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { fetchFeatureFlags, subscribeFeatureFlags, isFeatureVisible } from '../../shared/services/featureFlags';
+import { fetchSubFeatureFlags, subscribeSubFeatureFlags } from '../../shared/services/subFeatureFlags';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 
 const CACHE_KEY_HTD = 'healthcare_trustee_directory_cache';
 const CACHE_TIMESTAMP_KEY_HTD = 'healthcare_trustee_directory_cache_timestamp';
