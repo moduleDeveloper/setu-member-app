@@ -1,20 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronLeft, Heart, Home as HomeIcon, ShoppingCart, Sparkles, Trash2, X } from 'lucide-react';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 import {
   readWishlistItems,
   removeWishlistProduct,
   updateWishlistProduct,
   subscribeWishlist,
-} from '@/features/products/productWishlist';
+} from './productWishlist';
 import {
   getCartKey,
   readCartItems,
   setCartProductQuantity,
   subscribeCart,
-} from '@/features/products/productCart';
+} from './productCart';
 
 const T = {
   text: 'var(--body-text-color)',

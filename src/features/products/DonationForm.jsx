@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, Mail, PhoneCall, QrCode, UserRound, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { applyOpacity } from '@/shared/utils/colorUtils';
-import { fetchDonationMembersByTrust, getDonationFormPrefill } from '@/features/products/donationService';
-import { TRUST_VERSION_UPDATED_EVENT } from '@/shared/services/trustVersionService';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { applyOpacity } from '../../shared/utils/colorUtils';
+import { fetchDonationMembersByTrust, getDonationFormPrefill } from './donationService';
+import { TRUST_VERSION_UPDATED_EVENT } from '../../shared/services/trustVersionService';
 
 const DonationForm = () => {
   const theme = useAppTheme();

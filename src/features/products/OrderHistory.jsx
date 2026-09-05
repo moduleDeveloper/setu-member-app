@@ -13,16 +13,16 @@ import {
   clearOrderHistoryCache,
   loadOrderHistorySnapshot,
   resolveOrderHistoryTrustScope,
-} from '@/features/products/orderHistoryService';
+} from './orderHistoryService';
 import {
   ORDER_HISTORY_UNKNOWN_TRUST_KEY,
   ORDER_HISTORY_UNKNOWN_TRUST_LABEL,
   normalizeText,
   formatCurrency,
   normalizeOrderRecord,
-} from '@/features/products/orderHistoryDisplay';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getNavbarThemeStyles } from '@/shared/utils/themeUtils';
+} from './orderHistoryDisplay';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 
 const T = {
   page: 'var(--page-bg, var(--app-page-bg))',
