@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useBackNavigation } from '@/shared/hooks';
-import { specialLogin } from '@/features/auth/authService';
-import { fetchDirectoryData } from '@/features/directory-executivebody/directoryService';
-import { logUserSessionEvent } from '@/features/auth/sessionAuditService';
-import { persistUserSession } from '@/shared/utils/storageUtils';
-import { setLoginTermsPromptPending } from '@/shared/utils/legalContent';
-import { useAppTheme } from '@/shared/context/ThemeContext';
+import { useBackNavigation } from '../../shared/hooks';
+import { specialLogin } from './authService';
+import { fetchDirectoryData } from '../directory-executivebody/directoryService';
+import { logUserSessionEvent } from './sessionAuditService';
+import { persistUserSession } from '../../shared/utils/storageUtils';
+import { setLoginTermsPromptPending } from '../../shared/utils/legalContent';
+import { useAppTheme } from '../../shared/context/ThemeContext';
 
 const OTP_FLOW_KEY = 'otp_flow_allowed';
 const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';

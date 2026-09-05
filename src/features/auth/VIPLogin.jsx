@@ -26,13 +26,13 @@ import {
   Sparkles
 } from 'lucide-react';
 
-import { useBackNavigation } from '@/shared/hooks';
-import { checkPhoneNumber, verifyOTP } from '@/features/auth/authService';
-import { fetchDirectoryData } from '@/features/directory-executivebody/directoryService';
-import { fetchTrustById } from '@/shared/services/trustService';
-import { logUserSessionEvent } from '@/features/auth/sessionAuditService';
-import TermsModal from '@/shared/components/TermsModal';
-import { clearLoginTermsPromptPending, isLoginTermsPromptPending, resolveLegalTrustId, setLoginTermsPromptPending } from '@/shared/utils/legalContent';
+import { useBackNavigation } from '../../shared/hooks';
+import { checkPhoneNumber, verifyOTP } from './authService';
+import { fetchDirectoryData } from '../directory-executivebody/directoryService';
+import { fetchTrustById } from '../../shared/services/trustService';
+import { logUserSessionEvent } from './sessionAuditService';
+import TermsModal from '../../shared/components/TermsModal';
+import { clearLoginTermsPromptPending, isLoginTermsPromptPending, resolveLegalTrustId, setLoginTermsPromptPending } from '../../shared/utils/legalContent';
 const logo = '/new_logo.png';
 
 const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';

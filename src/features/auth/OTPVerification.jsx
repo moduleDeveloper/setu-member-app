@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useBackNavigation } from '@/shared/hooks';
-import { verifyOTP } from '@/features/auth/authService';
-import { fetchDirectoryData } from '@/features/directory-executivebody/directoryService';
-import { fetchActiveTrustsByMobile, fetchMemberTrustMemberships, fetchTrustById } from '@/shared/services/trustService';
-import { logUserSessionEvent } from '@/features/auth/sessionAuditService';
-import { persistUserSession } from '@/shared/utils/storageUtils';
-import { setLoginTermsPromptPending } from '@/shared/utils/legalContent';
+import { useBackNavigation } from '../../shared/hooks';
+import { verifyOTP } from './authService';
+import { fetchDirectoryData } from '../directory-executivebody/directoryService';
+import { fetchActiveTrustsByMobile, fetchMemberTrustMemberships, fetchTrustById } from '../../shared/services/trustService';
+import { logUserSessionEvent } from './sessionAuditService';
+import { persistUserSession } from '../../shared/utils/storageUtils';
+import { setLoginTermsPromptPending } from '../../shared/utils/legalContent';
 
 const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
