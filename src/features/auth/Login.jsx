@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useBackNavigation } from '@/shared/hooks';
-import { useTrustDataVersion } from '@/shared/hooks/useTrustDataVersion';
-import { checkPhoneNumber } from '@/features/auth/authService';
-import { fetchTrustById } from '@/shared/services/trustService';
+import { useBackNavigation } from '../../shared/hooks';
+import { useTrustDataVersion } from '../../shared/hooks/useTrustDataVersion';
+import { checkPhoneNumber } from './authService';
+import { fetchTrustById } from '../../shared/services/trustService';
 
 const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
