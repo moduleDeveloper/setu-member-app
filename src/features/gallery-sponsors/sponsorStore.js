@@ -1,5 +1,5 @@
-import { getSponsorById, getSponsors } from '@/features/gallery-sponsors/sponsorApiBackend';
-import { isFresh, isRowActive } from '@/features/gallery-sponsors/sponsorRules.js';
+import { getSponsorById, getSponsors } from './sponsorApiBackend';
+import { isFresh, isRowActive } from './sponsorRules.js';
 
 /**
  * Centralized Sponsor Store (ID normalized)

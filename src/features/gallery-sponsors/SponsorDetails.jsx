@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Building2, Globe, Mail, MapPin, Phone, Star } from 'lucide-react';
-import { getCachedSponsorById, getCachedSponsorDetail, getSponsorDetail, readSelectedSponsorId } from '@/features/gallery-sponsors/sponsorStore';
-import { useAppTheme } from '@/shared/context/ThemeContext';
-import { getThemeToken } from '@/shared/utils/themeUtils';
+import { getCachedSponsorById, getCachedSponsorDetail, getSponsorDetail, readSelectedSponsorId } from './sponsorStore';
+import { useAppTheme } from '../../shared/context/ThemeContext';
+import { getThemeToken } from '../../shared/utils/themeUtils';
 
 const ASSOCIATION_LABEL = 'In Association With';
 

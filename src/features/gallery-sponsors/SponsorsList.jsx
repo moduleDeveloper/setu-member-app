@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Building2, ChevronRight, Star } from 'lucide-react';
-import { fetchTrustById } from '@/shared/services/trustService';
+import { fetchTrustById } from '../../shared/services/trustService';
 import {
   buildOrderedSponsors,
   ensureAllSponsorsLoaded,
   setPinnedSponsor,
   setSelectedSponsorId
-} from '@/features/gallery-sponsors/sponsorStore';
-import { useAppTheme } from '@/shared/context/ThemeContext';
+} from './sponsorStore';
+import { useAppTheme } from '../../shared/context/ThemeContext';
 
 export const SponsorsContent = ({ onNavigate, onBack, variant = 'page' }) => {
   const isPageVariant = variant === 'page';

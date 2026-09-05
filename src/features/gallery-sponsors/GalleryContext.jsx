@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchGalleryFoldersPaginated, fetchPhotosByFolderPaginated } from '@/features/gallery-sponsors/galleryService';
+import { fetchGalleryFoldersPaginated, fetchPhotosByFolderPaginated } from './galleryService';
 
 const GALLERY_CONTEXT_VERSION = 6;
 const GALLERY_CACHE_KEY_PREFIX = 'gallery_normalized_cache_v6';
