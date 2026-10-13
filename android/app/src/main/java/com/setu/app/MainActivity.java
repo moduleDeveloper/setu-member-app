@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SecureScreenPlugin.class);
         registerPlugin(MetaEventsPlugin.class);
+        registerPlugin(SystemInfoPlugin.class);
 
         super.onCreate(savedInstanceState);
 

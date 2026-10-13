@@ -6,6 +6,7 @@ import { fetchDirectoryData } from './services/directoryService';
 import { fetchActiveTrustsByMobile, fetchMemberTrustMemberships, fetchTrustById, fetchTrustByAppSlug } from './services/trustService';
 import { logUserSessionEvent } from './services/sessionAuditService';
 import { trackMetaEvent } from './services/metaEvents';
+import { getSystemInfoMetadata } from './services/systemInfoService';
 import { persistUserSession } from './utils/storageUtils';
 import { setLoginTermsPromptPending } from './utils/legalContent';
 import { useTenant } from './context/TenantContext';
@@ -363,10 +364,14 @@ function OTPVerification() {
       }
     }
 
+    // Final member + trust are settled here; {} on web or on any failure.
+    const systemInfo = await getSystemInfoMetadata();
+
     await logUserSessionEvent({
       user: enrichedUser,
       actionType: 'login',
       extra: {
+        ...systemInfo,
         source: 'otp',
         login_method: loginMethod,
         trust_id: selectedTrustId || null
