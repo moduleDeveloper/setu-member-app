@@ -19,6 +19,8 @@ import galleryRoutes from './routes/galleryRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
 import orderHistoryRoutes from './routes/orderHistoryRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import locationRoutes from './routes/locationRoutes.js';
+import { initGeoIp } from './services/geoIpService.js';
 import { initFirebaseAdmin } from './config/firebaseAdmin.js';
 import { startNotificationPushWorker } from './services/notificationPushWorker.js';
 
@@ -31,6 +33,7 @@ dotenv.config();
 
 // Initialize express app
 const app = express();
+app.set('trust proxy', 1); // Nginx in front: req.ip = real client IP
 const PORT = process.env.PORT || 5005;
 const TRUST_BRAND_NAME = process.env.VITE_DEFAULT_TRUST_NAME || process.env.DEFAULT_TRUST_NAME || 'Trust';
 
@@ -141,6 +144,7 @@ app.use('/api/gallery', galleryRoutes); // Gallery routes
 app.use('/api/order-history', orderHistoryRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes); // Admin routes
+app.use('/api/client-location', locationRoutes); // Local GeoIP lookup
 app.use('/api', memberRoutes); // Member routes last to avoid catching other routes
 // --------------------
 // ERROR HANDLING
@@ -161,3 +165,4 @@ app.listen(PORT, () => {
 
 initFirebaseAdmin();
 startNotificationPushWorker();
+initGeoIp();

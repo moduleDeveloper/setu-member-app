@@ -1,6 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase.js';
 import { initializePhoneAuth, verifyOTP, checkPhoneExists } from '../services/otpService.js';
+import {
+  lookupClientLocation,
+  toSessionLocationMetadata,
+  SESSION_LOCATION_KEYS
+} from '../services/geoIpService.js';
 
 const SESSION_EVENT_TABLES = ['member_session', 'user_session_events'];
 const SESSION_EVENT_ACTIONS = new Set(['login', 'logout', 'autologout']);
@@ -41,6 +46,25 @@ const buildSessionEventPayload = (body = {}) => {
     app_platform: normalizeText(body.app_platform || body.appPlatform) || 'web',
     metadata: normalizeSessionMetadata(body.metadata)
   };
+};
+
+// Location keys are server-owned: any client-sent values are dropped, and for
+// a login with a final members_id + trust_id the server's local GeoIP result
+// is merged in. Existing metadata keys are kept. Never fails the login.
+const withSessionLocation = async (req, payload) => {
+  const metadata = { ...payload.metadata };
+  SESSION_LOCATION_KEYS.forEach((key) => { delete metadata[key]; });
+
+  if (payload.action_type === 'login' && payload.members_id && payload.trust_id) {
+    try {
+      const location = toSessionLocationMetadata(await lookupClientLocation(req));
+      if (location) Object.assign(metadata, location);
+    } catch (error) {
+      console.warn('[SessionAudit] location lookup skipped:', error?.message || error);
+    }
+  }
+
+  return { ...payload, metadata };
 };
 
 /**
@@ -350,7 +374,7 @@ export const createUserPanelToken = async (req, res, next) => {
  */
 export const logSessionEvent = async (req, res, next) => {
   try {
-    const payload = buildSessionEventPayload(req.body || {});
+    let payload = buildSessionEventPayload(req.body || {});
 
     if (!payload.action_type) {
       return res.status(400).json({
@@ -358,6 +382,8 @@ export const logSessionEvent = async (req, res, next) => {
         message: 'Invalid session action type'
       });
     }
+
+    payload = await withSessionLocation(req, payload);
 
     let lastError = null;
     let storedTable = null;
