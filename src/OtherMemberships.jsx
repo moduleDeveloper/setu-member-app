@@ -13,6 +13,7 @@ import { fetchActiveTrustsByMobile } from './services/trustService';
 import { isFeatureVisible } from './services/featureFlags';
 import { useFeatureFlags } from './hooks/useFeatureFlags';
 import { getAppHomePath } from './utils/tenantNavigation';
+import { trackAction } from './services/pageTrackingService';
 
 // ─── Supabase helpers ──────────────────────────────────────────────────────
 
@@ -702,6 +703,7 @@ const OtherMemberships = ({ onNavigate, variant = 'page' }) => {
   // ── handlers ──
   const handleDelete = async (id) => {
     if (!window.confirm('Remove this membership record?')) return;
+    trackAction('membership_remove_confirmed', { membership_id: id });
     setDeletingId(id);
     try {
       await deleteOtherMembership(id);
@@ -714,6 +716,7 @@ const OtherMemberships = ({ onNavigate, variant = 'page' }) => {
   };
 
   const handleCreateNewApp = () => {
+    trackAction('create_new_app_clicked');
     if (onNavigate) {
       onNavigate('add-community');
       return;
@@ -725,6 +728,10 @@ const OtherMemberships = ({ onNavigate, variant = 'page' }) => {
     const trustId = normalizeText(link?.trust_id || link?.Trust?.id);
     if (!trustId || openingTrustId) return;
 
+    trackAction('app_clicked', {
+      trust_id: trustId,
+      trust_name: normalizeText(link?.Trust?.name || link?.organisation_name),
+    });
     setOpeningTrustId(trustId);
     try {
       const supabase = await getSupabase();
@@ -795,6 +802,10 @@ const OtherMemberships = ({ onNavigate, variant = 'page' }) => {
   }, [isIOS, trustLinks, fetchTrustWebAppUrl]);
 
   const openTrustIdCard = (link) => {
+    trackAction('trust_id_card_opened', {
+      trust_id: normalizeText(link?.trust_id || link?.Trust?.id),
+      trust_name: normalizeText(link?.Trust?.name || link?.organisation_name),
+    });
     const cardData = enrichTrustCardData(link);
     try {
       sessionStorage.setItem(TRUST_ID_CARD_CACHE_KEY, JSON.stringify(cardData));
@@ -977,6 +988,7 @@ const OtherMemberships = ({ onNavigate, variant = 'page' }) => {
     // absent (resolvedUrl === '') — both cancel the navigation and surface
     // a real message, never a silent no-op.
     const handleIosClick = (event) => {
+      trackAction('app_clicked', { trust_id: trustId, trust_name: trustName, device_os: 'ios' });
       if (resolvedUrl) return;
       event.preventDefault();
       alert(
@@ -1272,7 +1284,7 @@ const OtherMemberships = ({ onNavigate, variant = 'page' }) => {
         }}
       >
         <button
-          onClick={() => setIsMenuOpen((prev) => !prev)}
+          onClick={() => { trackAction('menu_clicked'); setIsMenuOpen((prev) => !prev); }}
           className="p-2 rounded-xl transition-colors"
           style={{ color: navbarTheme?.textColor || 'var(--navbar-text)', background: 'transparent' }}
         >
@@ -1282,7 +1294,7 @@ const OtherMemberships = ({ onNavigate, variant = 'page' }) => {
           Other Memberships
         </h1>
         <button
-          onClick={() => (onNavigate ? onNavigate('home') : navigate(getAppHomePath()))}
+          onClick={() => { trackAction('home_clicked'); return (onNavigate ? onNavigate('home') : navigate(getAppHomePath())); }}
           className="p-2 rounded-xl transition-colors"
           style={{ color: navbarTheme?.textColor || 'var(--navbar-text)', background: 'transparent' }}
         >
@@ -1309,7 +1321,7 @@ const OtherMemberships = ({ onNavigate, variant = 'page' }) => {
           <div style={{ background: colors.errorBg, border: '1.5px solid var(--advertisement-card-border)', borderRadius: '16px', padding: '20px', textAlign: 'center', marginBottom: '16px' }}>
             <AlertCircle size={24} color={colors.error} style={{ margin: '0 auto 8px', display: 'block' }} />
             <p style={{ color: colors.error, fontSize: '14px', fontWeight: 600, margin: '0 0 12px' }}>{error}</p>
-            <button onClick={loadData} style={{ padding: '8px 20px', background: colors.primary, color: colors.onPrimary, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Retry</button>
+            <button onClick={() => { trackAction('retry_clicked'); loadData(); }} style={{ padding: '8px 20px', background: colors.primary, color: colors.onPrimary, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Retry</button>
           </div>
         )}
 

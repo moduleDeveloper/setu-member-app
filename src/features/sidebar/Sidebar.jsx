@@ -9,6 +9,7 @@ import { getProfile, updateMemberPrivacy } from '../../services/api';
 import { fetchFeatureFlags, isFeatureVisible } from '../../services/featureFlags';
 import { fetchShareAppLinksByTrustId } from '../../services/trustService';
 import { logUserSessionEvent } from '../../services/sessionAuditService';
+import { trackAction } from '../../services/pageTrackingService';
 import { useTrustDataVersion } from '../../hooks/useTrustDataVersion';
 import { useAppTheme } from '../../context/ThemeContext';
 import { applyOpacity } from '../../utils/colorUtils';
@@ -1082,7 +1083,10 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
                   <button
                     key={item.key}
                     type="button"
-                    onClick={() => openExternalLink(item.href)}
+                    onClick={() => {
+                      trackAction('social_icon_clicked', { social_platform: item.key }, { route: '/sidebar' });
+                      openExternalLink(item.href);
+                    }}
                     className="flex h-11 w-11 items-center justify-center rounded-full transition-all active:scale-95"
                     style={{
                       background: sidebarSocialButtonBg,
@@ -1122,6 +1126,8 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentPage, onLogout }) => {
 
         <button
           onClick={async () => {
+            // Called first: it reads the member identity synchronously, before logout clears it.
+            trackAction('logout_clicked', {}, { route: '/sidebar' });
             if (typeof onLogout === 'function') {
               await onLogout();
             } else {

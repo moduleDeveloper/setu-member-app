@@ -3,20 +3,20 @@
 // Pre-login auth screens (/login, /vip-login, /otp-verification,
 // /special-otp-verification) are excluded: no member identity exists there.
 
-export const PAGE_TRACKING_PLATFORM = 'setu_member_app';
+export const PAGE_TRACKING_PLATFORM = 'app';
 export const PAGE_TRACKING_MANIFEST_VERSION = '1';
 
 export const PAGE_TRACKING_MANIFEST = [
   { route: '/', name: 'Home', module: 'Home' },
   { route: '/profile', name: 'Profile', module: 'Profile' },
   { route: '/my-family', name: 'My Family', module: 'Profile' },
-  { route: '/other-memberships', name: 'Other Memberships', module: 'Profile' },
+  { route: '/other-memberships', name: 'App Gallery', module: 'Profile' },
   { route: '/nomination-details', name: 'Nomination Details', module: 'Profile' },
   { route: '/trust-id-card', name: 'Trust ID Card', module: 'Profile' },
-  { route: '/add-community', name: 'Add Community', module: 'Community' },
+  { route: '/add-community', name: 'Launch Your App', module: 'Community' },
   { route: '/user-panel', name: 'User Panel', module: 'User Panel' },
   { route: '/directory', name: 'Directory', module: 'Directory' },
-  { route: '/healthcare-trustee-directory', name: 'Healthcare Trustee Directory', module: 'Directory' },
+  { route: '/healthcare-trustee-directory', name: 'Member Directory', module: 'Directory' },
   { route: '/executive-body', name: 'Executive Body', module: 'Executive Body' },
   { route: '/executive_members_details', name: 'Executive Member Details', module: 'Executive Body' },
   { route: '/committee-members', name: 'Committee Members', module: 'Executive Body' },
@@ -50,5 +50,7 @@ export const PAGE_TRACKING_MANIFEST = [
   { route: '/developers', name: 'Developer Details', module: 'Support' },
   { route: '/terms-and-conditions', name: 'Terms and Conditions', module: 'Legal' },
   { route: '/privacy-policy', name: 'Privacy Policy', module: 'Legal' },
-  { route: '/app/:appSlug', name: 'Tenant Landing', module: 'Community' },
+  { route: '/app/:appSlug', name: 'PWA App Entry', module: 'PWA App' },
+  // No <Route> behind this: the sidebar is a panel, tracked only via trackAction(..., { route: '/sidebar' }).
+  { route: '/sidebar', name: 'Sidebar', module: 'Sidebar' },
 ];

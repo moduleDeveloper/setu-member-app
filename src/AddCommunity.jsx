@@ -7,6 +7,7 @@ import { getNavbarThemeStyles, getThemeToken } from './utils/themeUtils';
 import { applyOpacity } from './utils/colorUtils';
 import { getAppHomePath } from './utils/tenantNavigation';
 import { fetchFeatureFlags } from './services/featureFlags';
+import { trackAction } from './services/pageTrackingService';
 
 const DEFAULT_PAGE_TITLE = 'Add Community';
 
@@ -422,6 +423,7 @@ const AddCommunity = ({ onNavigateBack, variant = 'page' }) => {
 
     const selectedSampleApp = sampleApps.find((app) => app.id === form.sampleAppId) || null;
 
+    trackAction('app_creation_started', { sample_app_id: form.sampleAppId, sample_app_name: selectedSampleApp?.name || null });
     setSubmitting(true);
     // Show the launch animation immediately. After the install link is ready,
     // restart this cycle so the final launch screen gets its full duration.
@@ -523,6 +525,7 @@ const AddCommunity = ({ onNavigateBack, variant = 'page' }) => {
         }
       }
     } catch (error) {
+      trackAction('launch_failed', { reason: String(error?.message || error || '').slice(0, 200) });
       setSubmitError(getFriendlySubmitError(error, trustName));
       setSubmitting(false);
       setLaunching(false);
@@ -545,6 +548,7 @@ const AddCommunity = ({ onNavigateBack, variant = 'page' }) => {
       return;
     }
 
+    trackAction('app_launched', { new_trust_id: nextTrustId, app_slug: tenantTrust.app_slug });
     setLaunchCycle((prev) => prev + 1);
     await delay(LAUNCH_ANIMATION_MS);
     // Full-page navigation to the canonical production tenant URL — the
@@ -553,6 +557,7 @@ const AddCommunity = ({ onNavigateBack, variant = 'page' }) => {
     // existing flag for its Install/Download landing card — this
     // intentionally does NOT auto-enter Home; the destination is the
     // tenant's install screen.
+    
     const installUrl = `https://www.teiltd.in/app/${encodeURIComponent(tenantTrust.app_slug)}?install=1`;
     externalHandoffRef.current = true;
     window.location.replace(installUrl);

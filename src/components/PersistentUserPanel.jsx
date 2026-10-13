@@ -313,7 +313,7 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h1 className="text-lg font-extrabold tracking-wide" style={{ color: navbarTheme?.textColor }}>User Panel</h1>
+          <h1 className="text-lg font-extrabold tracking-wide" style={{ color: navbarTheme?.textColor }}>App Manager</h1>
           <button
             type="button"
             onClick={() => navigate(getAppHomePath())}

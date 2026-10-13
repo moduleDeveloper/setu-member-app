@@ -3244,22 +3244,6 @@ const Home = ({ onNavigate, onLogout }) => {
                 </div>
               ) : (
               <div className="relative px-4 mt-5 mb-3" style={{ animation: resolveAnimation('gallery', 'zoomIn') }} key="gallery">
-                <div className="pointer-events-none absolute -top-1.5 left-7 z-20 ">
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.18em] relative top-[12px]  flex-shrink-0"
-                    style={{
-                      color: onPrimaryText,
-                      background: `linear-gradient(135deg, ${applyOpacity(theme.primary, 0.94)}, ${applyOpacity(theme.secondary, 0.88)})`,
-                      border: `1px solid ${applyOpacity(theme.secondary, 0.42)}`,
-                      boxShadow: `0 10px 22px ${applyOpacity(theme.primary, 0.34)}, 0 2px 6px ${applyOpacity(theme.secondary, 0.18)}`,
-                      backdropFilter: 'blur(10px)',
-                      textShadow: '0 1px 2px rgba(0, 0, 0, 0.18)',
-                    }}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: onPrimaryText }} />
-                    Gallery
-                  </span>
-                </div>
 
                 <div
                   className="rounded-3xl overflow-hidden"
@@ -3277,7 +3261,7 @@ const Home = ({ onNavigate, onLogout }) => {
                       </div>
                     </div>
                   ) : carouselImages.length > 0 ? (
-                    <ImageSlider images={carouselImages} onNavigate={onNavigate} />
+                    <ImageSlider images={carouselImages} onNavigate={onNavigate} showCounter={false} />
                   ) : (
                     <button
                       onClick={() => onNavigate('gallery')}

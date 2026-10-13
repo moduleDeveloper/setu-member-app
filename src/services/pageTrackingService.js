@@ -113,24 +113,13 @@ const compileDynamicMatchers = (routes) => routes
   .sort((a, b) => b.staticCount - a.staticCount);
 
 const buildRouteCache = async () => {
-  let map = await fetchRegisteredRoutes();
+  // Read-only: routes are registered in page_routes by hand, never by the app.
+  // A manifest route with no row there simply isn't tracked (warned in dev).
+  const map = await fetchRegisteredRoutes();
 
-  // Only register routes the database does not know about yet.
-  const missing = PAGE_TRACKING_MANIFEST.filter((entry) => !map[normalizeRoute(entry.route)]);
-  if (missing.length > 0) {
-    const results = await Promise.allSettled(missing.map((entry) => callTrackingRpc('route_add', {
-      platform: PAGE_TRACKING_PLATFORM,
-      name: entry.name,
-      route: entry.route,
-      module: entry.module,
-      is_active: true,
-    })));
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') warn('route_add failed for', missing[index].route, result.reason);
-    });
-    // Re-read so the cache holds the real page_ids regardless of route_add's return shape.
-    map = await fetchRegisteredRoutes();
-  }
+  PAGE_TRACKING_MANIFEST.forEach((entry) => {
+    if (!map[normalizeRoute(entry.route)]) warn('route not registered in page_routes:', entry.route);
+  });
 
   // Keep only manifest routes: the cache must never map unknown routes.
   const manifestRoutes = PAGE_TRACKING_MANIFEST.map((entry) => normalizeRoute(entry.route));
@@ -276,5 +265,55 @@ export const trackNavigation = async (pathname) => {
     }
   } catch (error) {
     warn('trackNavigation failed', error);
+  }
+};
+
+// ─── Action entry point ─────────────────────────────────────────────────────
+
+// Records a button/form action (not a navigation) against the page the member
+// is currently on. Same RPC, same queue; metadata.source = 'action' tells it
+// apart from navigation rows. Flushed immediately: actions are often followed
+// by a full-page navigation that would otherwise drop the queued event.
+export const trackAction = async (action, extra = {}, options = {}) => {
+  try {
+    const actionName = String(action || '').trim();
+    if (!actionName || typeof window === 'undefined') return;
+
+    const identity = resolveTrackingIdentity();
+    if (!identity) return;
+
+    const ready = await ensureRouteCache();
+    if (!ready) return;
+
+    // options.route attributes the action to a registered page that has no URL
+    // of its own (e.g. '/sidebar'); metadata.pathname still records the page
+    // the member was actually on.
+    const pathname = String(window.location.pathname || '').split(/[?#]/)[0];
+    const match = matchTrackedRoute(options.route || pathname);
+    if (!match?.pageId) return;
+
+    const metadata = {
+      route: match.route,
+      pathname,
+      source: 'action',
+      action: actionName,
+      platform: PAGE_TRACKING_PLATFORM,
+      ...extra,
+    };
+    if (Object.keys(match.params).length > 0) metadata.params = match.params;
+
+    queue.push({
+      page_id: match.pageId,
+      members_id: identity.membersId,
+      user_reg_id: null,
+      trust_id: identity.trustId,
+      metadata,
+    });
+    if (queue.length > MAX_QUEUE_SIZE) queue = queue.slice(-MAX_QUEUE_SIZE);
+
+    attachFlushListeners();
+    flushPageActivity();
+  } catch (error) {
+    warn('trackAction failed', error);
   }
 };
