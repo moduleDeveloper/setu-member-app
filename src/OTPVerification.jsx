@@ -367,17 +367,6 @@ function OTPVerification() {
     // Final member + trust are settled here; {} on web or on any failure.
     const systemInfo = await getSystemInfoMetadata();
 
-    await logUserSessionEvent({
-      user: enrichedUser,
-      actionType: 'login',
-      extra: {
-        ...systemInfo,
-        source: 'otp',
-        login_method: loginMethod,
-        trust_id: selectedTrustId || null
-      }
-    });
-
     const selectedTrustName = isTenantAuth
       ? (tenantTrustName || normalizeText(localStorage.getItem('selected_trust_name')))
       : normalizeText(
@@ -386,6 +375,27 @@ function OTPVerification() {
         authDefaultTrust?.name ||
         localStorage.getItem('selected_trust_name')
       );
+
+    // The session row's trust_name must name the same Trust as its trust_id,
+    // not enrichedUser.trust (the first active membership).
+    const selectedTrustMembership = selectedMemberships.find(
+      (membership) => normalizeText(membership?.trust_id) === normalizeText(selectedTrustId)
+    );
+    const loginTrustName = isTenantAuth
+      ? selectedTrustName
+      : normalizeText(selectedTrustMembership?.trust_name) || selectedTrustName;
+
+    await logUserSessionEvent({
+      user: enrichedUser,
+      actionType: 'login',
+      extra: {
+        ...systemInfo,
+        source: 'otp',
+        login_method: loginMethod,
+        trust_id: selectedTrustId || null,
+        trust_name: loginTrustName || null
+      }
+    });
 
     localStorage.setItem('selected_trust_id', String(selectedTrustId));
     localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, String(selectedTrustId));
@@ -405,7 +415,8 @@ function OTPVerification() {
     // (see tenantNavigation.js), which would otherwise drop tenant identity
     // for a tenant login completed in an ordinary browser tab (not yet
     // installed). Non-tenant auth is completely unchanged.
-    navigate(isTenantAuth ? `/app/${tenantSlug}` : getAppHomePath(), { replace: true });
+    // Trailing slash keeps the URL inside the manifest scope '/app/<slug>/'.
+    navigate(isTenantAuth ? `/app/${tenantSlug}/` : getAppHomePath(), { replace: true });
     return true;
   };
 

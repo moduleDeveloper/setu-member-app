@@ -74,7 +74,10 @@ const readUrlTenantSlug = () => {
 };
 
 // getAppHomePath(): the path any "go Home" navigation should use.
-// - Installed/standalone PWA -> '/app/<slug>' for THIS window's tenant
+// - Installed/standalone PWA -> '/app/<slug>/' for THIS window's tenant. The
+//   trailing slash matters: the manifest scope is '/app/<slug>/' and Chrome
+//   prefix-matches it, so '/app/<slug>' alone is out of scope and a reload
+//   there shows the browser's out-of-scope toolbar.
 // - Everything else (normal browser tab, no slug, invalid slug) -> '/'
 export const getAppHomePath = () => {
   if (!isStandaloneDisplay()) return '/';
@@ -84,9 +87,9 @@ export const getAppHomePath = () => {
     // Still on /app/<slug> — authoritative, and worth recording so later
     // in-app routes (which drop the slug) still resolve Home correctly.
     rememberWindowTenantSlug(urlSlug);
-    return `/app/${urlSlug}`;
+    return `/app/${urlSlug}/`;
   }
 
   const slug = readWindowTenantSlug();
-  return slug ? `/app/${slug}` : '/';
+  return slug ? `/app/${slug}/` : '/';
 };
