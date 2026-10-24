@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -278,6 +278,9 @@ function CreateOrder() {
   const [_locationStatus, setLocationStatus] = useState('');
   const [_isCapturingLocation, setIsCapturingLocation] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [paymentOutcome, setPaymentOutcome] = useState('');
+  // Remembers saved pending purchases so a retry with the same cart does not create duplicates.
+  const pendingOrderRef = useRef({ signature: '', purchaseIds: [] });
 
   const trustId = normalizeText(
     checkoutTrustIdFromUrl
@@ -527,27 +530,45 @@ function CreateOrder() {
         return;
       }
 
-      const runPurchaseRequests = async (status) => {
-        const purchaseRequests = buildPurchaseRequests(items, memberId, trustId, status);
+      const cartSignature = `${trustId}:${items
+        .map((item) => `${item.key || item.id}x${getCartItemPricing(item).quantity}`)
+        .sort()
+        .join('|')}`;
+
+      const savePendingOrder = async () => {
+        if (pendingOrderRef.current.signature === cartSignature && pendingOrderRef.current.purchaseIds.length > 0) {
+          return pendingOrderRef.current.purchaseIds;
+        }
+
+        const purchaseRequests = buildPurchaseRequests(items, memberId, trustId, 'order_payment_pending');
+        const purchaseIds = [];
         for (const request of purchaseRequests) {
           const { data, error: rpcError } = await supabase.rpc('manage_purchase_by_member', request);
           if (rpcError) throw rpcError;
 
           if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
-            throw new Error(normalizeText(data.message) || 'Unable to save your purchase right now.');
+            throw new Error(normalizeText(data.error) || normalizeText(data.message) || 'Unable to save your purchase right now.');
           }
+
+          const purchaseId = normalizeText(data?.id);
+          if (!isUuid(purchaseId)) {
+            throw new Error('Unable to save your purchase right now.');
+          }
+          purchaseIds.push(purchaseId);
         }
+
+        pendingOrderRef.current = { signature: cartSignature, purchaseIds };
+        return purchaseIds;
       };
 
-      if (selectedTrustPaymentGateway === true) {
-        // Convert the cart rows into a pending order before Razorpay opens, so a
-        // dropped/closed checkout still leaves a traceable pending order in the DB.
-        await runPurchaseRequests('order_payment_pending');
+      // The app never marks an order paid; only the server does, after Razorpay confirms.
+      const purchaseIds = await savePendingOrder();
 
+      if (selectedTrustPaymentGateway === true) {
         try {
-          await openRazorpayCheckout({
-            amountInRupees: summary.totalAmount,
-            receipt: `order_${trustId}_${Date.now()}`,
+          const result = await openRazorpayCheckout({
+            trustId,
+            purchaseIds,
             name: trustName,
             description: `Order payment for ${trustName}`,
             prefill: {
@@ -555,17 +576,22 @@ function CreateOrder() {
               email: customerInfo.email || form.email,
               contact: customerInfo.mobile || form.mobile,
             },
-            notes: { trust_id: trustId, member_id: memberId },
+            themeColor: theme.primary,
           });
+          setPaymentOutcome(result.status);
         } catch (paymentError) {
-          setError(paymentError?.message || 'Payment was not completed. Please try again.');
+          setError(
+            paymentError?.code === 'PAYMENT_CANCELLED'
+              ? 'Payment was cancelled. Your order is saved — tap Pay now to try again.'
+              : paymentError?.message || 'Payment was not completed. Please try again.'
+          );
           return;
         }
-
-        await runPurchaseRequests('order_payment_done');
       } else {
-        await runPurchaseRequests('order_payment_pending');
+        setPaymentOutcome('pending_offline');
       }
+
+      pendingOrderRef.current = { signature: '', purchaseIds: [] };
 
       try {
         await clearCartItems(trustId, { sync: false });
@@ -642,7 +668,7 @@ function CreateOrder() {
                   {trustName}
                 </h2>
                 <p className="text-[11px] font-bold uppercase tracking-[0.24em]" style={{ color: theme.primary }}>
-                  Order confirmed
+                  {paymentOutcome === 'paid' || paymentOutcome === 'processing' || paymentOutcome === 'paid_needs_attention' ? 'Payment received' : 'Order confirmed'}
                 </p>
               </div>
             </div>
@@ -653,7 +679,10 @@ function CreateOrder() {
           <p className="mt-4 text-sm leading-6" style={{ color: theme.secondary }}>
             Thank You for shopping from us.
             <br />
-            {trustName} team will contact you within 24 hours.
+            {paymentOutcome === 'paid' && 'Payment received. Your order is confirmed.'}
+            {paymentOutcome === 'processing' && 'Payment received, confirming your order. It will show in Order History shortly.'}
+            {paymentOutcome === 'paid_needs_attention' && `Payment received. The ${trustName} team will activate your order shortly.`}
+            {(!paymentOutcome || paymentOutcome === 'pending_offline') && `${trustName} team will contact you within 24 hours.`}
           </p>
           <button
             type="button"

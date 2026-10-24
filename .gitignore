@@ -9,3 +9,6 @@ backend/node_modules/
 app_logcat.txt
 full_app_log*.txt
 setu_*.png
+
+android/setu-release.jks
+android/keystore.properties

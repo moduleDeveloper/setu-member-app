@@ -18,7 +18,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import galleryRoutes from './routes/galleryRoutes.js';
 import familyRoutes from './routes/familyRoutes.js';
 import orderHistoryRoutes from './routes/orderHistoryRoutes.js';
-import paymentRoutes from './routes/paymentRoutes.js';
+import paymentRoutes, { razorpayWebhookHandler } from './routes/paymentRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
 import { initGeoIp } from './services/geoIpService.js';
 import { initFirebaseAdmin } from './config/firebaseAdmin.js';
@@ -73,7 +73,11 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-  app.use(express.json());
+// Razorpay webhook needs the raw body for signature verification, so it is
+// mounted before express.json().
+app.post('/api/payments/webhook', express.raw({ type: '*/*', limit: '1mb' }), razorpayWebhookHandler);
+
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from public directory

@@ -14,6 +14,8 @@ import {
   loadOrderHistorySnapshot,
   resolveOrderHistoryTrustScope,
 } from './services/orderHistoryService';
+import { openRazorpayCheckout } from './services/paymentService';
+import { supabase } from './services/supabaseClient';
 import {
   ORDER_HISTORY_UNKNOWN_TRUST_KEY,
   ORDER_HISTORY_UNKNOWN_TRUST_LABEL,
@@ -92,9 +94,66 @@ export function OrderHistoryContent({ variant = 'page' } = {}) {
   const [selectedTrustKey, setSelectedTrustKey] = useState('');
   const [visibleCount, setVisibleCount] = useState(ORDER_HISTORY_PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [gatewayTrustIds, setGatewayTrustIds] = useState([]);
+  const [payingOrderId, setPayingOrderId] = useState('');
+  const [payMessage, setPayMessage] = useState('');
   const sentinelRef = useRef(null);
   const loadMoreFrameRef = useRef(null);
   const loadMoreTimeoutRef = useRef(null);
+
+  // Only trusts with the payment gateway on get a "Pay now" button on pending orders.
+  const pendingTrustKey = useMemo(() => (
+    [...new Set(orders.filter((order) => order.statusGroup === 'pending' && order.trustId).map((order) => order.trustId))].sort().join(',')
+  ), [orders]);
+
+  useEffect(() => {
+    if (!pendingTrustKey) {
+      setGatewayTrustIds([]);
+      return undefined;
+    }
+    let active = true;
+    supabase
+      .from('Trust')
+      .select('id, payment_gateway')
+      .in('id', pendingTrustKey.split(','))
+      .then(({ data }) => {
+        if (active) setGatewayTrustIds((data || []).filter((row) => row.payment_gateway).map((row) => row.id));
+      })
+      .catch(() => {
+        if (active) setGatewayTrustIds([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [pendingTrustKey]);
+
+  const handlePayPending = async (order) => {
+    setPayingOrderId(order.id);
+    setPayMessage('');
+    try {
+      const result = await openRazorpayCheckout({
+        trustId: order.trustId,
+        purchaseIds: [order.purchaseId],
+        name: order.trustName || order.trustLabel,
+        description: 'Order payment',
+        themeColor: theme.primary,
+      });
+      setPayMessage(
+        result.status === 'paid'
+          ? 'Payment received. Your order is confirmed.'
+          : 'Payment received, confirming your order. It will update here shortly.'
+      );
+      window.dispatchEvent(new Event('trust-changed'));
+    } catch (error) {
+      setPayMessage(
+        error?.code === 'PAYMENT_CANCELLED'
+          ? 'Payment was cancelled. Tap Pay now to try again.'
+          : error?.message || 'Payment was not completed. Please try again.'
+      );
+    } finally {
+      setPayingOrderId('');
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -531,6 +590,9 @@ export function OrderHistoryContent({ variant = 'page' } = {}) {
             </div>
           ) : (
             <div className="order-history-list">
+              {payMessage ? (
+                <p className="text-sm font-semibold" style={{ color: T.text }} role="status">{payMessage}</p>
+              ) : null}
               {visibleOrders.map((order) => {
                 const previewChips = order.items.slice(0, 3);
                 const remainingCount = Math.max(0, order.items.length - previewChips.length);
@@ -586,6 +648,16 @@ export function OrderHistoryContent({ variant = 'page' } = {}) {
                         <strong className="order-history-meta-value">{order.deliveryEta || order.trackingStage || 'In progress'}</strong>
                       </div>
                     </div>
+                    {order.statusGroup === 'pending' && order.purchaseId && gatewayTrustIds.includes(order.trustId) ? (
+                      <button
+                        type="button"
+                        className="order-history-secondary-btn"
+                        disabled={Boolean(payingOrderId)}
+                        onClick={() => handlePayPending(order)}
+                      >
+                        {payingOrderId === order.id ? 'Opening payment...' : 'Pay now'}
+                      </button>
+                    ) : null}
                   </article>
                 );
               })}

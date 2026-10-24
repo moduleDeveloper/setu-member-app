@@ -1,0 +1,260 @@
+import test, { after, before } from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import process from 'node:process';
+import { Buffer } from 'node:buffer';
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+
+const require = createRequire(new URL('../backend/package.json', import.meta.url));
+const express = (await import(pathToFileURL(require.resolve('express')))).default;
+const jwt = (await import(pathToFileURL(require.resolve('jsonwebtoken')))).default;
+const trustId = '11111111-1111-4111-8111-111111111111';
+const memberId = '22222222-2222-4222-8222-222222222222';
+const ids = ['33333333-3333-4333-8333-333333333333', '44444444-4444-4444-8444-444444444444'];
+let tables, serial, orders, activationCount, failActivation, failInvoice;
+const database = {
+  from(table) {
+    let action = 'select', values, single = false, filters = [], sort, limit;
+    const builder = {
+      select() { return this; },
+      insert(value) { action = 'insert'; values = value; return this; },
+      update(value) { action = 'update'; values = value; return this; },
+      eq(key, value) { filters.push((row) => row[key] === value); return this; },
+      neq(key, value) { filters.push((row) => row[key] !== value); return this; },
+      in(key, list) { filters.push((row) => list.includes(row[key])); return this; },
+      not(key, op, value) { filters.push((row) => row[key] !== value); return this; },
+      or(expression) {
+        filters.push((row) => expression.split(',').some((part) => {
+          const [key, , value] = part.split('.'); return row[key] === value;
+        })); return this;
+      },
+      order(key) { sort = key; return this; },
+      limit(value) { limit = value; return this; },
+      maybeSingle() { single = true; return this; },
+      single() { single = true; return this; },
+      then(resolve, reject) {
+        try {
+          const source = tables[table] ||= [];
+          let selected = source.filter((row) => filters.every((filter) => filter(row)));
+          if (sort) selected.sort((a, b) => String(b[sort]).localeCompare(String(a[sort])));
+          if (limit) selected = selected.slice(0, limit);
+          if (action === 'insert') {
+            selected = [{ id: `row-${++serial}`, ...structuredClone(values) }];
+            source.push(...selected);
+          } else if (action === 'update') {
+            if ((table === 'product_payments' && values.status === 'success' && failActivation)
+                || (table === 'product_invoices' && values.status === 'paid' && failInvoice)) {
+              return resolve({ data: null, error: { message: 'SUBSCRIPTION_CONFIG_NOT_FOUND' } });
+            }
+            for (const row of selected) {
+              if (table === 'product_payments' && values.status === 'success' && row.status === 'pending') activationCount++;
+              Object.assign(row, structuredClone(values));
+            }
+          }
+          resolve({ data: structuredClone(single ? selected[0] || null : selected), error: null });
+        } catch (error) { reject(error); }
+      },
+    };
+    return builder;
+  },
+};
+class Razorpay {
+  orders = { create: async (payload) => {
+    const order = { ...payload, id: `order_${orders.length + 1}` };
+    orders.push(order); return order;
+  } };
+  payments = {
+    fetch: async (id) => ({ id, order_id: orders.at(-1).id, amount: orders.at(-1).amount, status: 'authorized', method: 'upi' }),
+    capture: async (id, amount) => ({ id, amount, order_id: orders.at(-1).id, status: 'captured', method: 'upi' }),
+  };
+}
+globalThis.__rzpTest = { database, Razorpay, express, jwt };
+const load = (source) => import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+let source = await readFile(new URL('../backend/services/razorpayRouteService.js', import.meta.url), 'utf8');
+source = source.replace("import Razorpay from 'razorpay';", 'const { Razorpay } = globalThis.__rzpTest;')
+  .replace("import { paymentSupabase } from '../config/supabase.js';", 'const paymentSupabase = globalThis.__rzpTest.database;');
+const service = await load(source);
+globalThis.__rzpTest.service = service;
+source = await readFile(new URL('../backend/middleware/memberAuth.js', import.meta.url), 'utf8');
+source = source.replace("import jwt from 'jsonwebtoken';", 'const { jwt } = globalThis.__rzpTest;')
+  .replace("import { supabase } from '../config/supabase.js';", 'const supabase = globalThis.__rzpTest.database;');
+globalThis.__rzpTest.auth = await load(source);
+source = await readFile(new URL('../backend/routes/paymentRoutes.js', import.meta.url), 'utf8');
+source = source.replace("import express from 'express';", 'const { express } = globalThis.__rzpTest;')
+  .replace("import { requireMemberSession, memberBelongsToSession } from '../middleware/memberAuth.js';", 'const { requireMemberSession, memberBelongsToSession } = globalThis.__rzpTest.auth;')
+  .replace("import { supabase } from '../config/supabase.js';", 'const supabase = globalThis.__rzpTest.database;')
+  .replace(/import \{([\s\S]*?)\} from '..\/services\/razorpayRouteService.js';/, 'const {$1} = globalThis.__rzpTest.service;');
+const routes = await load(source);
+let server, url;
+const envKeys = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET', 'SETU_SESSION_SECRET'];
+const savedEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+before(async () => {
+  Object.assign(process.env, { RAZORPAY_KEY_ID: 'rzp_test_mock', RAZORPAY_KEY_SECRET: 'test-key',
+    RAZORPAY_WEBHOOK_SECRET: 'test-webhook', SETU_SESSION_SECRET: 'test-session' });
+  const app = express();
+  app.post('/api/payments/webhook', express.raw({ type: '*/*' }), routes.razorpayWebhookHandler);
+  app.use(express.json()); app.use('/api/payments', routes.default);
+  server = await new Promise((resolve) => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
+  url = `http://127.0.0.1:${server.address().port}/api/payments`;
+});
+after(async () => {
+  await new Promise((resolve) => server.close(resolve));
+  for (const key of envKeys) {
+    if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key];
+  }
+  delete globalThis.__rzpTest;
+});
+const reset = (route = true, count = 1) => {
+  serial = 0; orders = []; activationCount = 0; failActivation = false; failInvoice = false;
+  tables = {
+    Trust: [{ id: trustId, name: 'Setu AI', payment_gateway: true, razorpay_route: route }],
+    trust_bank_details: [{ trust_id: trustId, razorpay_id: 'acc_test', vendor_share: 98, updated_at: '2026-10-24' }],
+    product_purchases: ids.slice(0, count).map((id, i) => ({ id, member_id: memberId, trust_id: trustId,
+      type: 'order', status: 'order_payment_pending', quantity: i ? 1 : 2,
+      product_price: { mrp: 100, price_after_discount: 80, gst_pct: 5, gst_amount: 4,
+        transport_fee: 1, total_payable: 85.01, product_catalog: { product_name: i ? 'Yearly Subscription' : 'Product' } },
+    })), product_invoices: [], product_payments: [], Members: [],
+  };
+};
+const token = () => jwt.sign({ purpose: 'setu_member_session', memberId, phone: '9999999999' }, process.env.SETU_SESSION_SECRET);
+const post = async (path, body, auth = true) => {
+  const response = await fetch(url + path, { method: 'POST', headers: { 'Content-Type': 'application/json',
+    ...(auth ? { Authorization: `Bearer ${token()}` } : {}) }, body: JSON.stringify(body) });
+  return { status: response.status, body: await response.json() };
+};
+const checkout = () => post('/create-order', { trust_id: trustId, purchase_ids: tables.product_purchases.map((row) => row.id) });
+const captured = (order) => ({ id: 'pay_test', order_id: order.order_id, amount: order.amount, method: 'upi', status: 'captured' });
+const webhook = async (event, entity, eventId = 'event1', valid = true) => {
+  const body = JSON.stringify({ event, payload: { [event.startsWith('transfer.') ? 'transfer' : 'payment']: { entity } } });
+  const signature = crypto.createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET).update(body).digest('hex');
+  return fetch(url + '/webhook', { method: 'POST', body, headers: { 'Content-Type': 'application/json',
+    'x-razorpay-signature': valid ? signature : '00', 'x-razorpay-event-id': eventId } });
+};
+
+test('1: UPI capture records paid invoice and 98% Route transfer', async () => {
+  reset(); const { body } = await checkout();
+  assert.equal((await webhook('payment.captured', captured(body))).status, 200);
+  const row = tables.product_payments[0];
+  assert.equal(row.status, 'success'); assert.equal(row.payment_mode, 'upi');
+  assert.equal(row.transaction_id, 'pay_test'); assert.equal(tables.product_invoices[0].status, 'paid');
+  assert.match(tables.product_invoices[0].invoice_number, /^RZP-\d{6}-[a-f0-9]{8}$/);
+  assert.equal(orders[0].transfers[0].amount, Math.floor(body.amount * .98));
+  assert.equal((await webhook('transfer.processed', { id: 'trf_test', source: 'pay_test' }, 'transfer1')).status, 200);
+  assert.equal(row.transfer_status, 'processed'); assert.equal(row.gateway_transfer_id, 'trf_test');
+});
+test('2: mixed cart uses one order and shared transaction across invoice rows', async () => {
+  reset(true, 2); const { body } = await checkout();
+  assert.equal(body.amount, 8501 * 3); assert.equal(orders.length, 1);
+  await webhook('payment.captured', captured(body));
+  assert.equal(tables.product_invoices.length, 2); assert.equal(activationCount, 2);
+  assert.ok(tables.product_payments.every((row) => row.transaction_id === 'pay_test' && row.gateway_order_id === body.order_id));
+});
+test('3: client amount is ignored and unit paise are rounded before quantity', async () => {
+  reset(); tables.product_purchases[0].product_price.total_payable = 85.005;
+  const { body } = await post('/create-order', { trust_id: trustId, purchase_ids: [ids[0]], amount: 1, price: .01 });
+  assert.equal(body.amount, Math.round(85.005 * 100) * 2);
+});
+test('4: checkout retry supersedes pending rows; same-order recording is retry safe', async () => {
+  reset(); const first = await checkout(); const second = await checkout();
+  assert.equal(tables.product_payments[0].status, 'failed');
+  assert.equal(tables.product_payments[0].gateway_payload.superseded_by, second.body.order_id);
+  const quote = await service.quoteCheckout({ trustId, purchaseIds: [ids[0]] });
+  await service.recordPendingOrder({ quote, order: orders[1] });
+  assert.equal(tables.product_payments.length, 2); assert.equal(tables.product_invoices.length, 1);
+  assert.equal(tables.product_purchases.length, 1); assert.notEqual(first.body.order_id, second.body.order_id);
+});
+test('5: signed webhook settles without calling verify-payment', async () => {
+  reset(); const { body } = await checkout();
+  await webhook('order.paid', captured(body)); assert.equal(activationCount, 1);
+  assert.equal(tables.product_payments[0].status, 'success');
+});
+test('6: duplicate capture and non-capture events are harmless', async () => {
+  reset(); const { body } = await checkout();
+  await webhook('payment.failed', { ...captured(body), error_code: 'BAD_REQUEST_ERROR' }, 'failure1');
+  assert.equal(tables.product_payments[0].status, 'pending');
+  const snapshot = structuredClone(tables.product_payments);
+  await webhook('payment.failed', { ...captured(body), error_code: 'changed' }, 'failure1');
+  assert.deepEqual(tables.product_payments, snapshot);
+  await webhook('payment.captured', captured(body));
+  assert.equal((await webhook('payment.captured', captured(body))).status, 200);
+  assert.equal(activationCount, 1);
+});
+test('7: wrong webhook/checkout signatures return 400; valid verify fetches and captures', async () => {
+  reset(); const { body } = await checkout();
+  assert.equal((await webhook('payment.captured', captured(body), 'bad', false)).status, 400);
+  const request = { razorpay_order_id: body.order_id, razorpay_payment_id: 'pay_test', razorpay_signature: '00' };
+  assert.equal((await post('/verify-payment', request)).status, 400);
+  request.razorpay_signature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .update(`${body.order_id}|pay_test`).digest('hex');
+  assert.equal((await post('/verify-payment', request)).body.status, 'paid');
+});
+test('8: missing session returns 401; another member returns 403 before gateway call', async () => {
+  reset(); const request = { trust_id: trustId, purchase_ids: [ids[0]] };
+  assert.equal((await post('/create-order', request, false)).status, 401);
+  tables.product_purchases[0].member_id = ids[1];
+  assert.equal((await post('/create-order', request)).status, 403); assert.equal(orders.length, 0);
+});
+test('9: Route disabled creates no transfer and leaves transfer_status null', async () => {
+  reset(false); const { body } = await checkout();
+  assert.equal(orders[0].transfers, undefined); assert.equal(tables.product_payments[0].transfer_status, null);
+  await webhook('payment.captured', captured(body)); assert.equal(tables.product_payments[0].transfer_status, null);
+});
+test('permanent errors return 200, transient errors 500, activation errors stay pending', async () => {
+  reset(); const { body } = await checkout();
+  assert.equal((await webhook('payment.captured', { ...captured(body), order_id: 'order_unknown' })).status, 200);
+  assert.equal((await webhook('payment.captured', { ...captured(body), amount: 1 })).status, 200);
+  failActivation = true;
+  await webhook('payment.captured', captured(body));
+  assert.equal(tables.product_payments[0].status, 'pending');
+  assert.equal(tables.product_payments[0].gateway_payload.activation_error, 'SUBSCRIPTION_CONFIG_NOT_FOUND');
+  assert.equal(tables.product_payments[0].gateway_payload.captured_payment_id, 'pay_test');
+  failActivation = false; failInvoice = true;
+  assert.equal((await webhook('payment.captured', captured(body))).status, 500);
+  failInvoice = false;
+  assert.equal((await webhook('payment.captured', captured(body))).status, 200);
+  assert.equal(tables.product_invoices[0].status, 'paid');
+});
+test('quote rejects disabled gateway, unavailable items, mixed members and invalid Route configuration', async () => {
+  const quote = () => service.quoteCheckout({ trustId, purchaseIds: tables.product_purchases.map((row) => row.id) });
+  reset(); tables.Trust[0].payment_gateway = false;
+  await assert.rejects(quote, { code: 'PAYMENT_GATEWAY_DISABLED' });
+  reset(); tables.product_purchases[0].status = 'order_payment_done';
+  await assert.rejects(quote, { code: 'PURCHASES_NOT_PAYABLE' });
+  reset(true, 2); tables.product_purchases[1].member_id = ids[1];
+  await assert.rejects(quote, { code: 'PURCHASES_BELONG_TO_MULTIPLE_MEMBERS' });
+  reset(); tables.trust_bank_details[0].vendor_share = 0;
+  await assert.rejects(quote, { code: 'VENDOR_SHARE_NOT_CONFIGURED' });
+  reset(); tables.trust_bank_details[0].razorpay_id = 'invalid';
+  await assert.rejects(quote, { code: 'LINKED_ACCOUNT_INVALID' });
+  reset(); tables.product_purchases[0].product_price.total_payable = .01;
+  await assert.rejects(quote, { code: 'AMOUNT_TOO_SMALL' });
+});
+
+test('client checkout dismissal returns PAYMENT_CANCELLED and retains pending purchases', async () => {
+  reset();
+  const savedWindow = globalThis.window;
+  const savedStorage = globalThis.localStorage;
+  globalThis.__rzpTest.api = {
+    post: async (path, body) => ({ data: (await post(path.replace('/payments', ''), body)).body }),
+  };
+  globalThis.localStorage = { getItem: () => token() };
+  globalThis.window = { Razorpay: class {
+    constructor(options) { this.options = options; }
+    open() { this.options.modal.ondismiss(); }
+  } };
+  try {
+    const clientSource = (await readFile(new URL('../src/services/paymentService.js', import.meta.url), 'utf8'))
+      .replace("import { api } from './api';", 'const { api } = globalThis.__rzpTest;');
+    const client = await load(clientSource);
+    await assert.rejects(() => client.openRazorpayCheckout({ trustId, purchaseIds: [ids[0]] }), { code: 'PAYMENT_CANCELLED' });
+    assert.equal(tables.product_purchases.length, 1);
+    assert.equal(tables.product_purchases[0].status, 'order_payment_pending');
+    assert.equal(tables.product_payments[0].status, 'pending');
+  } finally {
+    if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
+    if (savedStorage === undefined) delete globalThis.localStorage; else globalThis.localStorage = savedStorage;
+    delete globalThis.__rzpTest.api;
+  }
+});

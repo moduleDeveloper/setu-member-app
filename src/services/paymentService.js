@@ -1,7 +1,9 @@
 import { api } from './api';
 
 const RAZORPAY_CHECKOUT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
-const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
+const SESSION_TOKEN_KEY = 'setu_session_token';
+const STATUS_POLL_ATTEMPTS = 6;
+const STATUS_POLL_INTERVAL_MS = 2500;
 
 let razorpayScriptPromise = null;
 
@@ -13,10 +15,15 @@ export const loadRazorpayScript = () => {
   if (razorpayScriptPromise) return razorpayScriptPromise;
 
   razorpayScriptPromise = new Promise((resolve, reject) => {
+    const fail = () => {
+      razorpayScriptPromise = null;
+      reject(new Error('Failed to load Razorpay checkout script.'));
+    };
+
     const existing = document.querySelector(`script[src="${RAZORPAY_CHECKOUT_SRC}"]`);
     if (existing) {
       existing.addEventListener('load', () => resolve(true));
-      existing.addEventListener('error', () => reject(new Error('Failed to load Razorpay checkout script.')));
+      existing.addEventListener('error', fail);
       return;
     }
 
@@ -24,86 +31,148 @@ export const loadRazorpayScript = () => {
     script.src = RAZORPAY_CHECKOUT_SRC;
     script.async = true;
     script.onload = () => resolve(true);
-    script.onerror = () => reject(new Error('Failed to load Razorpay checkout script.'));
+    script.onerror = fail;
     document.body.appendChild(script);
   });
 
   return razorpayScriptPromise;
 };
 
-export const createRazorpayOrder = async ({ amount, currency = 'INR', receipt }) => {
-  const response = await api.post('/payments/create-order', { amount, currency, receipt });
-  if (!response?.data?.success) {
-    throw new Error(response?.data?.message || 'Failed to create payment order.');
+const authConfig = () => {
+  let token = '';
+  try {
+    token = localStorage.getItem(SESSION_TOKEN_KEY) || '';
+  } catch {
+    token = '';
   }
-  return response.data;
+  if (!token) {
+    throw new Error('Your session has expired. Please sign in again to pay.');
+  }
+  return { headers: { Authorization: `Bearer ${token}` } };
+};
+
+const toUserError = (error, fallback) => {
+  const message = error?.response?.data?.message;
+  if (message) return new Error(message);
+  return error instanceof Error && error.message && !error.response ? error : new Error(fallback);
+};
+
+export const createPaymentOrder = async ({ trustId, purchaseIds }) => {
+  try {
+    const response = await api.post(
+      '/payments/create-order',
+      { trust_id: trustId, purchase_ids: purchaseIds },
+      authConfig()
+    );
+    if (!response?.data?.success) {
+      throw new Error(response?.data?.message || 'Failed to create payment order.');
+    }
+    return response.data;
+  } catch (error) {
+    throw toUserError(error, 'Failed to create payment order.');
+  }
 };
 
 export const verifyRazorpayPayment = async ({ razorpay_order_id, razorpay_payment_id, razorpay_signature }) => {
-  const response = await api.post('/payments/verify-payment', {
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature,
-  });
-  if (!response?.data?.success || !response?.data?.verified) {
-    throw new Error(response?.data?.message || 'Payment verification failed.');
+  try {
+    const response = await api.post(
+      '/payments/verify-payment',
+      { razorpay_order_id, razorpay_payment_id, razorpay_signature },
+      authConfig()
+    );
+    if (!response?.data?.success || !response?.data?.verified) {
+      throw new Error(response?.data?.message || 'Payment verification failed.');
+    }
+    return response.data;
+  } catch (error) {
+    throw toUserError(error, 'Payment verification failed.');
   }
-  return response.data;
+};
+
+export const getPaymentOrderStatus = async (orderId) => {
+  try {
+    const response = await api.get(`/payments/order-status/${encodeURIComponent(orderId)}`, authConfig());
+    return response.data;
+  } catch (error) {
+    throw toUserError(error, 'Unable to check payment status.');
+  }
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Polls until the order leaves "processing" (or attempts run out).
+const pollOrderStatus = async (orderId, attempts) => {
+  let status = 'processing';
+  for (let i = 0; i < attempts; i += 1) {
+    await sleep(STATUS_POLL_INTERVAL_MS);
+    try {
+      const result = await getPaymentOrderStatus(orderId);
+      status = result?.status || status;
+      if (status !== 'processing') break;
+    } catch {
+      // Keep polling; the webhook may still settle the order.
+    }
+  }
+  return status;
 };
 
 /**
- * Opens Razorpay Standard Checkout for the given rupee amount.
- * Resolves with { razorpay_order_id, razorpay_payment_id, razorpay_signature, verification }
- * only after the backend has verified the payment signature.
+ * Creates a server-priced order for the given pending purchases and opens
+ * Razorpay Checkout. Resolves { status, orderId, paymentId } where status is
+ * 'paid' | 'processing' | 'paid_needs_attention'. Rejects with code
+ * 'PAYMENT_CANCELLED' if the user closes the modal.
  */
 export const openRazorpayCheckout = async ({
-  amountInRupees,
-  receipt,
+  trustId,
+  purchaseIds,
   name,
   description,
   prefill = {},
-  notes = {},
+  themeColor = '#0f766e',
 }) => {
-  if (!RAZORPAY_KEY_ID) {
-    throw new Error('Payment gateway is not configured (missing Razorpay key).');
-  }
-
-  const amountInPaise = Math.round(Number(amountInRupees) * 100);
-  if (!Number.isFinite(amountInPaise) || amountInPaise < 100) {
-    throw new Error('Order amount must be at least ₹1.');
-  }
-
   await loadRazorpayScript();
-  const order = await createRazorpayOrder({ amount: amountInPaise, receipt });
+  const order = await createPaymentOrder({ trustId, purchaseIds });
 
   return new Promise((resolve, reject) => {
     const checkout = new window.Razorpay({
-      key: RAZORPAY_KEY_ID,
+      key: order.key_id,
       amount: order.amount,
       currency: order.currency,
+      order_id: order.order_id,
       name,
       description,
-      order_id: order.order_id,
       prefill,
-      notes,
-      theme: { color: '#0f766e' },
+      theme: { color: themeColor },
+      retry: { enabled: true, max_count: 3 },
       handler: async (response) => {
+        const paymentId = response?.razorpay_payment_id;
         try {
           const verification = await verifyRazorpayPayment(response);
-          resolve({ ...response, verification });
+          let status = verification.status;
+          if (status === 'processing') {
+            status = await pollOrderStatus(order.order_id, STATUS_POLL_ATTEMPTS);
+          }
+          resolve({ status, orderId: order.order_id, paymentId });
         } catch (verifyError) {
-          reject(verifyError);
+          // Money may have moved even though verify failed; ask the server before giving up.
+          const status = await pollOrderStatus(order.order_id, 3);
+          if (status === 'paid' || status === 'processing') {
+            resolve({ status, orderId: order.order_id, paymentId });
+          } else {
+            reject(verifyError);
+          }
         }
       },
       modal: {
-        ondismiss: () => reject(new Error('Payment cancelled.')),
+        ondismiss: () => {
+          const cancelled = new Error('Payment cancelled.');
+          cancelled.code = 'PAYMENT_CANCELLED';
+          reject(cancelled);
+        },
       },
     });
 
-    checkout.on('payment.failed', (response) => {
-      reject(new Error(response?.error?.description || 'Payment failed. Please try again.'));
-    });
-
+    // No reject on 'payment.failed': with retry enabled the user can try again in the same modal.
     checkout.open();
   });
 };

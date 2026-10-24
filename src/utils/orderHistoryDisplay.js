@@ -212,6 +212,7 @@ export const normalizeOrderRecord = (order, index) => {
 
   return {
     id,
+    purchaseId: normalizeText(order.purchase_id || order.id),
     createdAt: createdAtRaw,
     createdAtTs: Number.isNaN(createdAtTs) ? 0 : createdAtTs,
     createdAtLabel: formatOrderDate(createdAtRaw),
