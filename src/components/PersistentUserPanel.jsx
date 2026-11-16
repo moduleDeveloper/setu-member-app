@@ -276,6 +276,28 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
 
   const iframeSrc = useUserPanelSrc(mounted && !skipIframe, iframeVersion);
 
+  // While the App Manager is on screen, lock the outer page so only the iframe
+  // scrolls (avoids nested/double scrolling and iOS scroll chaining into <body>).
+  const lockScroll = mounted && isActive && !skipIframe;
+  useEffect(() => {
+    if (!lockScroll) return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehavior = prev.bodyOverscroll;
+    };
+  }, [lockScroll]);
+
   if (skipIframe) return null;
 
   if (!mounted) return null;
@@ -290,7 +312,14 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
         margin: '0 auto',
         width: 'min(100%, 430px)',
         maxWidth: '430px',
-        height: '100vh',
+        // iOS: 100vh is the *largest* viewport (toolbars hidden), so the bottom
+        // part sits off-screen / leaves a blank area. 100dvh tracks the visible
+        // viewport as Safari's bars show/hide. Browsers without dvh (iOS < 15.4)
+        // drop this value and `inset: 0` on the fixed box already fills the screen.
+        height: '100dvh',
+        minHeight: 0,
+        overflow: 'hidden',
+        overscrollBehavior: 'none',
         background: 'var(--page-bg, var(--app-page-bg))',
         display: isActive ? 'flex' : 'none',
       }}
@@ -302,6 +331,7 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
           backdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
           WebkitBackdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
           borderBottom: '1px solid var(--navbar-border)',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
         }}
       >
         <div className="h-[3px]" style={{ background: 'var(--navbar-accent)' }} />
@@ -328,9 +358,10 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
           src={iframeSrc}
           allow="clipboard-write; web-share"
           className="flex-1 w-full border-0"
+          style={{ minHeight: 0, display: 'block' }}
         />
       ) : (
-        <div className="flex-1" />
+        <div className="flex-1" style={{ minHeight: 0 }} />
       )}
 
       <BottomNav onNavigate={onNavigate} />
