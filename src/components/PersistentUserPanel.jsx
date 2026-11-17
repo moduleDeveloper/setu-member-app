@@ -10,8 +10,11 @@ import { getNavbarThemeStyles } from '../utils/themeUtils';
 import { getUserPanelToken } from '../services/authService';
 import BottomNav from './BottomNav';
 
-const USER_PANEL_LOGIN_URL = 'https://user-test.teiltd.in/auth/login';
-const USER_PANEL_SSO_URL = 'https://user-test.teiltd.in/auth/app-sso';
+// Set VITE_USER_PANEL_URL per environment (develop: https://user-test.teiltd.in,
+// live: https://user.teiltd.in). Falls back to the test panel if unset.
+const USER_PANEL_BASE_URL = (import.meta.env.VITE_USER_PANEL_URL || 'https://user-test.teiltd.in').replace(/\/+$/, '');
+const USER_PANEL_LOGIN_URL = `${USER_PANEL_BASE_URL}/auth/login`;
+const USER_PANEL_SSO_URL = `${USER_PANEL_BASE_URL}/auth/app-sso`;
 const USER_PANEL_ORIGIN = new URL(USER_PANEL_LOGIN_URL).origin;
 
 // The bypass token lives only 60s, so this must be called right before the
