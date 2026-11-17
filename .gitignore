@@ -4,7 +4,6 @@ dist-capacitor/
 .env
 backend/.env
 android
-android/
 ios/
 
 backend/node_modules/
@@ -22,4 +21,3 @@ android.7z
 android1111/
 ios 2nov/
 ios/ 
-android/
