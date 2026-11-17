@@ -1,5 +1,5 @@
 import { track } from '../services/analytics';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CornerUpLeft, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
@@ -11,8 +11,8 @@ import { getUserPanelToken } from '../services/authService';
 import BottomNav from './BottomNav';
 
 // Set VITE_USER_PANEL_URL per environment (develop: https://user-test.teiltd.in,
-// live: https://user.teiltd.in). Falls back to the test panel if unset.
-const USER_PANEL_BASE_URL = (import.meta.env.VITE_USER_PANEL_URL || 'https://user-test.teiltd.in').replace(/\/+$/, '');
+// live: https://user.teiltd.in). Falls back to live if unset.
+const USER_PANEL_BASE_URL = (import.meta.env.VITE_USER_PANEL_URL || 'https://user.teiltd.in').replace(/\/+$/, '');
 const USER_PANEL_LOGIN_URL = `${USER_PANEL_BASE_URL}/auth/login`;
 const USER_PANEL_SSO_URL = `${USER_PANEL_BASE_URL}/auth/app-sso`;
 const USER_PANEL_ORIGIN = new URL(USER_PANEL_LOGIN_URL).origin;
@@ -51,22 +51,20 @@ const readCurrentMemberId = () => {
 // `resetKey` changes, and clears it when disabled. Otherwise stays fixed so a
 // same-user panel is never reloaded.
 const useUserPanelSrc = (enabled, resetKey = 0) => {
-  const [src, setSrc] = useState(null);
+  // Store the resolved url together with the resetKey it was created for, so
+  // a stale url is never returned after a reset or when disabled.
+  const [resolved, setResolved] = useState({ key: null, url: null });
 
   useEffect(() => {
-    if (!enabled) {
-      setSrc(null);
-      return undefined;
-    }
+    if (!enabled) return undefined;
     let cancelled = false;
-    setSrc(null);
     createUserPanelUrl().then((url) => {
-      if (!cancelled) setSrc(url);
+      if (!cancelled) setResolved({ key: resetKey, url });
     });
     return () => { cancelled = true; };
   }, [enabled, resetKey]);
 
-  return src;
+  return enabled && resolved.key === resetKey ? resolved.url : null;
 };
 
 // Calls `onReset` when the SETU member logs out or changes (A -> B). Identity
@@ -77,7 +75,10 @@ const useSetuIdentityReset = (onReset) => {
   const currentMemberId = readCurrentMemberId();
   const previousMemberIdRef = useRef(currentMemberId);
   const onResetRef = useRef(onReset);
-  onResetRef.current = onReset;
+
+  useEffect(() => {
+    onResetRef.current = onReset;
+  });
 
   useEffect(() => {
     const onStorage = () => forceRender((v) => v + 1);
@@ -258,9 +259,8 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
   };
   useSetuIdentityReset(resetUserPanel);
 
-  useEffect(() => {
-    if (allowed && !mounted) setMounted(true);
-  }, [allowed, mounted]);
+  // Adjust state during render (React-recommended) instead of in an effect.
+  if (allowed && !mounted) setMounted(true);
 
   useEffect(() => {
     if (!skipIframe) return undefined;
@@ -279,6 +279,28 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
 
   const iframeSrc = useUserPanelSrc(mounted && !skipIframe, iframeVersion);
 
+  // While the App Manager is on screen, lock the outer page so only the iframe
+  // scrolls (avoids nested/double scrolling and iOS scroll chaining into <body>).
+  const lockScroll = mounted && isActive && !skipIframe;
+  useEffect(() => {
+    if (!lockScroll) return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehavior = prev.bodyOverscroll;
+    };
+  }, [lockScroll]);
+
   if (skipIframe) return null;
 
   if (!mounted) return null;
@@ -293,7 +315,14 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
         margin: '0 auto',
         width: 'min(100%, 430px)',
         maxWidth: '430px',
-        height: '100vh',
+        // iOS: 100vh is the *largest* viewport (toolbars hidden), so the bottom
+        // part sits off-screen / leaves a blank area. 100dvh tracks the visible
+        // viewport as Safari's bars show/hide. Browsers without dvh (iOS < 15.4)
+        // drop this value and `inset: 0` on the fixed box already fills the screen.
+        height: '100dvh',
+        minHeight: 0,
+        overflow: 'hidden',
+        overscrollBehavior: 'none',
         background: 'var(--page-bg, var(--app-page-bg))',
         display: isActive ? 'flex' : 'none',
       }}
@@ -305,6 +334,7 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
           backdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
           WebkitBackdropFilter: `blur(${navbarTheme?.blurPx || '12px'})`,
           borderBottom: '1px solid var(--navbar-border)',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
         }}
       >
         <div className="h-[3px]" style={{ background: 'var(--navbar-accent)' }} />
@@ -331,9 +361,10 @@ const PersistentUserPanel = ({ isActive, onNavigate }) => {
           src={iframeSrc}
           allow="clipboard-write; web-share"
           className="flex-1 w-full border-0"
+          style={{ minHeight: 0, display: 'block' }}
         />
       ) : (
-        <div className="flex-1" />
+        <div className="flex-1" style={{ minHeight: 0 }} />
       )}
 
       <BottomNav onNavigate={onNavigate} />

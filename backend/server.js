@@ -13,6 +13,7 @@ import reportRoutes from './routes/reportRoutes.js';
 import referralRoutes from './routes/referralRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import adminPaymentRoutes from './routes/adminPaymentRoutes.js';
 import sponsorRoutes from './routes/sponsorRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import galleryRoutes from './routes/galleryRoutes.js';
@@ -21,8 +22,6 @@ import orderHistoryRoutes from './routes/orderHistoryRoutes.js';
 import paymentRoutes, { razorpayWebhookHandler } from './routes/paymentRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
 import { initGeoIp } from './services/geoIpService.js';
-import { initFirebaseAdmin } from './config/firebaseAdmin.js';
-import { startNotificationPushWorker } from './services/notificationPushWorker.js';
 
 // ES module fix for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -147,6 +146,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/gallery', galleryRoutes); // Gallery routes
 app.use('/api/order-history', orderHistoryRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/admin/payments', adminPaymentRoutes); // Admin-only, before the generic admin router
 app.use('/api/admin', adminRoutes); // Admin routes
 app.use('/api/client-location', locationRoutes); // Local GeoIP lookup
 app.use('/api', memberRoutes); // Member routes last to avoid catching other routes
@@ -167,6 +167,4 @@ app.listen(PORT, () => {
 });
   
 
-initFirebaseAdmin();
-startNotificationPushWorker();
 initGeoIp();

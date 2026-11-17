@@ -50,6 +50,7 @@ import PrivacyPolicy from './PrivacyPolicy';
 import Gallery from './Gallery';
 import OtherMemberships from './OtherMemberships';
 import AdminUserProfiles from './admin/AdminUserProfiles';
+import AdminPayments from './admin/AdminPayments';
 import ContactUs from './ContactUs';
 import MyFamily from './MyFamily';
 import NominationDetails from './NominationDetails';
@@ -60,10 +61,10 @@ import PageTrackingListener from './components/PageTrackingListener';
 import TenantLanding from './TenantLanding';
 import { useTenant, getTenantSlugFromPath } from './context/TenantContext';
 import { getCurrentNotificationContext, matchesNotificationForContext } from './services/notificationAudience';
-import { initPushNotifications } from './services/pushNotificationService';
 import { createUserNotification } from './services/api';
 import { syncTrustVersion } from './services/trustVersionService';
 import { logUserSessionEvent } from './services/sessionAuditService';
+import { initPushNotifications, unregisterPushToken } from './services/pushNotificationService';
 import { applyThemeCssVariables, scopeCustomCss } from './utils/themeUtils';
 import { clearLoginTermsPromptPending } from './utils/legalContent';
 import { colorToHex } from './utils/colorUtils';
@@ -425,9 +426,6 @@ const HospitalTrusteeApp = () => {
   const [connectionLost, setConnectionLost] = useState(isConnectionFailed());
   useEffect(() => subscribeConnectionStatus(setConnectionLost), []);
   const notificationLightColorRef = useRef('');
-  const pushInitCleanupRef = useRef(null);
-  const pushInitAttemptedRef = useRef(false);
-  const lastLoggedInStateRef = useRef(false);
 
   useLayoutEffect(() => {
     if (!resolvedThemeTrustId) return;
@@ -454,44 +452,6 @@ const HospitalTrusteeApp = () => {
   useAndroidKeyboard();
   useInAppUpdate();
 
-  useEffect(() => {
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    const wasLoggedIn = lastLoggedInStateRef.current;
-    lastLoggedInStateRef.current = isLoggedIn;
-
-    if (!isLoggedIn) {
-      if (wasLoggedIn && typeof pushInitCleanupRef.current === 'function') {
-        pushInitCleanupRef.current();
-        pushInitCleanupRef.current = null;
-      }
-      pushInitAttemptedRef.current = false;
-      return undefined;
-    }
-
-    if (pushInitAttemptedRef.current) return undefined;
-
-    pushInitAttemptedRef.current = true;
-    const setupPushNotifications = async () => {
-      try {
-        const cleanup = await initPushNotifications();
-        if (typeof cleanup === 'function') {
-          pushInitCleanupRef.current = cleanup;
-        }
-      } catch (error) {
-        console.warn('Push notification init skipped:', error?.message || error);
-      }
-    };
-
-    setupPushNotifications();
-  }, [location.pathname]);
-
-  useEffect(() => () => {
-    if (typeof pushInitCleanupRef.current === 'function') {
-      pushInitCleanupRef.current();
-      pushInitCleanupRef.current = null;
-    }
-  }, []);
-
   const clearAuthAndRedirectToLogin = async (reason = 'logout', explicitUser = null) => {
     let currentUser = explicitUser;
     if (!currentUser) {
@@ -502,10 +462,12 @@ const HospitalTrusteeApp = () => {
         currentUser = null;
       }
     }
+    // Stop pushes to this phone; the token is also stored on the logout row (offline safety net).
+    const pushToken = await unregisterPushToken();
     await logUserSessionEvent({
       user: currentUser,
       actionType: reason === 'autologout' ? 'autologout' : 'logout',
-      extra: { source: 'app-shell', reason }
+      extra: { source: 'app-shell', reason, ...(pushToken ? { fcm_token: pushToken } : {}) }
     });
     const resetTrust = resolveDefaultThemeTrust();
     localStorage.removeItem('isLoggedIn');
@@ -676,15 +638,33 @@ const HospitalTrusteeApp = () => {
     };
   }, [refreshTheme]);
 
+  // Register this phone for push once a user is logged in (also on app start while logged in).
+  // initPushNotifications is idempotent per user, so running on route changes is cheap.
+  useEffect(() => {
+    if (localStorage.getItem('isLoggedIn') !== 'true') return;
+    initPushNotifications();
+  }, [location.pathname]);
+
   // Push tap deep link fallback
   useEffect(() => {
     const shouldOpen = localStorage.getItem('openNotificationsFromPush');
     const isLoggedIn = localStorage.getItem('isLoggedIn');
     if (shouldOpen === '1' && isLoggedIn) {
       localStorage.removeItem('openNotificationsFromPush');
-      navigate('/notifications');
+      navigate('/');
     }
   }, [location.pathname, navigate]);
+
+  // Push tap arrives after the first render on a cold start, so the effect above has already run.
+  useEffect(() => {
+    const openFromPushTap = () => {
+      if (localStorage.getItem('isLoggedIn') !== 'true') return;
+      localStorage.removeItem('openNotificationsFromPush');
+      navigate('/');
+    };
+    window.addEventListener('pushNotificationClicked', openFromPushTap);
+    return () => window.removeEventListener('pushNotificationClicked', openFromPushTap);
+  }, [navigate]);
 
   // â”€â”€â”€ Birthday Notification Check (Direct Supabase) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
@@ -1661,6 +1641,14 @@ const HospitalTrusteeApp = () => {
           element={
             <ProtectedRoute>
               <AdminUserProfiles onNavigate={handleNavigate} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-payments"
+          element={
+            <ProtectedRoute>
+              <AdminPayments onNavigate={handleNavigate} />
             </ProtectedRoute>
           }
         />

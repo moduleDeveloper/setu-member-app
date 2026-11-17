@@ -109,6 +109,15 @@ html, body {
   overflow-x: hidden;
 }
 
+/* With overflow-x: hidden on both html and body, body becomes its own
+   scroll container in iOS WKWebView / Android WebView, which can swallow
+   vertical touch scrolling. clip avoids that where supported. */
+@supports (overflow: clip) {
+  html, body {
+    overflow-x: clip;
+  }
+}
+
 input, textarea, select {
   font-size: 16px;
   font-family: var(--font-family, 'Inter', ui-sans-serif, system-ui, sans-serif);
@@ -355,5 +364,15 @@ html::-webkit-scrollbar-thumb:hover,
   .legal-content em {
     @apply italic;
     color: color-mix(in srgb, var(--body-text-color) 75%, var(--surface-color));
+  }
+}
+
+/* iOS Safari/WKWebView zooms the whole page when a focused field has a font-size
+   under 16px, and does not zoom back out. Keep every text field at 16px on iOS. */
+@supports (-webkit-touch-callout: none) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
