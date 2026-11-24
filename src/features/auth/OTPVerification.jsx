@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBackNavigation } from '../../shared/hooks';
-import { verifyOTP } from './authService';
+import { verifyOTP, completeSetuLogin } from './authService';
 import { fetchDirectoryData } from '../directory-executivebody/directoryService';
-import { fetchActiveTrustsByMobile, fetchMemberTrustMemberships, fetchTrustById } from '../../shared/services/trustService';
+import { fetchActiveTrustsByMobile, fetchMemberTrustMemberships, fetchTrustById, fetchTrustByAppSlug } from '../../shared/services/trustService';
 import { logUserSessionEvent } from './sessionAuditService';
+import { trackMetaEvent } from '../../shared/services/metaEvents';
+import { track, trackLogin } from '../../shared/services/analytics';
+import { getSystemInfoMetadata } from '../../shared/services/systemInfoService';
 import { persistUserSession } from '../../shared/utils/storageUtils';
 import { setLoginTermsPromptPending } from '../../shared/utils/legalContent';
+import { useTenant } from '../../shared/context/TenantContext';
+import { getAppHomePath, readWindowTenantSlug } from '../../shared/utils/tenantNavigation';
+import { resolveTenantAuthSlug, resolveLoginSelectedTrustId } from '../../shared/utils/tenantAuthSelection';
 
 const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
@@ -66,11 +72,20 @@ const setCachedBaseTrust = (trust, trustId) => {
   }
 };
 
+// Matches the local copies in TenantLanding.jsx/TenantContext.jsx/App.jsx —
+// there is no shared export for this, so each file keeps its own.
+const isStandaloneDisplay = () => {
+  if (typeof window === 'undefined') return false;
+  const mql = window.matchMedia && window.matchMedia('(display-mode: standalone)');
+  return Boolean(mql?.matches) || window.navigator?.standalone === true;
+};
+
 function OTPVerification() {
   const navigate = useNavigate();
   const location = useLocation();
   useBackNavigation(() => navigate('/login'));
   const authDefaultTrust = resolveAuthDefaultTrust();
+  const { installedTrustId, installedSlug, tenantTrust } = useTenant();
 
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -78,12 +93,32 @@ function OTPVerification() {
   const [focused, setFocused] = useState(false);
   const [trustInfo, setTrustInfo] = useState(() => getCachedBaseTrust(authDefaultTrust.id) || null);
 
+  // Tenant auth session identity — preserved independently of whether
+  // installedTrustId (an async Trust-row fetch) has resolved yet. Priority:
+  // TenantContext's own installedSlug (fastest, set synchronously from the
+  // URL) -> the tenantSlug Login.jsx passed through location.state (covers
+  // a fresh device where context hasn't caught up) -> this window's own
+  // sessionStorage-recorded slug (TenantContext/tenantNavigation's shared
+  // per-window record). Never '' just because installedTrustId is slow.
+  const locationTenantSlug = String(location.state?.tenantSlug || '').trim().toLowerCase();
+  const tenantSlug = resolveTenantAuthSlug({
+    installedSlug,
+    locationTenantSlug,
+    windowSlug: readWindowTenantSlug(),
+    // Same guard as Login.jsx: sessionStorage's per-window slug is only
+    // trusted inside a real tenant-owned (standalone) context, never for an
+    // ordinary browser OTP flow that merely has a stale leftover slug.
+    isStandaloneDisplay: isStandaloneDisplay()
+  });
+  const isTenantAuth = Boolean(tenantSlug);
+
   const user = location.state?.user || null;
   const accountCandidates = Array.isArray(location.state?.accounts) && location.state.accounts.length > 0
     ? location.state.accounts
     : (user ? [user] : []);
   const [otpVerified, setOtpVerified] = useState(false);
   const [verifiedLoginMethod, setVerifiedLoginMethod] = useState('otp');
+  const [loginProof, setLoginProof] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState(accountCandidates[0]?.members_id || accountCandidates[0]?.id || '');
   const phoneNumber = location.state?.phoneNumber || '';
   const isOtpFlowAllowed = sessionStorage.getItem(OTP_FLOW_KEY) === 'normal';
@@ -92,7 +127,7 @@ function OTPVerification() {
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
     if (isLoggedIn) {
-      navigate('/', { replace: true });
+      navigate(getAppHomePath(), { replace: true });
       return;
     }
     if (!canRenderOtpPage) navigate('/login', { replace: true });
@@ -126,7 +161,9 @@ function OTPVerification() {
     return accountCandidates.find((account) => String(account?.members_id || account?.id || '') === selectedId) || accountCandidates[0];
   };
 
-  const completeLogin = async (selectedUser, loginMethod = 'otp') => {
+  // `proof` is passed explicitly on the single-account path, where the
+  // loginProof state set a moment earlier has not re-rendered yet.
+  const completeLogin = async (selectedUser, loginMethod = 'otp', proof = loginProof) => {
     const allAccountMemberIds = Array.from(new Set(
       (Array.isArray(accountCandidates) ? accountCandidates : [])
         .map((account) => account?.members_id || account?.id || null)
@@ -237,33 +274,129 @@ function OTPVerification() {
       };
     }
 
+    // TENANT AUTH: login started from /app/<tenantSlug> (see tenantSlug's
+    // own definition above) — tenant identity and tenant access are
+    // separate concerns. TenantLanding's own resolveTenantAppAccess (run
+    // after this redirect) is the sole authority on membership/access; this
+    // only pins WHICH Trust this session is for. A brand-new tenant
+    // membership's reg_members row is only created by resolve_app_access
+    // AFTER this redirect, so it is almost always still absent from
+    // enrichedUser.hospital_memberships here — that must never fall back to
+    // preferredMembership/activeTrustMemberships[0] (e.g. an
+    // alphabetically-earlier existing membership in a different Trust).
+    let tenantTrustId = normalizeText(installedTrustId);
+    let tenantTrustName = normalizeText(tenantTrust?.name);
+    if (isTenantAuth && !tenantTrustId) {
+      // TenantContext hasn't resolved this Trust yet (e.g. this device's
+      // very first visit to /app/<slug>) — resolve the slug directly
+      // rather than silently losing tenant identity.
+      try {
+        const resolvedTenantTrust = await fetchTrustByAppSlug(tenantSlug);
+        if (resolvedTenantTrust?.id) {
+          tenantTrustId = normalizeText(resolvedTenantTrust.id);
+          tenantTrustName = normalizeText(resolvedTenantTrust.name) || tenantTrustName;
+        }
+      } catch (err) {
+        console.warn('[OTP] Failed to resolve tenant Trust from slug:', err?.message || err);
+      }
+    }
+
+    if (isTenantAuth && tenantTrustId) {
+      // Overrides (never merges with) the preferredMembership-derived
+      // trust/primary_trust above — those saved fields drive UI elsewhere
+      // (e.g. Home's multi-trust fallback chains) and must reflect this
+      // tenant, not whichever membership happened to sort first.
+      // Deliberately no is_active here: membership approval is
+      // resolve_app_access's decision, never fabricated at login.
+      enrichedUser.trust = {
+        id: tenantTrustId,
+        name: tenantTrustName || null,
+        icon_url: tenantTrust?.icon_url || null,
+        remark: tenantTrust?.remark || null
+      };
+      enrichedUser.primary_trust = { ...enrichedUser.trust };
+    }
+
     const persisted = persistUserSession(enrichedUser);
     if (!persisted.success) {
       setError(persisted.message || 'Unable to save session on this device. Please try again.');
       return false;
     }
 
-    await logUserSessionEvent({
-      user: enrichedUser,
-      actionType: 'login',
-      extra: {
-        source: 'otp',
-        login_method: loginMethod,
-        trust_id: normalizeText(TRUST_ID || authDefaultTrust.id) || null
-      }
-    });
-
     const selectedMemberships = Array.isArray(enrichedUser?.hospital_memberships) ? enrichedUser.hospital_memberships : [];
     const baseTrustId = normalizeText(TRUST_ID || authDefaultTrust.id);
     const baseMembership = selectedMemberships.find((membership) => normalizeText(membership?.trust_id) === baseTrustId) || null;
     const fallbackMembership = selectedMemberships.find((membership) => membership?.is_active !== false) || selectedMemberships[0] || null;
-    const selectedTrustId = normalizeText(baseMembership?.trust_id) || normalizeText(fallbackMembership?.trust_id) || baseTrustId;
-    const selectedTrustName = normalizeText(
-      baseMembership?.trust_name ||
-      trustInfo?.name ||
-      authDefaultTrust?.name ||
-      localStorage.getItem('selected_trust_name')
+
+    // Tenant auth: pin to the tenant Trust resolved above — never
+    // activeTrustMemberships[0]/first-active/selectedMemberships[0]/base
+    // Trust. This only pins identity; TenantLanding's resolveTenantAppAccess
+    // (run after the redirect below) remains the sole authority on
+    // public/private/pending access. Non-tenant auth (the ordinary '/'
+    // login) keeps its existing base/fallback membership selection,
+    // completely unchanged.
+    const selectedTrustId = resolveLoginSelectedTrustId({
+      isTenantAuth,
+      tenantTrustId,
+      baseTrustId,
+      baseMembershipTrustId: normalizeText(baseMembership?.trust_id),
+      fallbackMembershipTrustId: normalizeText(fallbackMembership?.trust_id)
+    });
+
+    // Server-verified session token (used later for User Panel auto-login).
+    // Never fabricated client-side: on failure the SETU login proceeds without
+    // it and the User Panel falls back to its normal login page.
+    try { localStorage.removeItem('setu_session_token'); } catch { /* ignore */ }
+    const sessionMemberId = normalizeText(
+      selectedUser?.members_id || selectedUser?.member_id || selectedUser?.id
     );
+    if (proof && sessionMemberId) {
+      try {
+        const sessionResult = await completeSetuLogin({
+          loginProof: proof,
+          memberId: sessionMemberId,
+          trustId: selectedTrustId || null
+        });
+        if (sessionResult?.setuSessionToken) {
+          localStorage.setItem('setu_session_token', sessionResult.setuSessionToken);
+        }
+      } catch (err) {
+        console.warn('[OTP] complete-login failed:', err?.message || err);
+      }
+    }
+
+    // Final member + trust are settled here; {} on web or on any failure.
+    const systemInfo = await getSystemInfoMetadata();
+
+    const selectedTrustName = isTenantAuth
+      ? (tenantTrustName || normalizeText(localStorage.getItem('selected_trust_name')))
+      : normalizeText(
+        baseMembership?.trust_name ||
+        trustInfo?.name ||
+        authDefaultTrust?.name ||
+        localStorage.getItem('selected_trust_name')
+      );
+
+    // The session row's trust_name must name the same Trust as its trust_id,
+    // not enrichedUser.trust (the first active membership).
+    const selectedTrustMembership = selectedMemberships.find(
+      (membership) => normalizeText(membership?.trust_id) === normalizeText(selectedTrustId)
+    );
+    const loginTrustName = isTenantAuth
+      ? selectedTrustName
+      : normalizeText(selectedTrustMembership?.trust_name) || selectedTrustName;
+
+    await logUserSessionEvent({
+      user: enrichedUser,
+      actionType: 'login',
+      extra: {
+        ...systemInfo,
+        source: 'otp',
+        login_method: loginMethod,
+        trust_id: selectedTrustId || null,
+        trust_name: loginTrustName || null
+      }
+    });
 
     localStorage.setItem('selected_trust_id', String(selectedTrustId));
     localStorage.setItem(LAST_SELECTED_TRUST_ID_KEY, String(selectedTrustId));
@@ -278,7 +411,13 @@ function OTPVerification() {
     try { sessionStorage.removeItem(OTP_FLOW_KEY); } catch { /* ignore */ }
     setLoginTermsPromptPending();
 
-    navigate('/', { replace: true });
+    // Tenant auth must land back on /app/<slug> explicitly — getAppHomePath()
+    // resolves to '/' whenever the page isn't in standalone display mode
+    // (see tenantNavigation.js), which would otherwise drop tenant identity
+    // for a tenant login completed in an ordinary browser tab (not yet
+    // installed). Non-tenant auth is completely unchanged.
+    // Trailing slash keeps the URL inside the manifest scope '/app/<slug>/'.
+    navigate(isTenantAuth ? `/app/${tenantSlug}/` : getAppHomePath(), { replace: true });
     return true;
   };
 
@@ -306,17 +445,25 @@ function OTPVerification() {
         trustId: normalizeText(authDefaultTrust.id)
       });
       if (!result.success) {
+        track('api_error', { screen_name: 'otp_verification', code: 'otp_verify_failed' });
         setError(result.message || 'Invalid OTP. Please try again.');
         setLoading(false);
         return;
       }
       setVerifiedLoginMethod(result?.loginMethod === 'secret_code' ? 'secret_code' : 'otp');
+      setLoginProof(result.loginProof || '');
 
       if (!user) {
         setError('User data not found. Please go back and try again.');
         setLoading(false);
         return;
       }
+
+      // Fire-and-forget (not awaited) so login is never slowed or blocked.
+      // TODO: verify-otp / check-phone responses expose no new-user flag yet; once the
+      // backend returns one, send this only for new users.
+      trackMetaEvent('fb_mobile_complete_registration', { fb_registration_method: 'phone_otp' });
+      trackLogin();
 
       if (accountCandidates.length > 1) {
         setError('');
@@ -327,9 +474,14 @@ function OTPVerification() {
         return;
       }
 
-      await completeLogin(accountCandidates[0] || user, result?.loginMethod === 'secret_code' ? 'secret_code' : 'otp');
+      await completeLogin(
+        accountCandidates[0] || user,
+        result?.loginMethod === 'secret_code' ? 'secret_code' : 'otp',
+        result.loginProof || ''
+      );
     } catch (err) {
       console.error('[OTP] Verify error:', err);
+      track('api_error', { screen_name: 'otp_verification', code: 'otp_verify_exception' });
       setError(
         otpVerified
           ? 'Failed to continue with selected account. Please try again.'

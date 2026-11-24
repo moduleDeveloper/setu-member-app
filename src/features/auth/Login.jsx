@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useBackNavigation } from '../../shared/hooks';
 import { useTrustDataVersion } from '../../shared/hooks/useTrustDataVersion';
 import { checkPhoneNumber } from './authService';
 import { fetchTrustById } from '../../shared/services/trustService';
+import { track } from '../../shared/services/analytics';
+import { useTenant } from '../../shared/context/TenantContext';
+import { getAppHomePath, readWindowTenantSlug } from '../../shared/utils/tenantNavigation';
+import { resolveTenantAuthSlug } from '../../shared/utils/tenantAuthSelection';
 
 const TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
 const LOGIN_TRUST_CACHE_KEY = 'cached_base_trust_info';
@@ -62,44 +66,94 @@ const setCachedBaseTrust = (trust, trustId) => {
   }
 };
 
+// Matches the local copies in TenantLanding.jsx/TenantContext.jsx/App.jsx —
+// there is no shared export for this, so each file keeps its own.
+const isStandaloneDisplay = () => {
+  if (typeof window === 'undefined') return false;
+  const mql = window.matchMedia && window.matchMedia('(display-mode: standalone)');
+  return Boolean(mql?.matches) || window.navigator?.standalone === true;
+};
+
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   useBackNavigation();
   const authDefaultTrust = resolveAuthDefaultTrust();
-  const { displayTrustVersion } = useTrustDataVersion(authDefaultTrust.id);
+  const { installedTrustId, installedSlug, tenantTrust } = useTenant();
+  // Tenant mode must not depend on installedTrustId alone — that's an async
+  // Trust-row fetch and can still be resolving on a fresh device/slow
+  // connection. installedSlug is set synchronously from the /app/<slug> URL
+  // (see TenantContext.jsx), so prefer it; location.state.tenantSlug (set
+  // by TenantLanding when it redirects here) and this window's own
+  // sessionStorage-recorded slug are further fallbacks for the same tenant
+  // identity, never a different one.
+  const locationTenantSlug = String(location.state?.tenantSlug || '').trim().toLowerCase();
+  const tenantSlug = resolveTenantAuthSlug({
+    installedSlug,
+    locationTenantSlug,
+    windowSlug: readWindowTenantSlug(),
+    // The sessionStorage fallback is only trusted inside a real
+    // tenant-owned context (an installed standalone PWA recovering its own
+    // identity) — never for an ordinary, non-standalone /login visit that
+    // merely has a stale slug left over from browsing a different tenant
+    // earlier in this same tab.
+    isStandaloneDisplay: isStandaloneDisplay()
+  });
+  const isTenantMode = Boolean(tenantSlug);
+  // Priority 1: installed/tenant Trust (white-label /app/<slug> identity).
+  // Priority 2: existing selected/default Trust fallback (unchanged).
+  const effectiveTrust = isTenantMode
+    ? { id: installedTrustId, name: '' }
+    : authDefaultTrust;
+  const { displayTrustVersion } = useTrustDataVersion(effectiveTrust.id);
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focused, setFocused] = useState(false);
-  const [_trustInfo, setTrustInfo] = useState(() => getCachedBaseTrust(authDefaultTrust.id) || null);
+  const [trustInfo, setTrustInfo] = useState(() => {
+    if (isTenantMode && tenantTrust && String(tenantTrust.id) === String(installedTrustId)) {
+      return tenantTrust;
+    }
+    return getCachedBaseTrust(effectiveTrust.id) || null;
+  });
 
   useEffect(() => {
     const user = localStorage.getItem('user');
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    if (user && user !== 'null' && user !== 'undefined' && isLoggedIn) navigate('/', { replace: true });
+    if (user && user !== 'null' && user !== 'undefined' && isLoggedIn) navigate(getAppHomePath(), { replace: true });
   }, [navigate]);
 
   useEffect(() => {
     try { localStorage.removeItem('cached_trust_info'); } catch { /* ignore */ }
   }, []);
 
+  // Pick up tenant Trust info as soon as TenantContext resolves it (e.g. it
+  // was already resolved earlier this session), instead of waiting on a
+  // separate fetch below.
+  useEffect(() => {
+    if (isTenantMode && tenantTrust && String(tenantTrust.id) === String(installedTrustId)) {
+      setTrustInfo(tenantTrust);
+      setCachedBaseTrust(tenantTrust, installedTrustId);
+    }
+  }, [isTenantMode, tenantTrust, installedTrustId]);
+
   useEffect(() => {
     let active = true;
     const loadTrust = async () => {
       try {
-        if (!authDefaultTrust.id) return;
-        const trust = await fetchTrustById(authDefaultTrust.id);
+        if (!effectiveTrust.id) return;
+        const trust = await fetchTrustById(effectiveTrust.id);
         if (!active || !trust) return;
         setTrustInfo(trust);
-        setCachedBaseTrust(trust, authDefaultTrust.id);
+        setCachedBaseTrust(trust, effectiveTrust.id);
       } catch (err) {
         console.warn('[Login] Failed to refresh base trust info:', err?.message || err);
       }
     };
     loadTrust();
     return () => { active = false; };
-  }, [authDefaultTrust.id]);
+  }, [effectiveTrust.id]);
 
   const handleCheckPhone = async (e) => {
     e.preventDefault();
@@ -109,6 +163,7 @@ function Login() {
     try {
       const checkResult = await checkPhoneNumber(phoneNumber);
       if (!checkResult.success) {
+        track('api_error', { screen_name: 'login', code: 'check_phone_failed' });
         setError(checkResult.message);
         setLoading(false);
         return;
@@ -116,10 +171,16 @@ function Login() {
 
       sessionStorage.setItem(OTP_FLOW_KEY, 'normal');
       navigate('/otp-verification', {
-        state: { user: checkResult.data.user, accounts: checkResult.data.accounts || [checkResult.data.user], phoneNumber }
+        state: {
+          user: checkResult.data.user,
+          accounts: checkResult.data.accounts || [checkResult.data.user],
+          phoneNumber,
+          tenantSlug: isTenantMode ? tenantSlug : ''
+        }
       });
     } catch (err) {
       console.error('[Login] Error checking phone:', err);
+      track('api_error', { screen_name: 'login', code: 'check_phone_exception' });
       setError('Failed to verify phone number. Please try again.');
     } finally {
       setLoading(false);
@@ -136,6 +197,21 @@ function Login() {
         <div style={styles.accentBar} />
 
         <div style={styles.cardBody}>
+
+          {/* Tenant Trust branding (white-label /app/<slug> installs only) */}
+          {isTenantMode && trustInfo?.name && (
+            <div style={styles.tenantBrand}>
+              {trustInfo.icon_url && (
+                <img
+                  src={trustInfo.icon_url}
+                  alt={trustInfo.name}
+                  style={styles.tenantLogo}
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              )}
+              <span style={styles.tenantName}>{trustInfo.name}</span>
+            </div>
+          )}
 
           {/* Heading */}
           <div style={styles.headingGroup}>
@@ -276,6 +352,25 @@ const styles = {
   },
   cardBody: {
     padding: '32px 24px 28px',
+  },
+  tenantBrand: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    marginBottom: '14px',
+  },
+  tenantLogo: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '7px',
+    objectFit: 'cover',
+  },
+  tenantName: {
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#d4af37',
+    letterSpacing: '0.3px',
   },
   headingGroup: {
     marginBottom: '28px',

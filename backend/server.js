@@ -13,14 +13,15 @@ import reportRoutes from './features/appointments-reports-referral/reportRoutes.
 import referralRoutes from './features/appointments-reports-referral/referralRoutes.js';
 import profileRoutes from './features/member/profileRoutes.js';
 import adminRoutes from './features/admin/adminRoutes.js';
+import adminPaymentRoutes from './features/admin/adminPaymentRoutes.js';
 import sponsorRoutes from './features/gallery-sponsors/sponsorRoutes.js';
 import notificationRoutes from './features/notifications/notificationRoutes.js';
 import galleryRoutes from './features/gallery-sponsors/galleryRoutes.js';
 import familyRoutes from './features/member/familyRoutes.js';
 import orderHistoryRoutes from './features/products/orderHistoryRoutes.js';
-import paymentRoutes from './features/products/paymentRoutes.js';
-import { initFirebaseAdmin } from './features/notifications/firebaseAdmin.js';
-import { startNotificationPushWorker } from './features/notifications/notificationPushWorker.js';
+import paymentRoutes, { razorpayWebhookHandler } from './features/products/paymentRoutes.js';
+import locationRoutes from './shared/location/locationRoutes.js';
+import { initGeoIp } from './shared/location/geoIpService.js';
 
 // ES module fix for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +32,7 @@ dotenv.config();
 
 // Initialize express app
 const app = express();
+app.set('trust proxy', 1); // Nginx in front: req.ip = real client IP
 const PORT = process.env.PORT || 5005;
 const TRUST_BRAND_NAME = process.env.VITE_DEFAULT_TRUST_NAME || process.env.DEFAULT_TRUST_NAME || 'Trust';
 
@@ -70,7 +72,11 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-  app.use(express.json());
+// Razorpay webhook needs the raw body for signature verification, so it is
+// mounted before express.json().
+app.post('/api/payments/webhook', express.raw({ type: '*/*', limit: '1mb' }), razorpayWebhookHandler);
+
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from public directory
@@ -140,7 +146,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/gallery', galleryRoutes); // Gallery routes
 app.use('/api/order-history', orderHistoryRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/admin/payments', adminPaymentRoutes); // Admin-only, before the generic admin router
 app.use('/api/admin', adminRoutes); // Admin routes
+app.use('/api/client-location', locationRoutes); // Local GeoIP lookup
 app.use('/api', memberRoutes); // Member routes last to avoid catching other routes
 // --------------------
 // ERROR HANDLING
@@ -159,5 +167,4 @@ app.listen(PORT, () => {
 });
   
 
-initFirebaseAdmin();
-startNotificationPushWorker();
+initGeoIp();

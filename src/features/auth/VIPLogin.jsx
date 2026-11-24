@@ -31,9 +31,11 @@ import { checkPhoneNumber, verifyOTP } from './authService';
 import { fetchDirectoryData } from '../directory-executivebody/directoryService';
 import { fetchTrustById } from '../../shared/services/trustService';
 import { logUserSessionEvent } from './sessionAuditService';
+import { unregisterPushToken } from '../notifications/pushNotificationService';
 import TermsModal from '../../shared/components/TermsModal';
 import { clearLoginTermsPromptPending, isLoginTermsPromptPending, resolveLegalTrustId, setLoginTermsPromptPending } from '../../shared/utils/legalContent';
-const logo = '/new_logo.png';
+import { getAppHomePath } from '../../shared/utils/tenantNavigation';
+import logo from '../../../new_logo.png';
 
 const DEFAULT_TRUST_NAME = import.meta.env.VITE_DEFAULT_TRUST_NAME || 'Trust';
 const BASE_TRUST_ID = import.meta.env.VITE_DEFAULT_TRUST_ID || '';
@@ -354,13 +356,15 @@ function VIPLogin({ onNavigate, onLogout }) {
       await onLogout('logout', user || pendingUser || null);
       return;
     }
+    const pushToken = await unregisterPushToken();
     await logUserSessionEvent({
       user: user || pendingUser || null,
       actionType: 'logout',
-      extra: { source: 'vip-manual-fallback' }
+      extra: { source: 'vip-manual-fallback', ...(pushToken ? { fcm_token: pushToken } : {}) }
     });
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('user');
+    localStorage.removeItem('setu_session_token');
     clearLoginTermsPromptPending();
     sessionStorage.clear();
     setShowTermsModal(false);
@@ -706,7 +710,7 @@ function VIPLogin({ onNavigate, onLogout }) {
             </button>
 
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate(getAppHomePath())}
               className="w-full py-4 rounded-2xl font-bold text-base text-gray-700 bg-white border border-amber-200 hover:bg-amber-50 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
             >
               <Home className="h-5 w-5 text-amber-500" />
@@ -726,7 +730,7 @@ function VIPLogin({ onNavigate, onLogout }) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-yellow-50 flex flex-col px-4 py-8">
         <button
-          onClick={() => { setFormError(''); setApplicationSubmitted(false); navigate('/'); }}
+          onClick={() => { setFormError(''); setApplicationSubmitted(false); navigate(getAppHomePath()); }}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6 self-start"
         >
           <ArrowLeft className="h-4 w-4" /> Back
@@ -963,7 +967,7 @@ function VIPLogin({ onNavigate, onLogout }) {
         <div className="relative flex items-center justify-between px-5 pt-8 pb-4">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate(getAppHomePath())}
               className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
               aria-label="Back"
             >

@@ -320,7 +320,7 @@ test('cart mutations send selected attributes to purchase API', async () => {
   });
 });
 
-test('cart move to wishlist updates existing purchase row to wishlist', async () => {
+test('cart move to wishlist creates wishlist row and removes cart row', async () => {
   createEnvironment({
     selected_trust_id: 'trust-cart-move-wishlist',
     last_selected_trust_id: 'trust-cart-move-wishlist',
@@ -360,12 +360,12 @@ test('cart move to wishlist updates existing purchase row to wishlist', async ()
         success: true,
         purchases: [
           {
-            id: request.p_payload.id,
+            id: request.p_payload.id || 'wishlist-purchase-64',
             type: request.p_payload.type,
             status: request.p_payload.status,
             quantity: request.p_payload.quantity,
             trust_id: request.p_trust_id,
-            product_price_id: 86,
+            product_price_id: request.p_payload.product_price_id || 86,
             selected_attributes: request.p_payload.selected_attributes
           }
         ]
@@ -381,28 +381,39 @@ test('cart move to wishlist updates existing purchase row to wishlist', async ()
     price: result.wishlistItem.price
   });
 
-  assert.equal(requests.length, 1);
+  assert.equal(requests.length, 2);
   assert.deepEqual(requests[0], {
     p_member_id: TEST_MEMBER_ID,
     p_trust_id: 'trust-cart-move-wishlist',
     p_action: 'upsert_purchase',
     p_payload: {
-      id: '64',
+      product_price_id: '86',
       type: 'wishlist',
-      status: 'wishlist',
       quantity: 1,
+      unit_price: 0,
+      status: 'wishlist',
       selected_attributes: {
         size: 'L'
       }
     }
   });
+  assert.deepEqual(requests[1], {
+    p_member_id: TEST_MEMBER_ID,
+    p_trust_id: 'trust-cart-move-wishlist',
+    p_action: 'upsert_purchase',
+    p_payload: {
+      id: '64',
+      status: 'remove_from_cart',
+      quantity: 1,
+    }
+  });
   assert.deepEqual(cartUtils.readCartItems('trust-cart-move-wishlist'), []);
-  assert.equal(result.wishlistItem.purchase_id, '64');
+  assert.equal(result.wishlistItem.purchase_id, 'wishlist-purchase-64');
   assert.equal(result.wishlistItem.status, 'wishlist');
 
   const wishlistItems = wishlistUtils.readWishlistItems('trust-cart-move-wishlist');
   assert.equal(wishlistItems.length, 1);
-  assert.equal(wishlistItems[0].purchase_id, '64');
+  assert.equal(wishlistItems[0].purchase_id, 'wishlist-purchase-64');
   assert.equal(wishlistItems[0].status, 'wishlist');
   assert.equal(wishlistItems[0].sync_state, 'synced');
 });
@@ -485,7 +496,7 @@ test('cart move to wishlist removes the cart row when product is already wishlis
       return {
         data: {
           success: false,
-          error: 'duplicate key value violates unique constraint "idx_unique_wishlist_item"'
+          error: 'duplicate key value violates unique constraint "idx_unique_active_wishlist_item_uuid"'
         }
       };
     }
@@ -1639,6 +1650,179 @@ test('cart remove and re-add reuse the previous purchase id', async () => {
   assert.equal(cartUtils.readCartItems('trust-readd')[0]?.purchase_id, 'purchase-readd');
 });
 
+test('cart re-add after an order creates a new cart row instead of reusing the order purchase id', async () => {
+  createEnvironment({
+    selected_trust_id: 'trust-after-order',
+    last_selected_trust_id: 'trust-after-order',
+    user: createUserEntry(),
+    'product_cart_purchase_refs_v1_trust-after-order': JSON.stringify({
+      'trust-after-order:product-ordered': {
+        purchase_id: 'purchase-now-order',
+        product_price_id: 'price-ordered',
+        id: 'product-ordered',
+        trust_id: 'trust-after-order'
+      }
+    })
+  });
+
+  const requests = [];
+  cartUtils.setCartPurchaseRpcOverrideForTests(async (request) => {
+    requests.push(request);
+    if (request.p_action === 'get') {
+      return {
+        data: {
+          success: true,
+          purchases: [{
+            id: 'purchase-now-order',
+            type: 'order',
+            status: 'order_payment_pending',
+            quantity: 1,
+            trust_id: 'trust-after-order',
+            product_price_id: 'price-ordered'
+          }]
+        }
+      };
+    }
+    return { data: { id: 'fresh-cart-purchase', product_price_id: request.p_payload.product_price_id } };
+  });
+
+  assert.deepEqual(await cartUtils.refreshCartCache('trust-after-order'), []);
+
+  await cartUtils.setCartProductQuantity(
+    { id: 'product-ordered', product_name: 'Ordered Product', price: { id: 'price-ordered', member_price: 500 } },
+    { trustId: 'trust-after-order', quantity: 1, price: { id: 'price-ordered', member_price: 500 } }
+  );
+
+  assert.deepEqual(requests[1].p_payload, {
+    product_price_id: 'price-ordered',
+    type: 'cart',
+    quantity: 1,
+    unit_price: 500,
+    status: 'add_to_cart',
+    selected_attributes: {}
+  });
+  assert.equal(cartUtils.readCartItems('trust-after-order')[0]?.purchase_id, 'fresh-cart-purchase');
+});
+
+test('forgetting ordered purchase ids keeps cart items but stops reusing their ids', async () => {
+  createEnvironment({
+    selected_trust_id: 'trust-forget',
+    last_selected_trust_id: 'trust-forget',
+    user: createUserEntry(),
+    'product_cart_v2_trust-forget': JSON.stringify([
+      {
+        id: 'product-forget',
+        trust_id: 'trust-forget',
+        purchase_id: 'purchase-forget',
+        product_price_id: 'price-forget',
+        product_name: 'Forget Product',
+        quantity: 2,
+        price: { id: 'price-forget', member_price: 50 }
+      }
+    ]),
+    'product_cart_purchase_refs_v1_trust-forget': JSON.stringify({
+      'trust-forget:product-forget': { purchase_id: 'purchase-forget', product_price_id: 'price-forget' },
+      'trust-forget:product-other': { purchase_id: 'purchase-other', product_price_id: 'price-other' }
+    })
+  });
+
+  cartUtils.forgetCartPurchaseRefs('trust-forget', ['purchase-forget']);
+
+  const [item] = cartUtils.readCartItems('trust-forget');
+  assert.equal(item.quantity, 2);
+  assert.equal(item.purchase_id, '');
+  assert.deepEqual(
+    Object.keys(JSON.parse(globalThis.localStorage.getItem('product_cart_purchase_refs_v1_trust-forget'))),
+    ['trust-forget:product-other']
+  );
+
+  const requests = [];
+  cartUtils.setCartPurchaseRpcOverrideForTests(async (request) => {
+    requests.push(request);
+    return { data: { id: 'fresh-forget-purchase', product_price_id: request.p_payload.product_price_id } };
+  });
+
+  await cartUtils.setCartProductQuantity(
+    { id: 'product-forget', product_name: 'Forget Product', price: { id: 'price-forget', member_price: 50 } },
+    { trustId: 'trust-forget', quantity: 3, price: { id: 'price-forget', member_price: 50 } }
+  );
+
+  assert.equal(requests[0].p_payload.id, undefined);
+  assert.equal(requests[0].p_payload.type, 'cart');
+  assert.equal(cartUtils.readCartItems('trust-forget')[0]?.purchase_id, 'fresh-forget-purchase');
+});
+
+test('cart remove can target the exact item object when product identity changed after refresh', async () => {
+  createEnvironment({
+    selected_trust_id: 'trust-remove-identity',
+    last_selected_trust_id: 'trust-remove-identity',
+    user: createUserEntry(),
+    'product_cart_v2_trust-remove-identity': JSON.stringify([
+      {
+        key: 'trust-remove-identity:price-identity',
+        id: 'price-identity',
+        trust_id: 'trust-remove-identity',
+        purchase_id: 'purchase-identity',
+        product_price_id: 'price-identity',
+        product_name: 'Identity Item',
+        quantity: 1,
+        price: { id: 'price-identity', member_price: 100 }
+      }
+    ])
+  });
+
+  const requests = [];
+  cartUtils.setCartPurchaseRpcOverrideForTests(async (request) => {
+    requests.push(request);
+    return {
+      data: {
+        id: request.p_payload.id,
+        product_price_id: 'price-identity',
+        status: request.p_payload.status
+      }
+    };
+  });
+
+  const target = cartUtils.readCartItems('trust-remove-identity')[0];
+  const updated = await cartUtils.removeCartProduct('old-product-id', 'trust-remove-identity', { item: target });
+
+  assert.deepEqual(updated, []);
+  assert.equal(requests[0].p_payload.id, 'purchase-identity');
+  assert.equal(requests[0].p_payload.status, 'remove_from_cart');
+});
+
+test('cart remove surfaces RPC error text from error field', async () => {
+  createEnvironment({
+    selected_trust_id: 'trust-remove-error',
+    last_selected_trust_id: 'trust-remove-error',
+    user: createUserEntry(),
+    'product_cart_v2_trust-remove-error': JSON.stringify([
+      {
+        id: 'cart-remove-error',
+        trust_id: 'trust-remove-error',
+        purchase_id: 'purchase-remove-error',
+        product_price_id: 'price-remove-error',
+        product_name: 'Remove Error',
+        quantity: 1,
+        price: { id: 'price-remove-error', member_price: 100 }
+      }
+    ])
+  });
+
+  cartUtils.setCartPurchaseRpcOverrideForTests(async () => ({
+    data: {
+      success: false,
+      error: 'server refused removal'
+    }
+  }));
+
+  await assert.rejects(
+    cartUtils.removeCartProduct('cart-remove-error', 'trust-remove-error'),
+    /server refused removal/
+  );
+  assert.equal(cartUtils.readCartItems('trust-remove-error').length, 1);
+});
+
 test('cart refresh loads active add_to_cart rows from purchase API', async () => {
   createEnvironment({
     selected_trust_id: 'trust-remote',
@@ -1955,4 +2139,104 @@ test('cart refresh preserves local attribute options when remote enrichment has 
   });
   assert.deepEqual(items[0].attribute_values.map((row) => row.value), ['S', 'M', 'L']);
   assert.deepEqual(cartUtils.readCartItems('trust-local-attrs')[0].attribute_values.map((row) => row.value), ['S', 'M', 'L']);
+});
+
+test('cart and wishlist preserve UUID product category and price identifiers as strings', async () => {
+  const trustId = 'trust-uuid-flow';
+  const productId = '550e8400-e29b-41d4-a716-446655440000';
+  const categoryId = '650e8400-e29b-41d4-a716-446655440001';
+  const priceId = '750e8400-e29b-41d4-a716-446655440002';
+  const cartPurchaseId = '850e8400-e29b-41d4-a716-446655440003';
+  const wishlistPurchaseId = '950e8400-e29b-41d4-a716-446655440004';
+
+  createEnvironment({
+    selected_trust_id: trustId,
+    last_selected_trust_id: trustId,
+    user: createUserEntry()
+  });
+
+  const product = {
+    id: productId,
+    category_id: categoryId,
+    product_name: 'UUID Product',
+    price: {
+      id: priceId,
+      member_price: 499,
+      price_after_discount: 499,
+      total_payable: 499
+    }
+  };
+
+  const cartRequests = [];
+  cartUtils.setCartPurchaseRpcOverrideForTests(async (request) => {
+    cartRequests.push(request);
+    return {
+      data: {
+        success: true,
+        purchases: [{
+          id: cartPurchaseId,
+          type: 'cart',
+          status: 'add_to_cart',
+          trust_id: trustId,
+          product_id: productId,
+          product_price_id: request.p_payload.product_price_id,
+          quantity: request.p_payload.quantity
+        }]
+      }
+    };
+  });
+
+  await cartUtils.setCartProductQuantity(product, {
+    trustId,
+    categoryId,
+    quantity: 2,
+    price: product.price
+  });
+
+  assert.equal(cartRequests[0].p_payload.product_price_id, priceId);
+  assert.equal(typeof cartRequests[0].p_payload.product_price_id, 'string');
+  assert.equal(cartUtils.getCartKey(productId, trustId), `${trustId}:${productId}`);
+  const [cartItem] = cartUtils.readCartItems(trustId);
+  assert.equal(cartItem.id, productId);
+  assert.equal(cartItem.category_id, categoryId);
+  assert.equal(cartItem.product_price_id, priceId);
+  assert.equal(cartItem.purchase_id, cartPurchaseId);
+  assert.equal(cartItem.quantity, 2);
+  assert.equal(cartUtils.getCartItemQuantity(productId, trustId), 2);
+
+  const wishlistRequests = [];
+  wishlistUtils.setWishlistPurchaseRpcOverrideForTests(async (request) => {
+    wishlistRequests.push(request);
+    return {
+      data: {
+        success: true,
+        purchases: [{
+          id: wishlistPurchaseId,
+          type: 'wishlist',
+          status: 'wishlist',
+          trust_id: trustId,
+          product_id: productId,
+          product_price_id: request.p_payload.product_price_id,
+          quantity: request.p_payload.quantity
+        }]
+      }
+    };
+  });
+
+  const result = await wishlistUtils.addWishlistProductAsync(product, {
+    trustId,
+    categoryId,
+    price: product.price
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(wishlistRequests[0].p_payload.product_price_id, priceId);
+  assert.equal(typeof wishlistRequests[0].p_payload.product_price_id, 'string');
+  const [wishlistItem] = wishlistUtils.readWishlistItems(trustId);
+  assert.equal(wishlistItem.id, productId);
+  assert.equal(wishlistItem.category_id, categoryId);
+  assert.equal(wishlistItem.product_price_id, priceId);
+  assert.equal(wishlistItem.purchase_id, wishlistPurchaseId);
+  assert.notEqual(wishlistItem.id, 'NaN');
+  assert.notEqual(wishlistItem.product_price_id, '0');
 });
