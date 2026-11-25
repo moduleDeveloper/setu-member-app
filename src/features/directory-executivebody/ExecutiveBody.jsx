@@ -7,6 +7,7 @@ import { getProfilePhotos } from '../../shared/services/api';
 import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
 import { applyOpacity } from '../../shared/utils/colorUtils';
 import { MEMBER_PRIVACY_UPDATED_EVENT, matchesMemberIdentity } from '../../shared/utils/memberIdentity';
+import { getAppHomePath } from '../../shared/utils/tenantNavigation';
 import {
   buildExecutiveBodyCommitteeSearchResults,
   getExecutiveBodySearchFields,
@@ -383,7 +384,7 @@ export const ExecutiveBodyContent = ({ onNavigate, variant = 'page' }) => {
               <h1 className="text-lg font-extrabold tracking-wide" style={{ color: navbarTextColor }}>Executive Body</h1>
               <button
                 type="button"
-                onClick={() => navigate('/')}
+                onClick={() => navigate(getAppHomePath())}
                 className="p-2 rounded-xl transition-colors"
                 style={{ color: navbarTextColor, background: 'transparent' }}
                 aria-label="Home"
@@ -411,6 +412,7 @@ export const ExecutiveBodyContent = ({ onNavigate, variant = 'page' }) => {
           <Search className="h-4 w-4" style={{ color: 'var(--advertisement-card-bg)' }} />
           <input
             type="text"
+            data-track="search_click"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={tab === 'committee' ? 'Search committees or members' : 'Search by name, role, membership, mobile'}
