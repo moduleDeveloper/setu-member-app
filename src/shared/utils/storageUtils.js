@@ -52,6 +52,13 @@ const compactMembership = (membership = {}) => ({
   membership_number: membership?.membership_number || membership?.['Membership number'] || null,
   qr_code: membership?.qr_code || null,
   trust_status: membership?.trust_status ?? null,
+  version: membership?.version ?? null,
+  web_app_url: membership?.web_app_url || null,
+  instagram_link: membership?.instagram_link || null,
+  facebook_link: membership?.facebook_link || null,
+  whatsapp_link: membership?.whatsapp_link || null,
+  linkedin_link: membership?.linkedin_link || null,
+  youtube_url: membership?.youtube_url || null,
   source: membership?.source || null,
 });
 
@@ -87,7 +94,9 @@ export const hasAnyTrustMembership = (user = {}) =>
 
 export const compactUserForStorage = (user = {}) => {
   const memberships = Array.isArray(user?.hospital_memberships) ? user.hospital_memberships : [];
-  const compactMemberships = memberships.slice(0, 25).map(compactMembership);
+  // No cap: a truncated list can drop the logged-in app's Trust (memberships
+  // are alphabetical), and Home then falls back to a different Trust.
+  const compactMemberships = memberships.map(compactMembership);
   const normalizedMembersId = isUuid(user?.members_id) ? String(user.members_id).trim() : null;
   const normalizedMemberId = isUuid(user?.member_id) ? String(user.member_id).trim() : normalizedMembersId;
   const compactMemberIds = Array.from(
@@ -161,6 +170,27 @@ const setLocalStorageWithRecovery = (key, value) => {
     } catch {
       return false;
     }
+  }
+};
+
+// Used by the tenant onboarding screen's "Use another mobile number" option:
+// clears only the auth/session/selected-Trust keys so a stale saved SETU
+// session isn't silently reused for a Trust the user never actually logged
+// into here. Deliberately does NOT touch the per-slug installed_app_trust_id:
+// <slug> keys or the per-window active_app_slug (TenantContext /
+// tenantNavigation) — those are this device/window's tenant PWA identity,
+// not part of the user's login session, and must survive so the user lands
+// back in the same tenant's login flow, not a generic one.
+export const clearTenantUserSession = () => {
+  try {
+    localStorage.removeItem(USER_STORAGE_KEY);
+    localStorage.removeItem(LOGGED_IN_STORAGE_KEY);
+    localStorage.removeItem('setu_session_token');
+    localStorage.removeItem('selected_trust_id');
+    localStorage.removeItem('selected_trust_name');
+    localStorage.removeItem('last_selected_trust_id');
+  } catch {
+    // ignore storage cleanup failures
   }
 };
 
