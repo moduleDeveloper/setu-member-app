@@ -1,8 +1,10 @@
+import { track } from '../../shared/services/analytics';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronDown, ChevronLeft, Heart, Home as HomeIcon, ShoppingCart, Trash2, X } from 'lucide-react';
 import { useAppTheme } from '../../shared/context/ThemeContext';
 import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
+import { getAppHomePath } from '../../shared/utils/tenantNavigation';
 import {
   clearCartItems,
   fetchTrustProductsCategories,
@@ -25,6 +27,7 @@ import {
   isTrustCatalogCacheFresh,
   readTrustCatalogCache,
 } from '../../shared/utils/trustCatalogCache';
+import { lockBodyScroll } from '../../shared/utils/scrollLock';
 
 const T = {
   text: 'var(--body-text-color)',
@@ -534,9 +537,26 @@ const CartSummarySkeleton = () => (
   </div>
 );
 
+// Dark page = the theme's page-text colour (always chosen to contrast with the
+// page background) is light.
+const isPageDark = () => {
+  if (typeof document === 'undefined') return false;
+  const probe = document.createElement('div');
+  probe.style.color = 'var(--page-text-color, var(--body-text-color))';
+  probe.style.display = 'none';
+  document.body.appendChild(probe);
+  const match = getComputedStyle(probe).color.match(/rgba?\(([^)]+)\)/);
+  document.body.removeChild(probe);
+  if (!match) return false;
+  const [r, g, b] = match[1].split(',').map((n) => parseFloat(n) / 255);
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) > 0.5;
+};
+
 function Cart() {
   const navigate = useNavigate();
   const theme = useAppTheme();
+  const pageDark = useMemo(() => isPageDark(), [theme]); // eslint-disable-line react-hooks/exhaustive-deps
   const primaryColor = theme?.primary || 'var(--brand-red)';
   const navbarTheme = getNavbarThemeStyles(theme);
   const navbarTextColor = navbarTheme?.textColor || 'var(--navbar-text)';
@@ -544,6 +564,7 @@ function Cart() {
   const [wishlistItems, setWishlistItems] = useState(() => readWishlistItems());
   const [isCartLoading, setIsCartLoading] = useState(true);
   const [removalPrompt, setRemovalPrompt] = useState(null);
+  const [clearPromptOpen, setClearPromptOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [attributeMenu, setAttributeMenu] = useState(null);
   const [variantOptionsByItemKey, setVariantOptionsByItemKey] = useState({});
@@ -604,12 +625,7 @@ function Cart() {
   useEffect(() => {
     if (!removalPrompt || typeof document === 'undefined') return undefined;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
+    return lockBodyScroll();
   }, [removalPrompt]);
   useEffect(() => {
     if (removalPrompt) {
@@ -678,6 +694,7 @@ function Cart() {
         attributeValues: item.attribute_values || [],
       });
       setItems(updated);
+      track('cart_quantity_update', { product_id: String(item.id), quantity: Number(nextQuantity) });
       return updated;
     } catch (cartError) {
       showToast(cartError?.message || 'Unable To Update Cart');
@@ -902,7 +919,8 @@ function Cart() {
 
     closeAttributeMenu();
     try {
-      const updated = await removeCartProduct(item.id, item.trust_id);
+      const updated = await removeCartProduct(item.id, item.trust_id, { item });
+      track('remove_from_cart', { product_id: String(item.id) });
       setItems(updated);
       showToast(toastLabel);
       return updated;
@@ -925,6 +943,7 @@ function Cart() {
     closeAttributeMenu();
     try {
       const result = await moveCartProductToWishlist(item.id, item.trust_id, {
+        item,
         quantity: getCartItemPricing(item).quantity || Number(item.quantity) || 1,
         selectedAttributes: item.selected_attributes || {},
       });
@@ -942,6 +961,7 @@ function Cart() {
       }
 
       setItems(result?.cartItems || []);
+      track('cart_move_to_wishlist', { product_id: String(item.id) });
       showToast(result?.alreadyInWishlist ? 'Already In Wishlist – Removed From Cart' : 'Moved To Wishlist');
     } catch (cartError) {
       showToast(cartError?.message || 'Unable To Move To Wishlist');
@@ -973,13 +993,20 @@ function Cart() {
       return;
     }
 
-    navigate(`/categories-products/list/${categoryId}/detail/${productId}`);
+    track('product_open', { product_id: productId, category_id: categoryId, source: 'cart' });
+    navigate(`/categories-products/list/${encodeURIComponent(categoryId)}/detail/${encodeURIComponent(productId)}`);
   };
 
-  const handleClearCart = async () => {
+  const handleClearCart = () => {
     closeAttributeMenu();
+    setClearPromptOpen(true);
+  };
+
+  const confirmClearCart = async () => {
+    setClearPromptOpen(false);
     try {
       const updated = await clearCartItems();
+      track('cart_clear');
       setItems(updated);
     } catch (cartError) {
       showToast(cartError?.message || 'Unable To Clear Cart');
@@ -987,7 +1014,7 @@ function Cart() {
   };
 
   return (
-    <main className="cart-page">
+    <main className={`cart-page${pageDark ? ' cart-page--dark' : ''}`}>
       <div
         className="theme-navbar sticky top-0 z-20"
         style={{
@@ -1017,7 +1044,7 @@ function Cart() {
               <h1 className="truncate text-lg font-extrabold tracking-wide" style={{ color: navbarTextColor }}>
                 {titleCaseText('Cart')}
               </h1>
-              <p className="mt-0.5 text-[11px] font-medium" style={{ color: T.muted }}>
+              <p className="mt-0.5 text-[11px] font-medium" style={{ color: pageDark ? 'color-mix(in srgb, var(--navbar-text) 78%, transparent)' : T.muted }}>
                 {summary.totalQuantity > 0
                   ? titleCaseText(`${summary.totalQuantity} item${summary.totalQuantity === 1 ? '' : 's'} in cart`)
                   : titleCaseText('Your shopping cart')}
@@ -1027,7 +1054,7 @@ function Cart() {
               <button
                 type="button"
                 className="ws-header-icon-btn"
-                onClick={() => navigate('/')}
+                onClick={() => navigate(getAppHomePath())}
                 aria-label="Go home"
               >
                 <HomeIcon size={20} strokeWidth={1.8} />
@@ -1226,7 +1253,7 @@ function Cart() {
                     navigate(checkoutTrustId ? `/create-order?trustId=${encodeURIComponent(checkoutTrustId)}` : '/create-order');
                   }}
                 >
-                  {titleCaseText('Create order')}
+                  {titleCaseText('Confirm order')}
                 </button>
                 <button type="button" className="cart-secondary-btn" onClick={handleClearCart}>
                   {titleCaseText('Clear cart')}
@@ -1347,6 +1374,46 @@ function Cart() {
               <button type="button" className="cart-modal-btn cart-modal-btn--remove" onClick={confirmRemoveFromCart}>
                 <Trash2 className="h-4 w-4" />
                 {titleCaseText('Remove From Cart')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {clearPromptOpen ? (
+        <div className="cart-modal-overlay" onClick={() => setClearPromptOpen(false)}>
+          <div
+            className="cart-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cart-clear-modal-title"
+            aria-describedby="cart-clear-modal-copy"
+          >
+            <div className="cart-modal-accent" />
+            <button type="button" className="cart-modal-close" onClick={() => setClearPromptOpen(false)} aria-label="Close">
+              <X size={18} />
+            </button>
+            <div className="cart-modal-header">
+              <div className="cart-modal-badge">
+                <Trash2 size={18} />
+              </div>
+              <div className="cart-modal-headings">
+                <h2 id="cart-clear-modal-title" className="cart-modal-title">
+                  {titleCaseText('Clear Cart?')}
+                </h2>
+                <p id="cart-clear-modal-copy" className="cart-modal-copy">
+                  {titleCaseText('All items will be removed from your cart.')}
+                </p>
+              </div>
+            </div>
+            <div className="cart-modal-actions cart-modal-actions--pair">
+              <button type="button" className="cart-modal-btn cart-modal-btn--ghost" onClick={() => setClearPromptOpen(false)}>
+                {titleCaseText('Cancel')}
+              </button>
+              <button type="button" className="cart-modal-btn cart-modal-btn--wishlist" onClick={confirmClearCart}>
+                <Trash2 className="h-4 w-4" />
+                {titleCaseText('Clear Cart')}
               </button>
             </div>
           </div>
@@ -1685,7 +1752,7 @@ function Cart() {
         .cart-qty-btn {
           border: 0;
           background:color-mix(in srgb, var(--brand-navy) 4%, ${T.surface});
-          color: ${navbarTextColor};
+          color: var(--body-text-color);
           font-size: 18px;
           font-weight: 700;
           cursor: pointer;
@@ -1703,7 +1770,7 @@ function Cart() {
           align-items: center;
           justify-content: center;
           min-width: 0;
-          color: ${navbarTextColor};
+          color: var(--body-text-color);
           font-size: 14px;
           font-weight: 700;
           letter-spacing: 0.02em;
@@ -1852,6 +1919,70 @@ function Cart() {
           color: var(--brand-navy);
           border: 1px solid color-mix(in srgb, var(--brand-navy) 18%, transparent);
         }
+        .cart-page--dark {
+          --ct-ink: var(--page-text-color, var(--body-text-color));
+          --ct-strong: var(--page-strong-color, var(--ct-ink));
+        }
+        .cart-page--dark .cart-card { border-bottom-color: color-mix(in srgb, var(--ct-ink) 16%, transparent); }
+        .cart-page--dark .cart-name { color: var(--ct-strong); }
+        .cart-page--dark .cart-price,
+        .cart-page--dark .cart-price-main { color: var(--page-price-color, var(--ct-ink)); }
+        .cart-page--dark .cart-mrp,
+        .cart-page--dark .cart-price-breakdown { color: color-mix(in srgb, var(--ct-ink) 62%, transparent); }
+        .cart-page--dark .cart-attribute-chip {
+          background: color-mix(in srgb, var(--ct-ink) 8%, transparent);
+          border-color: color-mix(in srgb, var(--ct-ink) 18%, transparent);
+          color: color-mix(in srgb, var(--ct-ink) 80%, transparent);
+        }
+        .cart-page--dark .cart-attribute-chip--interactive {
+          background: color-mix(in srgb, var(--ct-ink) 10%, transparent);
+          border-color: color-mix(in srgb, var(--ct-ink) 28%, transparent);
+          color: var(--ct-strong);
+        }
+        .cart-page--dark .cart-attribute-chip-icon { color: color-mix(in srgb, var(--ct-ink) 70%, transparent); }
+        .cart-page--dark .cart-image {
+          background: color-mix(in srgb, var(--ct-ink) 8%, transparent);
+        }
+        .cart-page--dark .cart-qty-control {
+          background: color-mix(in srgb, var(--ct-ink) 8%, transparent);
+          border-color: color-mix(in srgb, var(--ct-ink) 24%, transparent);
+        }
+        .cart-page--dark .cart-qty-btn {
+          background: color-mix(in srgb, var(--ct-ink) 12%, transparent);
+          color: var(--ct-strong);
+        }
+        .cart-page--dark .cart-qty-value { color: var(--ct-strong); }
+        .cart-page--dark .cart-remove {
+          background: color-mix(in srgb, var(--ct-ink) 12%, transparent);
+          border-color: color-mix(in srgb, var(--ct-ink) 22%, transparent);
+          color: var(--ct-strong);
+        }
+        .cart-page--dark .cart-summary {
+          background: color-mix(in srgb, var(--ct-ink) 8%, transparent);
+          border-color: color-mix(in srgb, var(--ct-ink) 16%, transparent);
+          box-shadow: 0 14px 30px color-mix(in srgb, black 30%, transparent);
+        }
+        .cart-page--dark .cart-summary-row { color: color-mix(in srgb, var(--ct-ink) 70%, transparent); }
+        .cart-page--dark .cart-summary-row strong { color: var(--ct-strong); }
+        .cart-page--dark .cart-summary-total { border-top-color: color-mix(in srgb, var(--ct-ink) 20%, transparent); }
+        .cart-page--dark .cart-secondary-btn {
+          background: color-mix(in srgb, var(--ct-ink) 10%, transparent);
+          border-color: color-mix(in srgb, var(--ct-ink) 30%, transparent);
+          color: var(--ct-strong);
+        }
+        .cart-page--dark .ws-skeleton { background: color-mix(in srgb, var(--ct-ink) 12%, transparent); }
+        .cart-page--dark .ws-skeleton::after {
+          background: linear-gradient(
+            180deg,
+            transparent 0%,
+            color-mix(in srgb, var(--ct-ink) 18%, transparent) 48%,
+            transparent 100%
+          );
+          opacity: 0.7;
+        }
+        .cart-page--dark .ws-skeleton-img { border-color: color-mix(in srgb, var(--ct-ink) 16%, transparent); }
+        .cart-page--dark .cart-skeleton-button--secondary { background: color-mix(in srgb, var(--ct-ink) 8%, transparent); }
+        .cart-page--dark .cart-summary--skeleton .cart-summary-row--total { border-top-color: color-mix(in srgb, var(--ct-ink) 16%, transparent); }
         .cart-modal-overlay {
           position: fixed;
           inset: 0;
@@ -1996,12 +2127,18 @@ function Cart() {
           pointer-events: none;
           animation: cartToastIn 0.18s ease-out;
         }
+        .cart-modal-actions--pair {
+          grid-template-columns: 1fr 1fr;
+        }
         @media (min-width: 420px) {
           .cart-modal-actions {
             grid-template-columns: 1fr 1fr;
           }
           .cart-modal-btn--ghost {
             grid-column: 1 / -1;
+          }
+          .cart-modal-actions--pair .cart-modal-btn--ghost {
+            grid-column: auto;
           }
         }
         @keyframes cartModalIn {

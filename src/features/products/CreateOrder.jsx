@@ -1,32 +1,49 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
+  ArrowRight,
   BadgeCheck,
+  Check,
   ChevronLeft,
   Home as HomeIcon,
-  Mail,
+  Lock,
+  MapPin,
   PhoneCall,
   ShoppingBag,
-  UserRound,
 } from 'lucide-react';
 import { useAppTheme } from '../../shared/context/ThemeContext';
+import { isPageDark, pageAccent } from '../../shared/utils/pageTone';
 import { getProfile } from '../../shared/services/api';
 import { resolveOrderHistoryMemberId } from './orderHistoryService';
 import { openRazorpayCheckout } from './paymentService';
+import { track } from '../../shared/services/analytics';
 import { supabase } from '../../shared/services/supabaseClient';
 import { applyOpacity } from '../../shared/utils/colorUtils';
-import { clearCartItems, getCartItemPricing, getCartSummary, readCartItems, refreshCartCache, subscribeCart } from './productCart';
+import { clearCartItems, forgetCartPurchaseRefs, getCartItemPricing, getCartSummary, readCartItems, refreshCartCache, subscribeCart } from './productCart';
 import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
+import { getAppHomePath } from '../../shared/utils/tenantNavigation';
+import { lockBodyScroll } from '../../shared/utils/scrollLock';
+import CheckoutDetailsCard from './CheckoutDetailsCard';
+import { useThemeButtonVars } from '../../shared/utils/themeButtonVars';
+import {
+  addressLabelText,
+  buildInitialCheckoutDetails,
+  formatAddress,
+  isCompanyOrder,
+  saveMemberCompany,
+  saveOrderCheckoutDetails,
+  validateCheckoutDetails,
+} from '../../shared/utils/checkoutDetails';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const T = {
   page: 'var(--page-bg, var(--app-page-bg))',
   surface: 'var(--surface-color)',
-  text: 'var(--surface-color)',
-  muted: 'color-mix(in srgb, var(--surface-color) 64%, var(--surface-color))',
-  line: 'color-mix(in srgb, var(--surface-color) 12%, transparent)',
+  text: 'var(--page-text-color, var(--body-text-color))',
+  muted: 'color-mix(in srgb, var(--page-text-color, var(--body-text-color)) 66%, transparent)',
+  line: 'color-mix(in srgb, var(--page-text-color, var(--body-text-color)) 16%, transparent)',
 };
 
 const normalizeText = (value) => {
@@ -178,8 +195,6 @@ const buildInitialForm = () => {
 const formatCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
 
 const normalizeRpcValue = (value) => {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
   return normalizeText(value);
 };
 
@@ -252,12 +267,74 @@ const buildPurchaseRequests = (items = [], memberId, trustId, status = 'order_pa
   });
 };
 
+const formatMobileForDisplay = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  const local = digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+  return local.length === 10 ? `+91 ${local.slice(0, 5)} ${local.slice(5)}` : normalizeText(value);
+};
+
+const STEP_ACCENT = 'var(--page-price-color, var(--page-text-color, var(--body-text-color)))';
+const STEP_BTN_BG = 'var(--pd-btn-bg, var(--app-button-bg))';
+const STEP_BTN_TEXT = 'var(--pd-btn-text, var(--app-button-text))';
+
+// Profile -> Address -> Pay. Themed through the same tokens as the rest of the page.
+function CheckoutStepper({ step, finalLabel, cardStyle }) {
+  const current = step === 'pay' ? 3 : 2;
+  const steps = [
+    { id: 1, label: 'Profile' },
+    { id: 2, label: 'Address' },
+    { id: 3, label: finalLabel },
+  ];
+
+  return (
+    <ol className="flex items-center rounded-[24px] px-4 py-3.5" style={cardStyle} aria-label="Checkout progress">
+      {steps.map((entry, index) => {
+        const done = entry.id < current;
+        const active = entry.id === current;
+        return (
+          <React.Fragment key={entry.id}>
+            <li className="flex items-center gap-2" aria-current={active ? 'step' : undefined}>
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-extrabold"
+                style={
+                  done || active
+                    ? {
+                      background: STEP_BTN_BG,
+                      color: STEP_BTN_TEXT,
+                      boxShadow: active ? `0 0 0 4px color-mix(in srgb, ${STEP_ACCENT} 22%, transparent)` : 'none',
+                    }
+                    : { background: T.line, color: T.muted }
+                }
+              >
+                {done ? <Check className="h-4 w-4" strokeWidth={3} /> : entry.id}
+              </span>
+              <span className="text-sm font-extrabold" style={{ color: active ? T.text : T.muted }}>
+                {entry.label}
+              </span>
+            </li>
+            {index < steps.length - 1 ? (
+              <span
+                className="mx-2 h-[3px] min-w-[16px] flex-1 rounded-full"
+                style={{ background: entry.id < current ? STEP_BTN_BG : T.line }}
+                aria-hidden="true"
+              />
+            ) : null}
+          </React.Fragment>
+        );
+      })}
+    </ol>
+  );
+}
+
 function CreateOrder() {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useAppTheme();
+  const pageDark = useMemo(() => isPageDark(), [theme]); // eslint-disable-line react-hooks/exhaustive-deps
+  const accent = pageAccent(theme.primary, pageDark);
   const navbarTheme = getNavbarThemeStyles(theme);
   const navbarTextColor = navbarTheme?.textColor || 'var(--navbar-text)';
+  const themeButtonVars = useThemeButtonVars(theme);
   const checkoutTrustIdFromUrl = useMemo(() => {
     const params = new URLSearchParams(location.search || '');
     return normalizeText(params.get('trustId'));
@@ -279,6 +356,17 @@ function CreateOrder() {
   const [_locationStatus, setLocationStatus] = useState('');
   const [_isCapturingLocation, setIsCapturingLocation] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [checkout, setCheckout] = useState(() => buildInitialCheckoutDetails());
+  const [showCheckoutErrors, setShowCheckoutErrors] = useState(false);
+  const [step, setStep] = useState('address'); // 'address' | 'pay'
+  const checkoutMemberId = useMemo(() => {
+    const id = resolveOrderHistoryMemberId(readLoggedInUser());
+    return id && isUuid(id) ? id : '';
+  }, []);
+  const patchCheckout = (patch) => setCheckout((prev) => ({ ...prev, ...patch }));
+  const [paymentOutcome, setPaymentOutcome] = useState('');
+  // Remembers saved pending purchases so a retry with the same cart does not create duplicates.
+  const pendingOrderRef = useRef({ signature: '', purchaseIds: [] });
 
   const trustId = normalizeText(
     checkoutTrustIdFromUrl
@@ -327,12 +415,7 @@ function CreateOrder() {
   useEffect(() => {
     if (!showSuccessPopup || typeof document === 'undefined') return undefined;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
+    return lockBodyScroll();
   }, [showSuccessPopup]);
 
   useEffect(() => {
@@ -499,6 +582,34 @@ function CreateOrder() {
     );
   };
 
+  const handleContinue = () => {
+    if (!checkout.loaded) {
+      setError('Loading your saved address. Please try again in a moment.');
+      return;
+    }
+
+    const checkoutError = validateCheckoutDetails(checkout);
+    if (checkoutError) {
+      setShowCheckoutErrors(true);
+      setError(checkoutError);
+      document.getElementById('checkout-details-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    setError('');
+    setStep('pay');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBack = () => {
+    if (step === 'pay') {
+      setError('');
+      setStep('address');
+      return;
+    }
+    navigate(-1);
+  };
+
   const handlePayNow = async (event) => {
     event.preventDefault();
 
@@ -528,27 +639,71 @@ function CreateOrder() {
         return;
       }
 
-      const runPurchaseRequests = async (status) => {
-        const purchaseRequests = buildPurchaseRequests(items, memberId, trustId, status);
+      if (!checkout.loaded) {
+        setError('Loading your saved address. Please try again in a moment.');
+        return;
+      }
+
+      const checkoutError = validateCheckoutDetails(checkout);
+      if (checkoutError) {
+        setShowCheckoutErrors(true);
+        setError(checkoutError);
+        document.getElementById('checkout-details-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      const cartSignature = `${trustId}:${items
+        .map((item) => `${item.key || item.id}x${getCartItemPricing(item).quantity}`)
+        .sort()
+        .join('|')}`;
+
+      const savePendingOrder = async () => {
+        if (pendingOrderRef.current.signature === cartSignature && pendingOrderRef.current.purchaseIds.length > 0) {
+          return pendingOrderRef.current.purchaseIds;
+        }
+
+        const purchaseRequests = buildPurchaseRequests(items, memberId, trustId, 'order_payment_pending');
+        const purchaseIds = [];
         for (const request of purchaseRequests) {
           const { data, error: rpcError } = await supabase.rpc('manage_purchase_by_member', request);
           if (rpcError) throw rpcError;
 
           if (data && typeof data === 'object' && !Array.isArray(data) && data.success === false) {
-            throw new Error(normalizeText(data.message) || 'Unable to save your purchase right now.');
+            throw new Error(normalizeText(data.error) || normalizeText(data.message) || 'Unable to save your purchase right now.');
           }
+
+          const purchaseId = normalizeText(data?.id);
+          if (!isUuid(purchaseId)) {
+            throw new Error('Unable to save your purchase right now.');
+          }
+          purchaseIds.push(purchaseId);
         }
+
+        pendingOrderRef.current = { signature: cartSignature, purchaseIds };
+        // These rows are orders now; a later add to cart must create a fresh cart row.
+        forgetCartPurchaseRefs(trustId, purchaseIds);
+        return purchaseIds;
       };
 
-      if (selectedTrustPaymentGateway === true) {
-        // Convert the cart rows into a pending order before Razorpay opens, so a
-        // dropped/closed checkout still leaves a traceable pending order in the DB.
-        await runPurchaseRequests('order_payment_pending');
+      // The app never marks an order paid; only the server does, after Razorpay confirms.
+      const purchaseIds = await savePendingOrder();
 
+      // Keep a snapshot of where this order goes (and the company / GST) so the team can see it later.
+      // This must not block the payment: the order itself is already saved.
+      try {
+        await saveOrderCheckoutDetails({ memberId, trustId, purchaseIds, details: checkout });
+        if (isCompanyOrder(checkout)) {
+          await saveMemberCompany(memberId, { companyName: checkout.companyName, gstNumber: checkout.gstNumber });
+        }
+      } catch (detailsError) {
+        console.warn('Saving checkout details failed:', detailsError?.message || detailsError);
+      }
+
+      if (selectedTrustPaymentGateway === true) {
         try {
-          await openRazorpayCheckout({
-            amountInRupees: summary.totalAmount,
-            receipt: `order_${trustId}_${Date.now()}`,
+          const result = await openRazorpayCheckout({
+            trustId,
+            purchaseIds,
             name: trustName,
             description: `Order payment for ${trustName}`,
             prefill: {
@@ -556,17 +711,22 @@ function CreateOrder() {
               email: customerInfo.email || form.email,
               contact: customerInfo.mobile || form.mobile,
             },
-            notes: { trust_id: trustId, member_id: memberId },
+            themeColor: theme.primary,
           });
+          setPaymentOutcome(result.status);
         } catch (paymentError) {
-          setError(paymentError?.message || 'Payment was not completed. Please try again.');
+          setError(
+            paymentError?.code === 'PAYMENT_CANCELLED'
+              ? 'Payment was cancelled. Your order is saved — tap Pay to try again.'
+              : paymentError?.message || 'Payment was not completed. Please try again.'
+          );
           return;
         }
-
-        await runPurchaseRequests('order_payment_done');
       } else {
-        await runPurchaseRequests('order_payment_pending');
+        setPaymentOutcome('pending_offline');
       }
+
+      pendingOrderRef.current = { signature: '', purchaseIds: [] };
 
       try {
         await clearCartItems(trustId, { sync: false });
@@ -574,6 +734,7 @@ function CreateOrder() {
         // Ignore cart cleanup issues and continue to the success modal.
       }
 
+      track('generate_lead', { lead_type: 'order' });
       setShowSuccessPopup(true);
     } catch (err) {
       console.error('Checkout purchase save failed:', err);
@@ -617,6 +778,7 @@ function CreateOrder() {
   };
 
   const isCheckoutDataLoading = isCartLoading || isCustomerDetailsLoading || isTrustSettingsLoading;
+  const isSubmitButtonDisabled = isCheckoutDataLoading || isSubmitting || !checkout.loaded;
 
   const successPopup = showSuccessPopup && typeof document !== 'undefined'
     ? createPortal(
@@ -643,7 +805,7 @@ function CreateOrder() {
                   {trustName}
                 </h2>
                 <p className="text-[11px] font-bold uppercase tracking-[0.24em]" style={{ color: theme.primary }}>
-                  Order confirmed
+                  {paymentOutcome === 'paid' || paymentOutcome === 'processing' || paymentOutcome === 'paid_needs_attention' ? 'Payment received' : 'Order confirmed'}
                 </p>
               </div>
             </div>
@@ -654,7 +816,10 @@ function CreateOrder() {
           <p className="mt-4 text-sm leading-6" style={{ color: theme.secondary }}>
             Thank You for shopping from us.
             <br />
-            {trustName} team will contact you within 24 hours.
+            {paymentOutcome === 'paid' && 'Payment received. Your order is confirmed.'}
+            {paymentOutcome === 'processing' && 'Payment received, confirming your order. It will show in Order History shortly.'}
+            {paymentOutcome === 'paid_needs_attention' && `Payment received. The ${trustName} team will activate your order shortly.`}
+            {(!paymentOutcome || paymentOutcome === 'pending_offline') && `${trustName} team will contact you within 24 hours.`}
           </p>
           <button
             type="button"
@@ -677,10 +842,12 @@ function CreateOrder() {
     <>
       {successPopup}
       <main
-        className="min-h-screen pb-8"
+        className="flex flex-col"
         style={{
+          minHeight: '100vh',
           background: T.page,
           color: T.text,
+          ...themeButtonVars,
         }}
       >
       <div
@@ -698,7 +865,7 @@ function CreateOrder() {
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
               className="p-2 rounded-xl transition-colors"
               style={{
                 color: navbarTextColor,
@@ -710,7 +877,7 @@ function CreateOrder() {
             </button>
             <div className="min-w-0 flex-1 text-center">
               <h1 className="truncate text-lg font-extrabold tracking-wide" style={{ color: navbarTextColor }}>
-                Create Order
+                Confirm Order
               </h1>
             </div>
             <button
@@ -720,7 +887,7 @@ function CreateOrder() {
                 color: navbarTextColor,
                 background: 'color-mix(in srgb, var(--navbar-bg) 72%, var(--surface-color))',
               }}
-              onClick={() => navigate('/')}
+              onClick={() => navigate(getAppHomePath())}
               aria-label="Go home"
             >
               <HomeIcon className="h-5 w-5" />
@@ -729,14 +896,26 @@ function CreateOrder() {
         </div>
       </div>
 
-      <section className="px-4 pt-4">
+      {items.length > 0 ? (
+        <div className="px-4 pt-4">
+          <div className="mx-auto max-w-5xl">
+            <CheckoutStepper
+              step={step}
+              finalLabel={selectedTrustPaymentGateway === true ? 'Pay' : 'Confirm'}
+              cardStyle={orderCardStyle}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <section className="flex-1 px-4 pt-4 pb-6">
         {isCartLoading && items.length === 0 ? (
           <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-4 text-center capitalize">
             <div className="flex h-16 w-16 items-center justify-center rounded-3xl" style={{ background: `linear-gradient(135deg, ${applyOpacity(theme.accent, 0.65)}, ${theme.accentBg})` }}>
               <ShoppingBag className="h-7 w-7" style={{ color: '#fff' }} />
             </div>
             <div>
-              <p className="text-xl font-extrabold" style={{ color: 'var(--surface-color)' }}>
+              <p className="text-xl font-extrabold" style={{ color: T.text }}>
                 Loading your cart
               </p>
               <p className="mt-2 text-sm leading-6" style={{ color: T.muted }}>
@@ -750,7 +929,7 @@ function CreateOrder() {
               <ShoppingBag className="h-7 w-7" style={{ color: '#fff' }} />
             </div>
             <div>
-              <p className="text-xl font-extrabold" style={{ color: 'var(--surface-color)' }}>
+              <p className="text-xl font-extrabold" style={{ color: T.text }}>
                 Your cart is empty
               </p>
               <p className="mt-2 text-sm leading-6" style={{ color: T.muted }}>
@@ -762,8 +941,8 @@ function CreateOrder() {
               onClick={() => navigate('/cart')}
               className="min-h-[46px] rounded-2xl px-5 text-sm font-extrabold transition-transform active:scale-[0.99]"
               style={{
-                background: `linear-gradient(135deg, ${applyOpacity(theme.accent, 0.85)}, ${theme.accentBg})`,
-                color: '#fff',
+                background: 'var(--app-button-bg)',
+                color: 'var(--app-button-text)',
               }}
             >
               Go to cart
@@ -771,69 +950,127 @@ function CreateOrder() {
           </div>
         ) : (
           <div className="mx-auto max-w-5xl space-y-4">
-            <form id="create-order-form" onSubmit={handlePayNow} className="space-y-4">
-              <div className="rounded-[30px] p-5 sm:p-6" style={orderCardStyle}>
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold uppercase tracking-[0.24em]" style={{ color: theme.primary }}>
-                      Customer Details
+            {step === 'address' ? (
+              <form
+                id="create-order-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleContinue();
+                }}
+                className="space-y-4"
+              >
+                <div className="rounded-[30px] p-5 sm:p-6" style={orderCardStyle}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.22em]" style={{ color: accent }}>
+                      Customer details
                     </p>
-                    <h2 className="mt-1 text-xl font-extrabold" style={{ color: 'var(--surface-color)' }}>
-                      Your profile details
-                    </h2>
-                  </div>
-                  <div
-                    className="rounded-2xl px-3 py-2 text-xs font-bold"
-                    style={{
-                      background: `color-mix(in srgb, ${theme.primary} 10%, var(--surface-color))`,
-                      color: theme.primary,
-                    }}
-                  >
-                    {isTrustSettingsLoading ? (
-                      <span
-                        className="block h-3.5 w-24 rounded-full animate-pulse"
-                        style={skeletonLineStyle}
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      trustName
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-3">
-                  <div
-                    className="flex items-center gap-3 rounded-2xl border px-4 py-3"
-                    style={{ borderColor: T.line, background: 'color-mix(in srgb, var(--surface-color) 88%, var(--page-bg))' }}
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ background: `color-mix(in srgb, ${theme.primary} 10%, var(--surface-color))` }}>
-                      <UserRound className="h-4 w-4" style={{ color: theme.primary }} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      {isCustomerDetailsLoading ? (
-                        <div className="space-y-2.5" aria-hidden="true">
-                          <span className="block h-4 w-3/4 rounded-full animate-pulse" style={skeletonLineStyle} />
-                          <span className="block h-4 w-1/2 rounded-full animate-pulse" style={skeletonLineStrongStyle} />
-                          <span className="block h-4 w-2/3 rounded-full animate-pulse" style={skeletonLineStyle} />
-                        </div>
+                    <div
+                      className="rounded-full px-3 py-1.5 text-xs font-bold"
+                      style={{ background: `color-mix(in srgb, ${accent} 12%, transparent)`, color: accent }}
+                    >
+                      {isTrustSettingsLoading ? (
+                        <span className="block h-3.5 w-20 rounded-full animate-pulse" style={skeletonLineStyle} aria-hidden="true" />
                       ) : (
-                        <p className="mt-0.5 truncate text-sm font-semibold" style={{ color: 'var(--surface-color)' }}>
-                          {customerInfo.fullName || 'Not available'}<br/>
-                          {customerInfo.mobile || 'Not available'}<br/>
-                          {customerInfo.email || null}
-                        </p>
+                        trustName
                       )}
                     </div>
                   </div>
 
-                  
+                  <div
+                    className="mt-4 flex items-center gap-3.5 rounded-2xl border px-4 py-3.5"
+                    style={{ borderColor: T.line, background: 'color-mix(in srgb, var(--page-text-color, var(--body-text-color)) 6%, transparent)' }}
+                  >
+                    {isCustomerDetailsLoading ? (
+                      <div className="flex w-full items-center gap-3.5" aria-hidden="true">
+                        <span className="block h-14 w-14 shrink-0 rounded-full animate-pulse" style={skeletonLineStrongStyle} />
+                        <div className="flex-1 space-y-2.5">
+                          <span className="block h-4 w-1/2 rounded-full animate-pulse" style={skeletonLineStrongStyle} />
+                          <span className="block h-3.5 w-2/3 rounded-full animate-pulse" style={skeletonLineStyle} />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-extrabold"
+                          style={{ background: STEP_BTN_BG, color: STEP_BTN_TEXT }}
+                        >
+                          {(customerInfo.fullName || '?').trim().charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-base font-extrabold" style={{ color: T.text }}>
+                            {customerInfo.fullName || 'Not available'}
+                          </p>
+                          <p className="mt-0.5 flex items-center gap-1.5 text-sm font-medium" style={{ color: T.muted }}>
+                            <PhoneCall className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{formatMobileForDisplay(customerInfo.mobile) || 'Not available'}</span>
+                          </p>
+                        </div>
+                        {customerInfo.mobile ? (
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                            style={{ background: 'color-mix(in srgb, #16a34a 16%, transparent)', color: '#16a34a' }}
+                          >
+                            <Check className="h-3 w-3" strokeWidth={3} />
+                            Verified
+                          </span>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
                 </div>
 
+                <CheckoutDetailsCard
+                  memberId={checkoutMemberId}
+                  value={checkout}
+                  onChange={patchCheckout}
+                  cardStyle={orderCardStyle}
+                  themePrimary={accent}
+                  showErrors={showCheckoutErrors}
+                />
+
+                {error ? (
+                  <div
+                    className="rounded-2xl px-4 py-3 text-sm font-semibold"
+                    style={{ background: applyOpacity('#ef4444', 0.1), color: '#dc2626' }}
+                    role="alert"
+                  >
+                    {error}
+                  </div>
+                ) : null}
+              </form>
+            ) : null}
+
+            {step === 'pay' ? (
+            <aside className="space-y-4">
+              <div className="rounded-[30px] p-5 sm:p-6" style={orderCardStyle}>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" style={{ background: `color-mix(in srgb, ${theme.primary} 10%, transparent)` }}>
+                    <MapPin className="h-5 w-5" style={{ color: accent }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.2em]" style={{ color: accent }}>
+                      Delivering to {checkout.addresses[checkout.selected] ? `· ${addressLabelText(checkout.addresses[checkout.selected].label)}` : ''}
+                    </p>
+                    <p className="mt-1.5 text-sm font-semibold leading-6" style={{ color: T.text }}>
+                      {formatAddress(checkout.addresses[checkout.selected])}
+                    </p>
+                    {isCompanyOrder(checkout) ? (
+                      <p className="mt-1 text-[13px] font-medium" style={{ color: T.muted }}>
+                        {[checkout.companyName, checkout.gstNumber ? `GST ${checkout.gstNumber}` : ''].filter(Boolean).join(' • ')}
+                      </p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold"
+                    style={{ borderColor: T.line, color: T.text }}
+                  >
+                    Change
+                  </button>
+                </div>
               </div>
 
-            </form>
-
-            <aside className="space-y-4">
               <div className="rounded-[30px] p-5 sm:p-6 capitalize" style={orderCardStyle}>
                 <div className="mb-4 flex items-start gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" style={{ background: `color-mix(in srgb, ${theme.primary} 10%, var(--surface-color))` }}>
@@ -847,10 +1084,10 @@ function CreateOrder() {
                       </div>
                     ) : (
                       <>
-                        <p className="text-xs font-bold uppercase tracking-[0.24em]" style={{ color: theme.primary }}>
+                        <p className="text-xs font-bold uppercase tracking-[0.24em]" style={{ color: accent }}>
                           Order summary
                         </p>
-                        <h2 className="mt-1 text-xl font-extrabold" style={{ color: 'var(--surface-color)' }}>
+                        <h2 className="mt-1 text-xl font-extrabold" style={{ color: T.text }}>
                           Review your order
                         </h2>
                       </>
@@ -894,7 +1131,7 @@ function CreateOrder() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-extrabold" style={{ color: 'var(--surface-color)' }}>
+                            <p className="truncate text-sm font-extrabold" style={{ color: T.text }}>
                               {item.product_name}
                             </p>
                             {item.category_name ? (
@@ -904,10 +1141,10 @@ function CreateOrder() {
                             ) : null}
                           </div>
                           <div className="text-right">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: theme.primary }}>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>
                               Qty {pricing.quantity}
                             </p>
-                            <p className="mt-1 text-sm font-extrabold" style={{ color: 'var(--surface-color)' }}>
+                            <p className="mt-1 text-sm font-extrabold" style={{ color: T.text }}>
                               {formatCurrency(pricing.totalAmount)}
                             </p>
                           </div>
@@ -968,31 +1205,31 @@ function CreateOrder() {
                     <>
                       <div className="flex items-center justify-between gap-3 py-1 text-sm" style={{ color: T.muted }}>
                         <span>Products</span>
-                        <strong style={{ color: 'var(--surface-color)' }}>{summary.distinctItems}</strong>
+                        <strong style={{ color: T.text }}>{summary.distinctItems}</strong>
                       </div>
                       <div className="flex items-center justify-between gap-3 py-1 text-sm" style={{ color: T.muted }}>
                         <span>Total quantity</span>
-                        <strong style={{ color: 'var(--surface-color)' }}>{summary.totalQuantity}</strong>
+                        <strong style={{ color: T.text }}>{summary.totalQuantity}</strong>
                       </div>
                       <div className="flex items-center justify-between gap-3 py-1 text-sm" style={{ color: T.muted }}>
                         <span>Subtotal</span>
-                        <strong style={{ color: 'var(--surface-color)' }}>{formatCurrency(summary.subtotal)}</strong>
+                        <strong style={{ color: T.text }}>{formatCurrency(summary.subtotal)}</strong>
                       </div>
                       <div className="flex items-center justify-between gap-3 py-1 text-sm" style={{ color: T.muted }}>
                         <span>Taxes</span>
-                        <strong style={{ color: 'var(--surface-color)' }}>{formatCurrency(summary.taxAmount)}</strong>
+                        <strong style={{ color: T.text }}>{formatCurrency(summary.taxAmount)}</strong>
                       </div>
                       {hasDeliveryCharge ? (
                         <div className="flex items-center justify-between gap-3 py-1 text-sm" style={{ color: T.muted }}>
                           <span>Delivery</span>
-                          <strong style={{ color: 'var(--surface-color)' }}>{formatCurrency(summary.transportAmount)}</strong>
+                          <strong style={{ color: T.text }}>{formatCurrency(summary.transportAmount)}</strong>
                         </div>
                       ) : null}
                       <div className="mt-2 flex items-center justify-between gap-3 border-t pt-3" style={{ borderColor: T.line }}>
                         <span className="text-sm font-semibold" style={{ color: T.muted }}>
                           Grand total
                         </span>
-                        <strong className="text-lg" style={{ color: 'var(--surface-color)' }}>
+                        <strong className="text-lg" style={{ color: T.text }}>
                           {formatCurrency(summary.totalAmount)}
                         </strong>
                       </div>
@@ -1012,46 +1249,51 @@ function CreateOrder() {
                   </div>
                 ) : null}
 
-                <div className="mt-5 grid gap-3">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/cart')}
-                    className="min-h-[50px] rounded-2xl border px-4 text-sm font-extrabold transition-transform active:scale-[0.99]"
-                    style={{
-                      background: T.surface,
-                      borderColor: applyOpacity(theme.primary, 0.18),
-                      color: 'var(--brand-navy)',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    form="create-order-form"
-                    className="min-h-[50px] rounded-2xl px-4 text-sm font-extrabold transition-transform active:scale-[0.99]"
-                    style={{
-                      background: `linear-gradient(135deg, ${applyOpacity(theme.accent, 0.85)}, ${theme.accentBg})`,
-                      color: '#fff',
-                    }}
-                  >
-                    {isTrustSettingsLoading
-                      ? 'Loading trust settings...'
-                      : isCustomerDetailsLoading
-                        ? 'Loading profile...'
-                        : isSubmitting
-                          ? 'Processing...'
-                          : 'Pay now'}
-                  </button>
-                </div>
-
-                <p className="mt-3 text-center text-[11px] leading-5" style={{ color: T.muted }}>
-                  By tapping Pay now, you confirm the order details above.
-                </p>
               </div>
             </aside>
+            ) : null}
           </div>
         )}
       </section>
+
+      {items.length > 0 ? (
+        <div
+          className="sticky bottom-0 z-30 px-4 pt-3"
+          style={{
+            background: T.page,
+            borderTop: `1px solid ${T.line}`,
+            boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.1)',
+            paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+          }}
+        >
+          <div className="mx-auto max-w-5xl">
+            <button
+              type="button"
+              onClick={step === 'address' ? handleContinue : () => handlePayNow({ preventDefault() {} })}
+              disabled={step === 'address' ? (isCheckoutDataLoading || !checkout.loaded) : isSubmitButtonDisabled}
+              className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl text-base font-extrabold transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:active:scale-100"
+              style={{
+                background: STEP_BTN_BG,
+                color: STEP_BTN_TEXT,
+                opacity: (step === 'address' ? (isCheckoutDataLoading || !checkout.loaded) : isSubmitButtonDisabled) ? 0.5 : 1,
+              }}
+            >
+              {step === 'address'
+                ? (selectedTrustPaymentGateway === true ? 'Continue to payment' : 'Review order')
+                : isSubmitting
+                  ? 'Processing...'
+                  : selectedTrustPaymentGateway === true
+                    ? `Pay ${formatCurrency(summary.totalAmount)}`
+                    : 'Confirm order'}
+              {step === 'address' ? <ArrowRight className="h-5 w-5" /> : null}
+            </button>
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-[11.5px] font-medium" style={{ color: T.muted }}>
+              <Lock className="h-3 w-3" />
+              Your details are safe and used only for this order
+            </p>
+          </div>
+        </div>
+      ) : null}
       </main>
     </>
   );
