@@ -1,3 +1,4 @@
+import { track } from '../../shared/services/analytics';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, FileText, HomeIcon, Menu, Plus, ShieldCheck, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +7,7 @@ import { applyOpacity } from '../../shared/utils/colorUtils';
 import { getFamilyMembers } from '../../shared/services/api';
 import { supabase } from '../../shared/services/supabaseClient';
 import { getNavbarThemeStyles } from '../../shared/utils/themeUtils';
+import { getAppHomePath } from '../../shared/utils/tenantNavigation';
 import Sidebar from '../home-navigation/Sidebar';
 
 const resolveInitialMemberships = () => {
@@ -241,6 +243,7 @@ const NominationDetails = ({ onNavigate }) => {
       if (error) throw error;
       await refreshNominations();
       setNominationForm({ family_member_id: '' });
+      track('nomination_save');
       setMessage({ type: 'success', text: 'Nominee saved successfully.' });
     } catch (error) {
       setMessage({ type: 'error', text: error?.message || 'Unable to update nominee.' });
@@ -315,6 +318,7 @@ const NominationDetails = ({ onNavigate }) => {
         .in('id', targetIds);
       if (error) throw error;
       await refreshNominations();
+      track('nomination_remove');
       setMessage({ type: 'success', text: 'Nomination removed.' });
     } catch (error) {
       setMessage({ type: 'error', text: error?.message || 'Unable to remove nomination.' });
@@ -392,7 +396,7 @@ const NominationDetails = ({ onNavigate }) => {
             <h1 className="text-lg font-extrabold tracking-wide" style={{ color: navbarTextColor }}>Nomination Details</h1>
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => navigate(getAppHomePath())}
               className="p-2 rounded-xl transition-colors"
               style={{ color: navbarTextColor, background: 'transparent' }}
               aria-label="Home"
