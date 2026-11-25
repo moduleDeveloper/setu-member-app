@@ -13,7 +13,7 @@ android {
         applicationId "com.Setu.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("VERSION_CODE") ?: "8").toInteger()
+        versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "8")
         versionName System.getenv("VERSION_NAME") ?: "1.8"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
