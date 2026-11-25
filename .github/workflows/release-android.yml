@@ -130,10 +130,10 @@ jobs:
 
       - name: Set up signing keystore
         env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASS: ${{ secrets.KEY_PASS }}
+          KEYSTORE_B64: ${{ secrets.SETU_KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.SETU_KEYSTORE_PASS }}
+          KEY_ALIAS: ${{ secrets.SETU_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.SETU_KEY_PASS }}
         run: |
           for name in KEYSTORE_B64 KEYSTORE_PASS KEY_ALIAS KEY_PASS; do
             [ -n "${!name}" ] || { echo "::error::$name secret missing"; exit 1; }
