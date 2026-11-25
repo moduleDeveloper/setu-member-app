@@ -105,7 +105,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
+        
+      - name: Patch facebook-login plugin for AGP 9
+        run: sed -i 's/proguard-android\.txt/proguard-android-optimize.txt/' node_modules/@capacitor-community/facebook-login/android/build.gradle
       - name: Write .env from APP_ENV
         env:
           APP_ENV: ${{ secrets.APP_ENV }}
