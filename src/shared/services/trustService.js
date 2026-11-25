@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+export { resolveAccessAllowed, resolveMembershipIsActive } from '../utils/tenantAccessDecision';
 
 const normalizeText = (value) => String(value || '').trim();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -49,7 +50,7 @@ export const fetchMemberTrusts = async (membersId) => {
   // Fetch trust details for all trust IDs
   const { data: trusts, error: trustError } = await supabase
     .from('Trust')
-    .select('id,name,icon_url,remark,created_at,version')
+    .select('id,name,legal_name,icon_url,remark,created_at,version')
     .in('id', trustIds);
 
   if (trustError) {
@@ -66,6 +67,7 @@ export const fetchMemberTrusts = async (membersId) => {
     return {
       id: m.trust_id || null,
       name: t.name || null,
+      legal_name: t.legal_name || null,
       icon_url: t.icon_url || null,
       remark: t.remark || null,
       is_active: m.is_active,
@@ -88,6 +90,7 @@ const mapMembershipRowsWithTrusts = (regMemberships = [], trustById = {}) =>
       id: m?.id || `membership-${index}`,
       trust_id: trustId,
       trust_name: trust?.name || null,
+      trust_legal_name: trust?.legal_name || null,
       trust_icon_url: trust?.icon_url || null,
       trust_remark: trust?.remark || null,
       is_active: m?.is_active,
@@ -107,6 +110,7 @@ const mapActiveTrustResponseToMemberships = (payload = {}) => {
       id: trust?.trust_id || `active-trust-${index}`,
       trust_id: trust?.trust_id || null,
       trust_name: trust?.trust_name || null,
+      trust_legal_name: trust?.trust_legal_name || trust?.legal_name || null,
       trust_icon_url: trust?.icon_url || null,
       trust_remark: trust?.remark || null,
       is_active: trust?.is_active !== false,
@@ -116,6 +120,13 @@ const mapActiveTrustResponseToMemberships = (payload = {}) => {
       member_id: payload?.member_id || null,
       qr_code: trust?.qr_code || null,
       trust_status: trust?.trust_status ?? null,
+      version: trust?.version ?? null,
+      web_app_url: trust?.web_app_url || null,
+      instagram_link: trust?.instagram_link || null,
+      facebook_link: trust?.facebook_link || null,
+      whatsapp_link: trust?.whatsapp_link || null,
+      linkedin_link: trust?.linkedin_link || null,
+      youtube_url: trust?.youtube_url || null,
       source: 'active_trusts_by_mobile'
     }))
     .sort((a, b) => {
@@ -326,22 +337,102 @@ export const fetchTrustById = async (id) => {
   return data || null;
 };
 
-export const fetchShareAppLinksByTrustId = async (trustId) => {
-  const normalizedTrustId = String(trustId || '').trim();
-  if (!normalizedTrustId) return null;
+export const fetchTrustByAppSlug = async (appSlug) => {
+  const normalizedSlug = normalizeText(appSlug).toLowerCase();
+  if (!normalizedSlug) return null;
 
   const { data, error } = await supabase
-    .from('shareApp_links')
-    .select('trust_id, play_store_link, app_store_link, instagram_link, facebook_link, whatsapp_link, linkedin_link, version')
-    .eq('trust_id', normalizedTrustId)
+    .from('Trust')
+    .select('id,name,legal_name,remark,icon_url,app_slug,app_visibility,pwa_icon_192_url,pwa_icon_512_url,pwa_theme_color,pwa_background_color,pwa_enabled,version')
+    .eq('app_slug', normalizedSlug)
+    .eq('pwa_enabled', true)
     .maybeSingle();
 
   if (error) {
-    console.warn('Error fetching share app links:', error);
+    console.warn('Error fetching trust by app slug:', error);
     return null;
   }
 
   return data || null;
+};
+
+// Resolves (and, if needed, server-side creates) this member's reg_members
+// row for the tenant Trust behind /app/<appSlug>. Backed by the deployed
+// generate-webApp-link Edge Function's `resolve_app_access` action, which
+// reads Trust.app_visibility itself to decide the new reg_members row's
+// is_active on insert (public -> true, private -> false) and never touches
+// is_active on an existing row — the client only ever reads the decision,
+// it never sends is_active/app_visibility values of its own, and never
+// writes reg_members.is_active itself.
+//
+// The response carries several fields for this decision, not just
+// is_active: `app_visibility`, `membership_is_active` (the raw stored
+// reg_members.is_active, mirrored under `reg_member.is_active` too),
+// `access_allowed` (the actual open/pending decision — already accounts for
+// a public app being open even when an existing membership row has
+// is_active=false), `access_status`, and a top-level `is_active` kept only
+// as a backward-compatible alias of `access_allowed`. Use this module's
+// re-exported resolveAccessAllowed()/resolveMembershipIsActive() (see
+// ../utils/tenantAccessDecision) rather than reading any of these fields
+// directly, so a future field rename/removal only needs updating in one
+// place.
+export const resolveTenantAppAccess = async ({ appSlug, membersId }) => {
+  const normalizedSlug = normalizeText(appSlug).toLowerCase();
+  const normalizedMembersId = normalizeText(membersId);
+  if (!normalizedSlug || !normalizedMembersId) return null;
+
+  const { data, error } = await supabase.functions.invoke('generate-webApp-link', {
+    body: { action: 'resolve_app_access', app_slug: normalizedSlug, members_id: normalizedMembersId }
+  });
+
+  if (error) {
+    console.warn('Error resolving tenant app access:', error);
+    throw error;
+  }
+
+  if (!data?.success) {
+    console.warn('Tenant app access resolution failed:', data?.message);
+    return null;
+  }
+
+  return data;
+};
+
+// Keeps reg_members' denormalized Name in sync after a profile-popup save —
+// resolve_app_access only copies Name onto a *newly created* row and never
+// updates it again on its own. Only ever writes Name; is_active is never
+// touched from the client.
+export const syncTenantMembershipName = async ({ regMemberId, name }) => {
+  const normalizedId = normalizeText(regMemberId);
+  const normalizedName = normalizeText(name);
+  if (!normalizedId || !normalizedName) return;
+
+  const { error } = await supabase
+    .from('reg_members')
+    .update({ Name: normalizedName })
+    .eq('id', normalizedId);
+
+  if (error) {
+    console.warn('Error syncing tenant membership name:', error);
+  }
+};
+
+export const fetchTrustHelpUrl = async (trustId) => {
+  const normalizedTrustId = normalizeText(trustId);
+  if (!normalizedTrustId) return null;
+
+  const { data, error } = await supabase
+    .from('Trust')
+    .select('help_url')
+    .eq('id', normalizedTrustId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Error fetching trust help_url:', error);
+    return null;
+  }
+
+  return normalizeText(data?.help_url) || null;
 };
 
 export const fetchTemplatesForTrust = async (trustId) => {
