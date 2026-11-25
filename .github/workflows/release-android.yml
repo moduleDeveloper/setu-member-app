@@ -1,0 +1,219 @@
+name: Release Android (Google Play)
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "android/**"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.json"
+      - "vite.config.js"
+      - "index.html"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build only, do not upload to Google Play
+        type: boolean
+        default: true
+      user_fraction:
+        description: Rollout fraction (1.0 = full rollout, e.g. 0.1 = 10% staged)
+        type: string
+        default: "1.0"
+      in_app_update_priority:
+        description: In-app update priority (0-5)
+        type: string
+        default: "0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-android
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PACKAGE_NAME: com.Setu.app
+    steps:
+      # Decide up front whether this run may upload. Never touches secrets.
+      - name: Decide upload mode
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          AUTO_RELEASE_ENABLED: ${{ vars.AUTO_RELEASE_ENABLED }}
+          USER_FRACTION: ${{ inputs.user_fraction }}
+          UPDATE_PRIORITY: ${{ inputs.in_app_update_priority }}
+        run: |
+          upload=false
+          if [ "$EVENT_NAME" = "push" ]; then
+            [ "$AUTO_RELEASE_ENABLED" = "true" ] && upload=true
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            [ "$DRY_RUN" = "false" ] && upload=true
+          fi
+
+          fraction="${USER_FRACTION:-1.0}"
+          priority="${UPDATE_PRIORITY:-0}"
+          if ! [[ "$fraction" =~ ^(1(\.0+)?|0?\.[0-9]*[1-9][0-9]*)$ ]]; then
+            echo "::error::user_fraction must be a number in (0, 1], got '$fraction'"; exit 1
+          fi
+          [[ "$priority" =~ ^[0-5]$ ]] || { echo "::error::in_app_update_priority must be 0-5"; exit 1; }
+
+          if awk -v f="$fraction" 'BEGIN { exit !(f < 1.0) }'; then
+            status=inProgress
+          else
+            status=completed
+            fraction=""
+          fi
+
+          {
+            echo "upload=$upload"
+            echo "status=$status"
+            echo "fraction=$fraction"
+            echo "priority=$priority"
+          } >> "$GITHUB_OUTPUT"
+          echo "Upload to Google Play: $upload (status=$status fraction='${fraction}' priority=$priority)"
+          if [ "$upload" != "true" ]; then echo "::notice::Build-only run: nothing will be uploaded to Google Play."; fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          # default 'tools platform-tools' is not found in new cmdline-tools
+          packages: ''
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.1.0"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Patch plugin gradle files for AGP 9
+        run: find node_modules -path "*/android/build.gradle" -print0 | xargs -0 sed -i 's/proguard-android\.txt/proguard-android-optimize.txt/'
+
+      - name: Write .env from APP_ENV
+        env:
+          APP_ENV: ${{ secrets.APP_ENV }}
+        run: |
+          [ -n "$APP_ENV" ] || { echo "::error::APP_ENV secret missing"; exit 1; }
+          printf '%s\n' "$APP_ENV" > .env
+          chmod 600 .env
+          missing=0
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY VITE_API_BASE_URL; do
+            if ! grep -Eq "^[[:space:]]*(export[[:space:]]+)?${name}=.+" .env; then
+              echo "::error::APP_ENV is missing required variable: $name"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+      - name: Build web assets and sync Capacitor
+        run: npm run android:sync
+
+      - name: Set up signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.SETU_KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.SETU_KEYSTORE_PASS }}
+          KEY_ALIAS: ${{ secrets.SETU_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.SETU_KEY_PASS }}
+        run: |
+          for name in KEYSTORE_B64 KEYSTORE_PASS KEY_ALIAS KEY_PASS; do
+            [ -n "${!name}" ] || { echo "::error::$name secret missing"; exit 1; }
+          done
+          echo "$KEYSTORE_B64" | base64 -d > android/setu-release.jks
+          chmod 600 android/setu-release.jks
+          {
+            echo "storeFile=setu-release.jks"
+            echo "storePassword=$KEYSTORE_PASS"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASS"
+          } > android/keystore.properties
+          chmod 600 android/keystore.properties
+
+      - name: Set up google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON_B64" ]; then
+            echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > android/app/google-services.json
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON_B64 not set; building without google-services.json (push notifications will not work)"
+          fi
+
+      - name: Build release AAB
+        working-directory: android
+        run: |
+          export VERSION_CODE=$((100 + ${{ github.run_number }}))
+          export VERSION_NAME="1.9.${{ github.run_number }}"
+          echo "versionCode=$VERSION_CODE versionName=$VERSION_NAME"
+          chmod +x ./gradlew
+          ./gradlew bundleRelease
+
+      - name: Verify AAB and signer
+        env:
+          EXPECTED_UPLOAD_SHA256: ${{ vars.EXPECTED_UPLOAD_SHA256 }}
+        run: |
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          [ -f "$aab" ] || { echo "::error::AAB not found at $aab"; exit 1; }
+          size=$(stat -c %s "$aab")
+          echo "AAB size: $size bytes"
+          [ "$size" -gt 1048576 ] || { echo "::error::AAB too small ($size bytes)"; exit 1; }
+
+          cert=$(keytool -printcert -jarfile "$aab" || true)
+          sha=$(printf '%s\n' "$cert" | grep -m1 'SHA256:' | sed 's/.*SHA256:[[:space:]]*//')
+          [ -n "$sha" ] || { echo "::error::AAB is not signed (no signer certificate found)"; exit 1; }
+          echo "Signer SHA-256: $sha"
+
+          if [ -n "$EXPECTED_UPLOAD_SHA256" ]; then
+            norm() { printf '%s' "$1" | tr -d ': ' | tr 'a-f' 'A-F'; }
+            if [ "$(norm "$sha")" != "$(norm "$EXPECTED_UPLOAD_SHA256")" ]; then
+              echo "::error::Signer SHA-256 does not match EXPECTED_UPLOAD_SHA256; refusing to upload"
+              exit 1
+            fi
+            echo "Signer matches EXPECTED_UPLOAD_SHA256"
+          else
+            echo "::notice::EXPECTED_UPLOAD_SHA256 not set; skipping signer pinning check"
+          fi
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload to Google Play
+        if: steps.gate.outputs.upload == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PACKAGE_NAME }}
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: production
+          status: ${{ steps.gate.outputs.status }}
+          userFraction: ${{ steps.gate.outputs.fraction }}
+          inAppUpdatePriority: ${{ steps.gate.outputs.priority }}
+
+      - name: Cleanup secrets
+        if: always()
+        run: |
+          rm -f android/setu-release.jks android/keystore.properties .env android/app/google-services.json
